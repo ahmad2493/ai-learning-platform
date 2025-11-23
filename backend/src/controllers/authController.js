@@ -1,0 +1,319 @@
+const bcrypt = require('bcryptjs');
+const crypto = require('crypto');
+const nodemailer = require('nodemailer');
+const User = require('../models/User');
+const { generateToken } = require('../utils/jwt');
+
+// Email configuration
+const transporter = nodemailer.createTransport({
+  service: 'gmail',
+  auth: {
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASS,
+  },
+});
+
+// Generate unique user_id
+const generateUserId = async () => {
+  const count = await User.countDocuments();
+  return `USR${String(count + 1).padStart(6, '0')}`;
+};
+
+// Send password reset email
+const sendResetPasswordEmail = async (email, resetToken) => {
+  const resetURL = `${process.env.FRONTEND_URL}/reset-password/${resetToken}`;
+
+  const mailOptions = {
+    from: process.env.EMAIL_USER,
+    to: email,
+    subject: 'Password Reset - AI Learning Platform',
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2>Password Reset Request</h2>
+        <p>Click the link below to reset your password:</p>
+        <a href="${resetURL}" style="display: inline-block; padding: 10px 20px; background-color: #4F46E5; color: white; text-decoration: none; border-radius: 5px;">
+          Reset Password
+        </a>
+        <p>This link will expire in 1 hour.</p>
+        <p>If you didn't request this, please ignore this email.</p>
+      </div>
+    `,
+  };
+
+  await transporter.sendMail(mailOptions);
+};
+
+// Register new user
+exports.registerUser = async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    // Validate required fields
+    if (!email || !password) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email and password are required',
+      });
+    }
+
+    if (password.length < 8) {
+      return res.status(400).json({
+        success: false,
+        message: 'Password must be at least 8 characters long',
+      });
+    }
+
+    // Check if user exists
+    const existingUser = await User.findOne({ email: email.toLowerCase() });
+    
+    if (existingUser) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email already registered',
+      });
+    }
+
+    // Hash password
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    // Generate user_id
+    const user_id = await generateUserId();
+
+    // Create user with minimal required fields
+    // Other fields can be updated via profile completion later
+    const user = await User.create({
+      user_id,
+      role_id: 'ROLE001', // Default student role
+      role_name: 'Student',
+      first_name: 'User', // Placeholder
+      last_name: user_id, // Placeholder
+      cnic: `TEMP-${user_id}`, // Placeholder - to be updated later
+      email: email.toLowerCase().trim(),
+      contact_no: '0000000000', // Placeholder - to be updated later
+      password: hashedPassword,
+      gender: 'Not Specified', // Placeholder
+      dob: new Date('2000-01-01'), // Placeholder
+      address: 'Not Provided', // Placeholder
+      status: 'Active',
+      profile_photo_url: 'default-avatar.png',
+      created_at: new Date(),
+      updated_at: new Date(),
+    });
+
+    // Generate token
+    const token = generateToken(user);
+
+    res.status(201).json({
+      success: true,
+      message: 'Registration successful. Please complete your profile.',
+      data: {
+        user: {
+          user_id: user.user_id,
+          email: user.email,
+          role_name: user.role_name,
+        },
+        token,
+      },
+    });
+  } catch (error) {
+    console.error('Registration error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Registration failed',
+    });
+  }
+};
+
+// Login user
+exports.loginUser = async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    // Validate fields
+    if (!email || !password) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email and password are required',
+      });
+    }
+
+    // Find user
+    const user = await User.findOne({ email: email.toLowerCase() });
+    if (!user) {
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid credentials',
+      });
+    }
+
+    // Check if account is active
+    if (user.status !== 'Active') {
+      return res.status(403).json({
+        success: false,
+        message: 'Account is not active',
+      });
+    }
+
+    // Check password
+    const isValidPassword = await bcrypt.compare(password, user.password);
+    if (!isValidPassword) {
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid credentials',
+      });
+    }
+
+    // Generate token
+    const token = generateToken(user);
+
+    // Update user
+    user.updated_at = new Date();
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Login successful',
+      data: {
+        user: {
+          user_id: user.user_id,
+          first_name: user.first_name,
+          last_name: user.last_name,
+          email: user.email,
+          role_name: user.role_name,
+          profile_photo_url: user.profile_photo_url,
+        },
+        token,
+      },
+    });
+  } catch (error) {
+    console.error('Login error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Login failed',
+    });
+  }
+};
+
+// Forgot password
+exports.forgotPassword = async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email is required',
+      });
+    }
+
+    // Find user
+    const user = await User.findOne({ email: email.toLowerCase() });
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'No account found with this email',
+      });
+    }
+
+    // Generate reset token
+    const resetToken = crypto.randomBytes(32).toString('hex');
+    
+    // Update user with reset token
+    user.resetPasswordToken = resetToken;
+    user.resetPasswordExpires = Date.now() + 3600000; // 1 hour
+    user.updated_at = new Date();
+    await user.save();
+
+    // Send email
+    await sendResetPasswordEmail(email, resetToken);
+
+    res.status(200).json({
+      success: true,
+      message: 'Password reset email sent',
+    });
+  } catch (error) {
+    console.error('Forgot password error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to send reset email',
+    });
+  }
+};
+
+// Reset password
+exports.resetPassword = async (req, res) => {
+  try {
+    const { token } = req.params;
+    const { password } = req.body;
+
+    if (!password) {
+      return res.status(400).json({
+        success: false,
+        message: 'Password is required',
+      });
+    }
+
+    if (password.length < 8) {
+      return res.status(400).json({
+        success: false,
+        message: 'Password must be at least 8 characters long',
+      });
+    }
+
+    // Find user with valid token
+    const user = await User.findOne({
+      resetPasswordToken: token,
+      resetPasswordExpires: { $gt: Date.now() },
+    });
+
+    if (!user) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid or expired reset token',
+      });
+    }
+
+    // Update password
+    user.password = await bcrypt.hash(password, 10);
+    user.resetPasswordToken = undefined;
+    user.resetPasswordExpires = undefined;
+    user.updated_at = new Date();
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Password reset successful',
+    });
+  } catch (error) {
+    console.error('Reset password error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Password reset failed',
+    });
+  }
+};
+
+// Get current user
+exports.getCurrentUser = async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id).select('-password');
+    
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found',
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: { user },
+    });
+  } catch (error) {
+    console.error('Get user error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch user data',
+    });
+  }
+};
