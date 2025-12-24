@@ -3,7 +3,7 @@ const crypto = require('crypto');
 const nodemailer = require('nodemailer');
 const User = require('../models/User');
 const { generateToken } = require('../utils/jwt');
-const { validateEmail } = require('../utils/validateEmail');
+const { validateEmail } = require('../middleware/validateEmail');
 const generateUserId = require('../utils/generateUserId');
 
 // Email configuration

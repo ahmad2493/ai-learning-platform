@@ -13,7 +13,7 @@ passport.use(
     {
       clientID: process.env.GOOGLE_CLIENT_ID,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-      callbackURL: '/api/auth/google/callback',
+      callbackURL: `${process.env.BASE_URL || 'https://bd8229de9bbf.ngrok-free.app'}/api/auth/google/callback`,
     },
     async (accessToken, refreshToken, profile, done) => {
       try {
@@ -45,8 +45,7 @@ passport.use(
           user_id,
           role_id: 'ROLE001',
           role_name: 'Student',
-          first_name: firstName,
-          last_name: lastName,
+          name: firstName + lastName,
           cnic: `GOOGLE-${googleId}`, // Placeholder for Google users
           email: email.toLowerCase(),
           contact_no: '0000000000', // Placeholder

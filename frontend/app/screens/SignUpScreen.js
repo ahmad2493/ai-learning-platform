@@ -11,6 +11,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../utils/ThemeContext';
 import { BASE_URL } from '../utils/apiConfig';
+import * as WebBrowser from 'expo-web-browser';
 
 export default function SignUpScreen({ navigation }) {
   const { theme } = useTheme();
@@ -30,10 +31,7 @@ const handleSignUp = async () => {
     alert("Passwords do not match");
     return;
   }
-  console.log('=== SIGNUP ATTEMPT ===');
-  console.log('BASE_URL:', BASE_URL);
-  console.log('Full URL:', `${BASE_URL}/register`);
-  console.log('Email:', email);
+
   try {
     const response = await fetch(`${BASE_URL}/register`, {
       method: "POST",
@@ -47,25 +45,16 @@ const handleSignUp = async () => {
       }),
     });
 
-    
-    console.log('Response received:', response.status);
     const data = await response.json();
-    console.log('Response data:', data);
-
-
+    
     if (data.success) {
       alert("Registration successful!");
-      console.log("User data:", data.data);
       // Navigate to SignIn or Settings
       navigation.navigate("SignIn");
     } else {
       alert(data.message || "Registration failed");
     }
   } catch (error) {
-    console.error("SignUp error:", error);
-    console.error("Error type:", error.constructor.name);
-    console.error("Error message:", error.message);
-    console.error("Full error:", error);
     alert("An error occurred. Please try again.");
   }
 };
@@ -75,10 +64,11 @@ const handleSignUp = async () => {
     navigation.navigate('SignIn');
   };
 
-  const handleGoogleSignIn = () => {
-    // Handle Google sign in
-    console.log('Google Sign In');
-  };
+  const handleGoogleSignIn = async () => {
+    const authUrl = `${BASE_URL}/google/signup`;
+    await WebBrowser.openAuthSessionAsync(authUrl);
+};
+
 
   const handleFacebookSignIn = () => {
     // Handle Facebook sign in
