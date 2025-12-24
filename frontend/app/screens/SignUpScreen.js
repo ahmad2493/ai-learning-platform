@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../utils/ThemeContext';
+import { BASE_URL } from '../utils/apiConfig';
 
 export default function SignUpScreen({ navigation }) {
   const { theme } = useTheme();
@@ -19,14 +20,56 @@ export default function SignUpScreen({ navigation }) {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [agreeToTerms, setAgreeToTerms] = useState(false);
 
-  const handleSignUp = () => {
-    // Handle sign up logic here
-    console.log('Sign Up:', { fullName, email, password, confirmPassword });
-    // TODO: Add actual sign up logic here
-    // For testing navigation, navigate to Settings after sign up
-    // Remove this in production and add proper authentication check
-    navigation.navigate("Settings");
-  };
+const handleSignUp = async () => {
+  if (!agreeToTerms) {
+    alert("You must agree to the Terms & Conditions");
+    return;
+  }
+
+  if (password !== confirmPassword) {
+    alert("Passwords do not match");
+    return;
+  }
+  console.log('=== SIGNUP ATTEMPT ===');
+  console.log('BASE_URL:', BASE_URL);
+  console.log('Full URL:', `${BASE_URL}/register`);
+  console.log('Email:', email);
+  try {
+    const response = await fetch(`${BASE_URL}/register`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        email: email,
+        password: password,
+        name: fullName
+      }),
+    });
+
+    
+    console.log('Response received:', response.status);
+    const data = await response.json();
+    console.log('Response data:', data);
+
+
+    if (data.success) {
+      alert("Registration successful!");
+      console.log("User data:", data.data);
+      // Navigate to SignIn or Settings
+      navigation.navigate("SignIn");
+    } else {
+      alert(data.message || "Registration failed");
+    }
+  } catch (error) {
+    console.error("SignUp error:", error);
+    console.error("Error type:", error.constructor.name);
+    console.error("Error message:", error.message);
+    console.error("Full error:", error);
+    alert("An error occurred. Please try again.");
+  }
+};
+
 
   const handleSignIn = () => {
     navigation.navigate('SignIn');

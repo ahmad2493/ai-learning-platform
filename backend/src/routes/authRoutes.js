@@ -14,6 +14,7 @@ router.post('/reset-password/:token', authController.resetPassword);
 // Get current user
 router.get('/me', authenticateToken, authController.getCurrentUser);
 
+
 // Logout
 router.post('/logout', (req, res) => {
   res.json({

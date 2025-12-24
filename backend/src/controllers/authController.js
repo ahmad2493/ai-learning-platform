@@ -3,6 +3,8 @@ const crypto = require('crypto');
 const nodemailer = require('nodemailer');
 const User = require('../models/User');
 const { generateToken } = require('../utils/jwt');
+const { validateEmail } = require('../utils/validateEmail');
+const generateUserId = require('../utils/generateUserId');
 
 // Email configuration
 const transporter = nodemailer.createTransport({
@@ -13,11 +15,6 @@ const transporter = nodemailer.createTransport({
   },
 });
 
-// Generate unique user_id
-const generateUserId = async () => {
-  const count = await User.countDocuments();
-  return `USR${String(count + 1).padStart(6, '0')}`;
-};
 
 // Send password reset email
 const sendResetPasswordEmail = async (email, resetToken) => {
@@ -44,85 +41,111 @@ const sendResetPasswordEmail = async (email, resetToken) => {
 };
 
 // Register new user
+
 exports.registerUser = async (req, res) => {
+
   try {
-    const { email, password } = req.body;
+    let { email, password, name } = req.body;
 
-    // Validate required fields
-    if (!email || !password) {
+    // ================= Normalize Input =================
+    email = email ? email.trim().toLowerCase() : '';
+    name = name ? name.trim() : '';
+
+    // ================= Required Fields =================
+    if (!name) {
       return res.status(400).json({
         success: false,
-        message: 'Email and password are required',
+        message: 'Name is required.',
       });
     }
 
-    if (password.length < 8) {
+    if (!password) {
       return res.status(400).json({
         success: false,
-        message: 'Password must be at least 8 characters long',
+        message: 'Password is required.',
       });
     }
 
-    // Check if user exists
-    const existingUser = await User.findOne({ email: email.toLowerCase() });
-    
+    if (password.length < 5) {
+      return res.status(400).json({
+        success: false,
+        message: 'Password must be at least 5 characters long.',
+      });
+    }
+
+    // ================= Email Validation =================
+    const emailError = validateEmail(email);
+    if (emailError) {
+      return res.status(400).json({
+        success: false,
+        message: emailError,
+      });
+    }
+
+    // ================= Uniqueness Check =================
+    const existingUser = await User.findOne({ email });
     if (existingUser) {
       return res.status(400).json({
         success: false,
-        message: 'Email already registered',
+        message: 'Email already registered.',
       });
     }
 
-    // Hash password
+    // ================= Password Hash =================
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Generate user_id
+    // ================= Generate User ID =================
     const user_id = await generateUserId();
 
-    // Create user with minimal required fields
-    // Other fields can be updated via profile completion later
+    // ================= Create User =================
     const user = await User.create({
       user_id,
-      role_id: 'ROLE001', // Default student role
+      role_id: 'ROLE001',
       role_name: 'Student',
-      first_name: 'User', // Placeholder
-      last_name: user_id, // Placeholder
-      cnic: `TEMP-${user_id}`, // Placeholder - to be updated later
-      email: email.toLowerCase().trim(),
-      contact_no: '0000000000', // Placeholder - to be updated later
+
+      name,
+      email,
       password: hashedPassword,
-      gender: 'Not Specified', // Placeholder
-      dob: new Date('2000-01-01'), // Placeholder
-      address: 'Not Provided', // Placeholder
+
+      // placeholders (profile completion later)
+      cnic: `TEMP-${user_id}`,
+      contact_no: '0000000000',
+      gender: 'Not Specified',
+      dob: new Date('2000-01-01'),
+      address: 'Not Provided',
+
       status: 'Active',
       profile_photo_url: 'default-avatar.png',
       created_at: new Date(),
       updated_at: new Date(),
     });
 
-    // Generate token
+    // ================= Token =================
     const token = generateToken(user);
 
-    res.status(201).json({
+    return res.status(201).json({
       success: true,
       message: 'Registration successful. Please complete your profile.',
       data: {
         user: {
           user_id: user.user_id,
+          name: user.name,
           email: user.email,
           role_name: user.role_name,
         },
         token,
       },
     });
+
   } catch (error) {
     console.error('Registration error:', error);
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
-      message: 'Registration failed',
+      message: 'Server error during registration.',
     });
   }
 };
+
 
 // Login user
 exports.loginUser = async (req, res) => {
