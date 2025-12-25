@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -7,60 +7,132 @@ import {
   TouchableOpacity,
   SafeAreaView,
   ScrollView,
+  Alert,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../utils/ThemeContext";
 import { BASE_URL } from "../utils/apiConfig";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as WebBrowser from "expo-web-browser";
+import * as Linking from "expo-linking";
+
+WebBrowser.maybeCompleteAuthSession();
 
 export default function SignInScreen({ navigation }) {
   const { theme } = useTheme();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
+  // Handle deep link callback from OAuth
+  useEffect(() => {
+    const handleDeepLink = async (event) => {
+      const { path, queryParams } = Linking.parse(event.url);
+      
+      if (path === 'auth/callback' && queryParams?.token) {
+        try {
+          await AsyncStorage.setItem('authToken', queryParams.token);
+          
+          if (queryParams.user_id) {
+            await AsyncStorage.setItem('user_id', queryParams.user_id);
+          }
+          
+          // Fetch full user data
+          const response = await fetch(`${BASE_URL}/auth/me`, {
+            method: 'GET',
+            headers: {
+              'Authorization': `Bearer ${queryParams.token}`,
+              'Content-Type': 'application/json',
+            },
+          });
 
-const handleSignIn = async () => {
-  // only empty check (backend validates email)
-  if (!email || !password) {
-    alert("Email and password are required");
-    return;
-  }
+          const userData = await response.json();
+          
+          if (userData.success && userData.data.user) {
+            const user = userData.data.user;
+            await AsyncStorage.setItem('userName', user.name || `${user.first_name || ''} ${user.last_name || ''}`.trim());
+            await AsyncStorage.setItem('userEmail', user.email);
+          }
+          
+          Alert.alert('Success', 'Login successful!', [
+            {
+              text: 'OK',
+              onPress: () => {
+                navigation.reset({
+                  index: 0,
+                  routes: [{ name: "Settings" }],
+                });
+              }
+            }
+          ]);
+        } catch (error) {
+          console.error('Error handling OAuth callback:', error);
+          Alert.alert('Error', 'Failed to complete login');
+        }
+      }
+    };
 
-  try {
-    const response = await fetch(`${BASE_URL}/login`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        email,
-        password,
-      }),
+    const subscription = Linking.addEventListener('url', handleDeepLink);
+
+    Linking.getInitialURL().then((url) => {
+      if (url) {
+        handleDeepLink({ url });
+      }
     });
 
-    const result = await response.json();
+    return () => {
+      subscription.remove();
+    };
+  }, [navigation]);
 
-    if (!response.ok) {
-      alert(result.message);
+  const handleSignIn = async () => {
+    // only empty check (backend validates email)
+    if (!email || !password) {
+      Alert.alert("Error", "Email and password are required");
       return;
     }
 
-    // SUCCESS
-    const { token, user } = result.data;
+    try {
+      const response = await fetch(`${BASE_URL}/auth/login`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          email,
+          password,
+        }),
+      });
 
-    await AsyncStorage.setItem("token", token);
-    await AsyncStorage.setItem("user", JSON.stringify(user));
+      const result = await response.json();
 
-    navigation.reset({
-      index: 0,
-      routes: [{ name: "Settings" }], // change later if needed
-    });
+      if (!response.ok) {
+        Alert.alert("Error", result.message);
+        return;
+      }
 
-  } catch (error) {
-    console.error("Login error:", error);
-    alert("Server error. Try again.");
-  }
-};
+      // SUCCESS
+      const { token, user } = result.data;
+
+      // Store token with consistent key name
+      await AsyncStorage.setItem("authToken", token);
+
+      // Store individual user fields for easy access
+      if (user) {
+        await AsyncStorage.setItem("user_id", user.user_id);
+        await AsyncStorage.setItem("userName", user.name || `${user.first_name || ''} ${user.last_name || ''}`.trim());
+        await AsyncStorage.setItem("userEmail", user.email);
+      }
+
+      navigation.reset({
+        index: 0,
+        routes: [{ name: "Settings" }],
+      });
+
+    } catch (error) {
+      console.error("Login error:", error);
+      Alert.alert("Error", "Server error. Try again.");
+    }
+  };
 
   const handleSignUp = () => {
     navigation.navigate("SignUp");
@@ -70,9 +142,26 @@ const handleSignIn = async () => {
     navigation.navigate("ForgotPassword");
   };
 
-  const handleGoogleSignIn = () => {
-    // Handle Google sign in
-    console.log("Google Sign In");
+  const handleGoogleSignIn = async () => {
+    try {
+      const authUrl = `${BASE_URL}/auth/google/signin`;
+      
+      console.log('Opening Google OAuth URL:', authUrl);
+      
+      const result = await WebBrowser.openAuthSessionAsync(
+        authUrl,
+        'darsgah://auth/callback'
+      );
+
+      console.log('OAuth result:', result);
+
+      if (result.type === 'cancel') {
+        Alert.alert('Cancelled', 'Google sign-in was cancelled');
+      }
+    } catch (error) {
+      console.error('Google Sign In Error:', error);
+      Alert.alert('Error', 'Failed to sign in with Google');
+    }
   };
 
   const handleFacebookSignIn = () => {

@@ -6,11 +6,14 @@ import {
   TouchableOpacity,
   SafeAreaView,
   ScrollView,
-  Image,
   Animated,
+  ActivityIndicator,
+  Alert,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../utils/ThemeContext";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { BASE_URL } from "../utils/apiConfig";
 
 export default function SettingsScreen({ navigation }) {
   const { theme } = useTheme();
@@ -18,9 +21,97 @@ export default function SettingsScreen({ navigation }) {
   const sidebarAnimation = React.useRef(new Animated.Value(0)).current;
   const sidebarWidth = 90;
 
-  // Sample user data - you can replace this with actual user data
-  const userName = "Brooklyn Simmons";
-  const userEmail = "brooklyn234@gmail.com";
+  // User data state
+  const [userData, setUserData] = useState({
+    name: "",
+    email: "",
+    loading: true,
+  });
+
+  // Fetch user data on component mount
+  useEffect(() => {
+    fetchUserData();
+  }, []);
+
+  const fetchUserData = async () => {
+    try {
+      // Get token from AsyncStorage
+      const token = await AsyncStorage.getItem("authToken");
+      
+      if (!token) {
+        // No token, redirect to login
+        Alert.alert("Session Expired", "Please login again", [
+          { text: "OK", onPress: () => navigation.replace("SignIn") }
+        ]);
+        return;
+      }
+
+      // Fetch user data from backend
+      const response = await fetch(`${BASE_URL}/auth/me`, {
+        method: "GET",
+        headers: {
+          "Authorization": `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      });
+
+      const data = await response.json();
+
+      if (data.success && data.data.user) {
+        const user = data.data.user;
+        const userName = user.name || `${user.first_name || ''} ${user.last_name || ''}`.trim() || "User";
+        const userEmail = user.email || "";
+        
+        setUserData({
+          name: userName,
+          email: userEmail,
+          loading: false,
+        });
+
+        // Store user data locally for quick access
+        await AsyncStorage.setItem("userName", userName);
+        await AsyncStorage.setItem("userEmail", userEmail);
+      } else {
+        // Failed to fetch user data, try loading from cache
+        const cachedName = await AsyncStorage.getItem("userName");
+        const cachedEmail = await AsyncStorage.getItem("userEmail");
+        
+        setUserData({
+          name: cachedName || "User",
+          email: cachedEmail || "",
+          loading: false,
+        });
+      }
+    } catch (error) {
+      console.error("Error fetching user data:", error);
+      
+      // Try to load from local storage as fallback
+      const cachedName = await AsyncStorage.getItem("userName");
+      const cachedEmail = await AsyncStorage.getItem("userEmail");
+      
+      setUserData({
+        name: cachedName || "User",
+        email: cachedEmail || "",
+        loading: false,
+      });
+    }
+  };
+
+  // Get initials from name
+  const getInitials = (name) => {
+    if (!name) return "U";
+    const parts = name.trim().split(" ");
+    if (parts.length === 1) {
+      return parts[0].substring(0, 2).toUpperCase();
+    }
+    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  };
+
+  // Get first name for sidebar
+  const getFirstName = (name) => {
+    if (!name) return "User";
+    return name.split(" ")[0];
+  };
 
   // Close sidebar when navigating to different screens
   useEffect(() => {
@@ -63,22 +154,99 @@ export default function SettingsScreen({ navigation }) {
     navigation.navigate("AboutApp");
   };
 
-  const handleLogout = () => {
-    // Navigate back to SignIn screen (for testing)
-    // In production, this should clear user session/tokens
-    navigation.navigate("SignIn");
+  const handleLogout = async () => {
+    Alert.alert(
+      "Logout",
+      "Are you sure you want to logout?",
+      [
+        {
+          text: "Cancel",
+          style: "cancel",
+        },
+        {
+          text: "Logout",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              // Get token before clearing (in case backend needs it)
+              const token = await AsyncStorage.getItem("authToken");
+              
+              // Optional: Call backend logout endpoint
+              if (token) {
+                try {
+                  await fetch(`${BASE_URL}/auth/logout`, {
+                    method: "POST",
+                    headers: {
+                      "Authorization": `Bearer ${token}`,
+                      "Content-Type": "application/json",
+                    },
+                  });
+                } catch (backendError) {
+                  // Backend logout failed, but continue with local logout
+                  console.warn("Backend logout failed:", backendError);
+                }
+              }
+              
+              // Clear all stored data
+              await AsyncStorage.multiRemove([
+                "authToken",
+                "user_id",
+                "userName",
+                "userEmail",
+              ]);
+              
+              // Double-check: Clear all AsyncStorage (optional, more thorough)
+              // await AsyncStorage.clear();
+              
+              // Navigate to SignIn with reset stack
+              navigation.reset({
+                index: 0,
+                routes: [{ name: "SignIn" }],
+              });
+              
+            } catch (error) {
+              console.error("Error during logout:", error);
+              
+              // Even if there's an error, try to clear storage and navigate
+              try {
+                await AsyncStorage.clear();
+              } catch (clearError) {
+                console.error("Failed to clear storage:", clearError);
+              }
+              
+              navigation.reset({
+                index: 0,
+                routes: [{ name: "SignIn" }],
+              });
+            }
+          },
+        },
+      ]
+    );
   };
 
   const handleSidebarNavigation = (screenName) => {
     closeSidebar();
-    // Handle navigation to different screens via sidebar
     if (screenName === "Settings") {
-      // Already on Settings screen
       return;
     }
-    // Add navigation logic for other screens when they're created
     console.log(`Navigate to ${screenName}`);
   };
+
+  if (userData.loading) {
+    return (
+      <SafeAreaView
+        style={[styles.container, { backgroundColor: theme.background }]}
+      >
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={theme.primary} />
+          <Text style={[styles.loadingText, { color: theme.text }]}>
+            Loading...
+          </Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView
@@ -111,15 +279,17 @@ export default function SettingsScreen({ navigation }) {
                   { backgroundColor: theme.profileBackground },
                 ]}
               >
-                <Text style={styles.profileInitials}>BS</Text>
+                <Text style={styles.profileInitials}>
+                  {getInitials(userData.name)}
+                </Text>
               </View>
             </View>
             <View style={styles.profileInfo}>
               <Text style={[styles.profileName, { color: theme.text }]}>
-                {userName}
+                {userData.name}
               </Text>
               <Text style={[styles.profileEmail, { color: theme.text }]}>
-                {userEmail}
+                {userData.email}
               </Text>
             </View>
             <Ionicons name="grid" size={24} color={theme.primary} />
@@ -181,7 +351,7 @@ export default function SettingsScreen({ navigation }) {
         </ScrollView>
       </View>
 
-      {/* Overlay - closes sidebar when tapped */}
+      {/* Overlay */}
       {sidebarVisible && (
         <TouchableOpacity
           style={styles.overlay}
@@ -209,7 +379,6 @@ export default function SettingsScreen({ navigation }) {
         ]}
       >
         <View style={styles.sidebarIcons}>
-          {/* Dashboard */}
           <TouchableOpacity
             style={styles.sidebarIcon}
             onPress={() => handleSidebarNavigation("Dashboard")}
@@ -217,7 +386,6 @@ export default function SettingsScreen({ navigation }) {
             <Ionicons name="grid-outline" size={24} color="#FFFFFF" />
           </TouchableOpacity>
 
-          {/* AI Assistant */}
           <TouchableOpacity
             style={styles.sidebarIcon}
             onPress={() => handleSidebarNavigation("AIAssistant")}
@@ -225,7 +393,6 @@ export default function SettingsScreen({ navigation }) {
             <Ionicons name="chatbubbles-outline" size={24} color="#FFFFFF" />
           </TouchableOpacity>
 
-          {/* Test Generator */}
           <TouchableOpacity
             style={styles.sidebarIcon}
             onPress={() => handleSidebarNavigation("TestGenerator")}
@@ -233,7 +400,6 @@ export default function SettingsScreen({ navigation }) {
             <Ionicons name="book-outline" size={24} color="#FFFFFF" />
           </TouchableOpacity>
 
-          {/* Study Materials */}
           <TouchableOpacity
             style={styles.sidebarIcon}
             onPress={() => handleSidebarNavigation("StudyMaterials")}
@@ -241,7 +407,6 @@ export default function SettingsScreen({ navigation }) {
             <Ionicons name="layers-outline" size={24} color="#FFFFFF" />
           </TouchableOpacity>
 
-          {/* Progress */}
           <TouchableOpacity
             style={styles.sidebarIcon}
             onPress={() => handleSidebarNavigation("Progress")}
@@ -249,7 +414,6 @@ export default function SettingsScreen({ navigation }) {
             <Ionicons name="bar-chart-outline" size={24} color="#FFFFFF" />
           </TouchableOpacity>
 
-          {/* Settings (Active) */}
           <View style={[styles.sidebarIcon, styles.activeSidebarIcon]}>
             <Ionicons name="settings" size={24} color="#FFFFFF" />
           </View>
@@ -264,10 +428,12 @@ export default function SettingsScreen({ navigation }) {
                 { backgroundColor: theme.profileBackground },
               ]}
             >
-              <Text style={styles.sidebarProfileInitials}>BS</Text>
+              <Text style={styles.sidebarProfileInitials}>
+                {getInitials(userData.name)}
+              </Text>
             </View>
             <Text style={styles.sidebarProfileName}>
-              {userName.split(" ")[0]}
+              {getFirstName(userData.name)}
             </Text>
           </View>
           <TouchableOpacity
@@ -290,6 +456,15 @@ const styles = StyleSheet.create({
   },
   contentWrapper: {
     flex: 1,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  loadingText: {
+    marginTop: 10,
+    fontSize: 16,
   },
   overlay: {
     position: "absolute",
@@ -400,21 +575,6 @@ const styles = StyleSheet.create({
   settingsDescription: {
     fontSize: 14,
     lineHeight: 20,
-  },
-  logoutButton: {
-    borderRadius: 15,
-    padding: 18,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    marginTop: 20,
-    marginBottom: 30,
-  },
-  logoutButtonText: {
-    color: "#FFFFFF",
-    fontSize: 16,
-    fontWeight: "bold",
-    marginLeft: 10,
   },
   sidebar: {
     position: "absolute",

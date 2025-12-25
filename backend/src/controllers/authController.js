@@ -148,6 +148,7 @@ exports.registerUser = async (req, res) => {
 
 
 // Login user
+// Login user
 exports.loginUser = async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -208,8 +209,7 @@ exports.loginUser = async (req, res) => {
       data: {
         user: {
           user_id: user.user_id,
-          first_name: user.first_name,
-          last_name: user.last_name,
+          name: user.name, // ✅ Fixed: use 'name' instead of first_name/last_name
           email: user.email,
           role_name: user.role_name,
           profile_photo_url: user.profile_photo_url,
@@ -227,75 +227,6 @@ exports.loginUser = async (req, res) => {
 };
 
 
-
-// exports.loginUser = async (req, res) => {
-//   try {
-//     const { email, password } = req.body;
-
-//     // Validate fields
-//     if (!email || !password) {
-//       return res.status(400).json({
-//         success: false,
-//         message: 'Email and password are required',
-//       });
-//     }
-
-//     // Find user
-//     const user = await User.findOne({ email: email.toLowerCase() });
-//     if (!user) {
-//       return res.status(401).json({
-//         success: false,
-//         message: 'Invalid credentials',
-//       });
-//     }
-
-//     // Check if account is active
-//     if (user.status !== 'Active') {
-//       return res.status(403).json({
-//         success: false,
-//         message: 'Account is not active',
-//       });
-//     }
-
-//     // Check password
-//     const isValidPassword = await bcrypt.compare(password, user.password);
-//     if (!isValidPassword) {
-//       return res.status(401).json({
-//         success: false,
-//         message: 'Invalid credentials',
-//       });
-//     }
-
-//     // Generate token
-//     const token = generateToken(user);
-
-//     // Update user
-//     user.updated_at = new Date();
-//     await user.save();
-
-//     res.status(200).json({
-//       success: true,
-//       message: 'Login successful',
-//       data: {
-//         user: {
-//           user_id: user.user_id,
-//           first_name: user.first_name,
-//           last_name: user.last_name,
-//           email: user.email,
-//           role_name: user.role_name,
-//           profile_photo_url: user.profile_photo_url,
-//         },
-//         token,
-//       },
-//     });
-//   } catch (error) {
-//     console.error('Login error:', error);
-//     res.status(500).json({
-//       success: false,
-//       message: 'Login failed',
-//     });
-//   }
-// };
 
 // Forgot password
 exports.forgotPassword = async (req, res) => {

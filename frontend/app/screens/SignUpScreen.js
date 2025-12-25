@@ -33,7 +33,7 @@ const handleSignUp = async () => {
   }
 
   try {
-    const response = await fetch(`${BASE_URL}/register`, {
+    const response = await fetch(`${BASE_URL}/auth/register`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -65,7 +65,7 @@ const handleSignUp = async () => {
   };
 
   const handleGoogleSignIn = async () => {
-    const authUrl = `${BASE_URL}/google/signup`;
+    const authUrl = `${BASE_URL}/auth/google/signup`;
     await WebBrowser.openAuthSessionAsync(authUrl);
 };
 
