@@ -10,20 +10,57 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../utils/ThemeContext";
+import { BASE_URL } from "../utils/apiConfig";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 export default function SignInScreen({ navigation }) {
   const { theme } = useTheme();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
-  const handleSignIn = () => {
-    // Handle sign in logic here
-    console.log("Sign In:", { email, password });
-    // TODO: Add actual authentication logic here
-    // For testing navigation, navigate to Settings after sign in
-    // Remove this in production and add proper authentication check
-    navigation.navigate("Settings");
-  };
+
+const handleSignIn = async () => {
+  // only empty check (backend validates email)
+  if (!email || !password) {
+    alert("Email and password are required");
+    return;
+  }
+
+  try {
+    const response = await fetch(`${BASE_URL}/login`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        email,
+        password,
+      }),
+    });
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      alert(result.message);
+      return;
+    }
+
+    // SUCCESS
+    const { token, user } = result.data;
+
+    await AsyncStorage.setItem("token", token);
+    await AsyncStorage.setItem("user", JSON.stringify(user));
+
+    navigation.reset({
+      index: 0,
+      routes: [{ name: "Settings" }], // change later if needed
+    });
+
+  } catch (error) {
+    console.error("Login error:", error);
+    alert("Server error. Try again.");
+  }
+};
 
   const handleSignUp = () => {
     navigation.navigate("SignUp");
