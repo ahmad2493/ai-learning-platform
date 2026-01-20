@@ -49,7 +49,7 @@ export default function ChangePasswordScreen({ navigation }) {
     }
 
     try {
-      const response = await fetch(`${BASE_URL}/api/students/${userId}/change_password`, {
+      const response = await fetch(`${BASE_URL}/students/${userId}/change_password`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',

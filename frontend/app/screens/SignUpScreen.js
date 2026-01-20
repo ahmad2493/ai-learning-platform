@@ -61,7 +61,7 @@ export default function SignUpScreen({ navigation }) {
     }
 
     try {
-      const response = await fetch(`${BASE_URL}/api/auth/register`, {
+      const response = await fetch(`${BASE_URL}/auth/register`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

@@ -57,7 +57,7 @@ export default function SignInScreen({ navigation }) {
           }
 
           // Fetch full user data
-          const response = await fetch(`${BASE_URL}/api/auth/me`, {
+          const response = await fetch(`${BASE_URL}/auth/me`, {
             method: "GET",
             headers: {
               Authorization: `Bearer ${queryParams.token}`,
@@ -103,7 +103,7 @@ export default function SignInScreen({ navigation }) {
     if (!validateFields()) return;
 
     try {
-      const response = await fetch(`${BASE_URL}/api/auth/login`, {
+      const response = await fetch(`${BASE_URL}/auth/login`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -128,7 +128,7 @@ export default function SignInScreen({ navigation }) {
       await AsyncStorage.setItem("authToken", token);
 
       // Fetch full user data
-      const meResponse = await fetch(`${BASE_URL}/api/auth/me`, {
+      const meResponse = await fetch(`${BASE_URL}/auth/me`, {
         method: "GET",
         headers: {
           Authorization: `Bearer ${token}`,
@@ -166,7 +166,7 @@ export default function SignInScreen({ navigation }) {
 
   const handleGoogleSignIn = async () => {
     try {
-      const authUrl = `${BASE_URL}/api/auth/google/signin`;
+      const authUrl = `${BASE_URL}/auth/google/signin`;
 
       console.log("Opening Google OAuth URL:", authUrl);
 
