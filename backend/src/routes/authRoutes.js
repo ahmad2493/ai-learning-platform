@@ -9,11 +9,14 @@ const { generateToken } = require('../utils/jwt');
 router.post('/register', authController.registerUser);
 router.post('/login', authController.loginUser);
 router.post('/forgot-password', authController.forgotPassword);
-router.post('/reset-password/:token', authController.resetPassword);
-router.post('/forgot-password', authController.forgotPassword);
+//router.post('/reset-password/:token', authController.resetPassword);
+//router.post('/forgot-password', authController.forgotPassword);
 router.post('/verify-reset-otp', authController.verifyResetOTP);
 router.post('/reset-password', authController.resetPassword);
+
 router.post('/update-password', authController.updatePassword);
+//router.post('/update-password',authController.updatePassword);
+
 
 // Get current user
 router.get('/me', authenticateToken, authController.getCurrentUser);
@@ -35,7 +38,7 @@ router.get(
     scope: ['profile', 'email'],
     session: false,
   })
-);
+); 
 
 // Google OAuth - Sign Up
 router.get(
