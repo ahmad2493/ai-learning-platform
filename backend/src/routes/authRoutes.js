@@ -4,6 +4,7 @@ const router = express.Router();
 const authController = require('../controllers/authController');
 const { authenticateToken } = require('../middleware/auth');
 const { generateToken } = require('../utils/jwt');
+console.log('authController:', authController);
 
 // Regular authentication routes
 router.post('/register', authController.registerUser);
