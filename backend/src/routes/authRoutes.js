@@ -13,6 +13,7 @@ router.post('/reset-password/:token', authController.resetPassword);
 router.post('/forgot-password', authController.forgotPassword);
 router.post('/verify-reset-otp', authController.verifyResetOTP);
 router.post('/reset-password', authController.resetPassword);
+router.post('/update-password', authController.updatePassword);
 
 // Get current user
 router.get('/me', authenticateToken, authController.getCurrentUser);

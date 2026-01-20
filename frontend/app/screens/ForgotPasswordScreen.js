@@ -1,101 +1,96 @@
-import React, { useState } from 'react';
+import React, { useState } from "react";
 import {
   View,
   Text,
   StyleSheet,
   TextInput,
   TouchableOpacity,
-  SafeAreaView,
-  ScrollView,
-} from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { useTheme } from '../utils/ThemeContext';
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { Ionicons } from "@expo/vector-icons";
+import { useTheme } from "../utils/ThemeContext";
+import CustomAlert from "../components/CustomAlert";
 
 export default function ForgotPasswordScreen({ navigation }) {
   const { theme } = useTheme();
-  const [email, setEmail] = useState('');
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
+  const [email, setEmail] = useState("");
+  const [alertVisible, setAlertVisible] = useState(false);
+  const [alertConfig, setAlertConfig] = useState({
+    title: "",
+    message: "",
+    type: "error",
+  });
+  const [error, setError] = useState(null);
 
-  const handleUpdatePassword = () => {
-    // Handle password update logic here
-    console.log('Update Password:', { email, newPassword, confirmPassword });
+  const showAlert = (title, message, type = "error") => {
+    setAlertConfig({ title, message, type });
+    setAlertVisible(true);
+  };
+
+  const handleSendInstructions = () => {
+    if (!email) {
+      setError("Please enter your email address.");
+      return;
+    }
+    setError(null);
+    
+    // For now, just navigate to the ResetPasswordScreen
+    navigation.navigate('ResetPassword', { email: email });
   };
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        {/* Header Section */}
-        <View style={styles.header}>
-          <View style={styles.iconContainer}>
-            <Ionicons name="mail" size={40} color={theme.accent} />
-            <Ionicons
-              name="lock-closed"
-              size={20}
-              color={theme.accent}
-              style={[styles.lockIcon, { backgroundColor: theme.surface }]}
-            />
-          </View>
-          <Text style={[styles.title, { color: theme.text }]}>Set a New Password</Text>
-        </View>
-
-        {/* White Card Container */}
-        <View style={[styles.card, { backgroundColor: theme.surface }]}>
-          <View style={styles.form}>
-            <TextInput
-              style={[styles.input, { 
-                backgroundColor: theme.inputBackground, 
-                borderColor: theme.inputBorder,
-                color: theme.text 
-              }]}
-              placeholder="Email Address"
-              placeholderTextColor={theme.textSecondary}
-              value={email}
-              onChangeText={setEmail}
-              keyboardType="email-address"
-              autoCapitalize="none"
-            />
-            <TextInput
-              style={[styles.input, { 
-                backgroundColor: theme.inputBackground, 
-                borderColor: theme.inputBorder,
-                color: theme.text 
-              }]}
-              placeholder="New Password"
-              placeholderTextColor={theme.textSecondary}
-              value={newPassword}
-              onChangeText={setNewPassword}
-              secureTextEntry
-            />
-            <TextInput
-              style={[styles.input, { 
-                backgroundColor: theme.inputBackground, 
-                borderColor: theme.inputBorder,
-                color: theme.text 
-              }]}
-              placeholder="Confirm New Password"
-              placeholderTextColor={theme.textSecondary}
-              value={confirmPassword}
-              onChangeText={setConfirmPassword}
-              secureTextEntry
-            />
-
-            {/* Update Password Button */}
-            <TouchableOpacity
-              style={[styles.updateButton, { backgroundColor: theme.accent }]}
-              onPress={handleUpdatePassword}
-              activeOpacity={0.8}
-            >
-              <Text style={styles.updateButtonText}>Update Password</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        {/* Password Requirements */}
-        <Text style={[styles.requirementsText, { color: theme.textSecondary }]}>
-          Must be at least 8 characters, include a number and a symbol
+      <CustomAlert
+        visible={alertVisible}
+        title={alertConfig.title}
+        message={alertConfig.message}
+        type={alertConfig.type}
+        onClose={() => setAlertVisible(false)}
+      />
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => navigation.goBack()}>
+          <Ionicons name="arrow-back-outline" size={28} color={theme.text} />
+        </TouchableOpacity>
+      </View>
+      <View style={styles.content}>
+        <Ionicons name="mail-unread-outline" size={80} color={theme.primary} style={{ marginBottom: 20 }}/>
+        <Text style={[styles.title, { color: theme.text }]}>Forgot Password?</Text>
+        <Text style={[styles.subtitle, { color: theme.textSecondary }]}>
+          Enter the email address associated with your account and we'll send you a link to reset your password.
         </Text>
-      </ScrollView>
+
+        <View style={styles.inputContainer}>
+          <Ionicons name="mail-outline" size={22} color={theme.textSecondary} style={styles.inputIcon}/>
+          <TextInput
+            style={[
+              styles.input,
+              {
+                backgroundColor: theme.surface,
+                borderColor: error ? "red" : theme.inputBorder,
+                color: theme.text,
+              },
+            ]}
+            placeholder="Enter your email"
+            placeholderTextColor={theme.textSecondary}
+            value={email}
+            onChangeText={(text) => {
+              setEmail(text);
+              if (error) setError(null);
+            }}
+            keyboardType="email-address"
+            autoCapitalize="none"
+          />
+        </View>
+        {error && <Text style={styles.errorText}>{error}</Text>}
+
+        <TouchableOpacity
+          style={[styles.sendButton, { backgroundColor: theme.primary }]}
+          onPress={handleSendInstructions}
+          activeOpacity={0.8}
+        >
+          <Text style={styles.sendButtonText}>Send Instructions</Text>
+        </TouchableOpacity>
+      </View>
     </SafeAreaView>
   );
 }
@@ -104,60 +99,62 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  scrollContent: {
-    paddingHorizontal: 20,
-    paddingTop: 40,
-    alignItems: 'center',
-  },
   header: {
-    alignItems: 'center',
-    marginBottom: 30,
+    padding: 15,
   },
-  iconContainer: {
-    position: 'relative',
-    marginBottom: 20,
-  },
-  lockIcon: {
-    position: 'absolute',
-    bottom: -5,
-    right: -5,
-    borderRadius: 10,
-    padding: 2,
+  content: {
+    flex: 1,
+    alignItems: "center",
+    paddingHorizontal: 30,
+    paddingTop: 40,
   },
   title: {
-    fontSize: 24,
-    fontWeight: 'bold',
+    fontSize: 28,
+    fontWeight: "bold",
+    marginBottom: 15,
+    textAlign: 'center',
   },
-  card: {
-    borderRadius: 20,
-    padding: 25,
-    width: '100%',
-    marginBottom: 20,
+  subtitle: {
+    fontSize: 16,
+    textAlign: "center",
+    marginBottom: 40,
   },
-  form: {
+  inputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
     width: '100%',
+  },
+  inputIcon: {
+    position: 'absolute',
+    left: 15,
+    zIndex: 1,
   },
   input: {
-    borderRadius: 10,
-    padding: 15,
-    marginBottom: 15,
+    flex: 1,
+    borderRadius: 12,
+    paddingVertical: 18,
+    paddingHorizontal: 20,
+    paddingLeft: 45,
     fontSize: 16,
     borderWidth: 1,
   },
-  updateButton: {
+  errorText: {
+    color: 'red',
+    alignSelf: 'flex-start',
+    marginLeft: 10,
+    marginTop: 5,
+    marginBottom: 10,
+  },
+  sendButton: {
+    width: '100%',
     borderRadius: 12,
-    paddingVertical: 16,
-    alignItems: 'center',
-    marginTop: 10,
+    paddingVertical: 18,
+    alignItems: "center",
+    marginTop: 20,
   },
-  updateButtonText: {
-    color: '#FFFFFF',
+  sendButtonText: {
+    color: "#FFFFFF",
     fontSize: 18,
-    fontWeight: 'bold',
-  },
-  requirementsText: {
-    fontSize: 14,
-    textAlign: 'center',
-    marginTop: 10,
+    fontWeight: "bold",
   },
 });

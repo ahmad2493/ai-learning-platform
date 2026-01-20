@@ -13,12 +13,6 @@ const app = express();
 // MIDDLEWARE
 // ========================================
 
-// Ngrok Browser Warning Skip - MUST BE FIRST
-app.use((req, res, next) => {
-  res.setHeader('ngrok-skip-browser-warning', 'true');
-  next();
-});
-
 // CORS - Updated to allow mobile app connections
 app.use(cors({
   origin: function(origin, callback) {
@@ -32,10 +26,8 @@ app.use(cors({
       'exp://192.168.100.12:8081'
     ];
     
-    // Check if origin is in allowed list OR starts with your local IP OR contains ngrok
-    if (allowedOrigins.includes(origin) || 
-        origin.startsWith('http://192.168.100') || 
-        origin.includes('ngrok')) {
+    // Check if origin is in allowed list OR starts with your local IP
+    if (allowedOrigins.includes(origin) || origin.startsWith('http://192.168.100') || origin.includes('ngrok')) {
       callback(null, true);
     } else {
       callback(null, true); // In development, allow all
@@ -71,8 +63,8 @@ app.use(passport.session());
 
 mongoose
   .connect(process.env.MONGODB_URI)
-  .then(() => console.log('✓ MongoDB Connected'))
-  .catch((err) => console.error('✗ MongoDB Connection Error:', err));
+  .then(() => console.log('MongoDB Connected'))
+  .catch((err) => console.error('MongoDB Connection Error:', err));
 
 // ========================================
 // ROUTES
@@ -81,10 +73,10 @@ mongoose
 const authRoutes = require('./src/routes/authRoutes');
 app.use('/api/auth', authRoutes);
 
-const adminRoutes = require('./src/routes/AdminRoutes');
+const adminRoutes = require('./src/routes/adminRoutes');
 app.use('/api/admins', adminRoutes);
 
-const studentRoutes = require('./src/routes/StudentRoutes');
+const studentRoutes = require('./src/routes/studentRoutes');
 app.use('/api/students', studentRoutes);
 
 // Health check
@@ -92,20 +84,15 @@ app.get('/', (req, res) => {
   res.json({ 
     success: true, 
     message: 'AI Learning Platform API is running',
-    environment: process.env.NODE_ENV || 'development',
-    googleOAuth: !!(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET),
-    timestamp: new Date().toISOString()
+    googleOAuth: !!(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET)
   });
 });
 
 // 404 Handler
 app.use((req, res) => {
-  console.log(`404 - Route not found: ${req.method} ${req.originalUrl}`);
   res.status(404).json({
     success: false,
     message: 'Route not found',
-    path: req.originalUrl,
-    method: req.method
   });
 });
 
@@ -124,24 +111,8 @@ app.use((err, req, res, next) => {
 
 const PORT = process.env.PORT || 5000;
 
-app.listen(PORT, '0.0.0.0', () => {
-  console.log('\n========================================');
-  console.log('🚀 Server Started Successfully');
-  console.log('========================================');
-  console.log(`📡 Port: ${PORT}`);
-  console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
-  console.log(`🔐 Google OAuth: ${process.env.GOOGLE_CLIENT_ID ? '✓ Enabled' : '✗ Disabled'}`);
-  
-  if (process.env.FRONTEND_URL) {
-    console.log(`🔗 Frontend URL: ${process.env.FRONTEND_URL}`);
-  }
-  
-  console.log('\n📋 Available Routes:');
-  console.log('   GET  /');
-  console.log('   POST /api/auth/register');
-  console.log('   POST /api/auth/login');
-  console.log('   GET  /api/auth/google/signup');
-  console.log('   GET  /api/auth/google/signin');
-  console.log('   GET  /api/auth/google/callback');
-  console.log('========================================\n');
+app.listen(PORT, '0.0.0.0',() => {
+  console.log(`Server running on port ${PORT}`);
+  //console.log(`Frontend URL: ${process.env.FRONTEND_URL}`);
+  console.log(`Google OAuth: ${process.env.GOOGLE_CLIENT_ID ? 'Enabled' : 'Disabled'}`);
 });

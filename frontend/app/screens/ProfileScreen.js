@@ -1,155 +1,157 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
-  SafeAreaView,
   ScrollView,
   Image,
   TextInput,
   Platform,
-  Animated,
+  KeyboardAvoidingView,
+  Alert
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../utils/ThemeContext';
 import Sidebar from './SidebarComponent';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as ImagePicker from 'expo-image-picker';
 
 export default function ProfileScreen({ navigation }) {
   const { theme } = useTheme();
+  const [sidebarVisible, setSidebarVisible] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
-  const [showMenu, setShowMenu] = useState(false);
-
-  // Animation values
-  const scaleValue = useRef(new Animated.Value(1)).current;
-  const offsetValue = useRef(new Animated.Value(0)).current;
-  const rotateValue = useRef(new Animated.Value(0)).current; // For 3D rotation
 
   const [userData, setUserData] = useState({
-    name: 'Brooklyn Simmons',
-    email: 'brooklyn234@gmail.com',
-    bio: 'Aspiring full-stack developer with a passion for creating innovative and user-friendly applications. Currently honing my skills in React Native and Node.js.',
-    location: 'San Francisco, CA',
-    joined: 'January 2023',
+    name: 'User',
+    email: '',
+    bio: '',
+    profilePicture: null,
   });
 
+  // This will only run once to load initial data
+  useEffect(() => {
+    const loadUserData = async () => {
+      try {
+        const name = await AsyncStorage.getItem('userName');
+        const email = await AsyncStorage.getItem('userEmail');
+        const storedData = {};
+        if (name) storedData.name = name;
+        if (email) storedData.email = email;
+        setUserData(prev => ({...prev, ...storedData}));
+      } catch (error) {
+        console.error("Failed to load user data from storage.", error);
+      }
+    };
+    loadUserData();
+  }, []);
+
   const handleInputChange = (field, value) => {
-    setUserData(prev => ({ ...prev, [field]: value }));
+    setUserData(prev => ({...prev, [field]: value}));
+  }
+
+  // This function now only exits edit mode. No saving.
+  const handleSaveChanges = () => {
+    setIsEditing(false);
+  };
+
+  const handlePickImage = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission Denied', 'Sorry, we need camera roll permissions to make this work!');
+      return;
+    }
+
+    let result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaType.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 1,
+    });
+
+    if (!result.canceled) {
+      const uri = result.assets[0].uri;
+      // Update the image in the UI state only
+      setUserData(prev => ({ ...prev, profilePicture: uri }));
+    }
   };
 
   const getInitials = (name) => {
-    const names = name.split(' ');
-    return names.map((n) => n[0]).join('').toUpperCase();
+    if (!name) return '';
+    return name.split(' ').map((n) => n[0]).join('').toUpperCase();
+  }
+
+  const toggleSidebar = () => {
+    setSidebarVisible(!sidebarVisible);
   };
 
-  const toggleMenu = () => {
-    Animated.parallel([
-      Animated.timing(scaleValue, {
-        toValue: showMenu ? 1 : 0.85,
-        duration: 300,
-        useNativeDriver: true,
-      }),
-      Animated.timing(offsetValue, {
-        toValue: showMenu ? 0 : 250,
-        duration: 300,
-        useNativeDriver: true,
-      }),
-      Animated.timing(rotateValue, {
-        toValue: showMenu ? 0 : 1,
-        duration: 300,
-        useNativeDriver: true,
-      }),
-    ]).start();
-    setShowMenu(!showMenu);
+  const handleEditPress = () => {
+    if (isEditing) {
+      handleSaveChanges();
+    } else {
+      setIsEditing(true);
+    }
   };
-  
-  const rotateY = rotateValue.interpolate({
-    inputRange: [0, 1],
-    outputRange: ['0deg', '-15deg'], // 3D rotation effect
-  });
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: theme.primary }]}>
-      <View style={styles.sidebarContainer}>
-        <Sidebar activeScreen="Profile" />
-      </View>
-
-      <Animated.View 
-        style={[
-            styles.screen,
-            { 
-                backgroundColor: theme.background, 
-                transform: [
-                    { scale: scaleValue }, 
-                    { translateX: offsetValue },
-                    { rotateY: rotateY },
-                ]
-            }
-        ]}
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
+      <KeyboardAvoidingView 
+        style={{ flex: 1 }} 
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
       >
-        {showMenu && (
-            <TouchableOpacity style={styles.overlay} onPress={toggleMenu} />
-        )}
-        <View style={[styles.header, { backgroundColor: theme.background }]}>
-          <TouchableOpacity onPress={toggleMenu}>
-            <Ionicons name="menu-outline" size={28} color={theme.text} />
-          </TouchableOpacity>
-          <Text style={[styles.headerTitle, { color: theme.text }]}>Profile</Text>
-          <View style={{ width: 28 }} />{/* For spacing */}
-        </View>
-
-        <ScrollView contentContainerStyle={styles.scrollContent}>
-            <View style={[styles.profileHeader, { backgroundColor: theme.surface }]}>
-                <TouchableOpacity style={styles.avatarContainer} disabled={!isEditing}>
-                  <View style={[styles.avatar, {backgroundColor: theme.primary, justifyContent: 'center', alignItems: 'center'}]}>
-                      {isEditing ? (
-                          <Ionicons name="camera-outline" size={40} color="white" />
-                      ) : (
-                          <Text style={styles.avatarInitials}>{getInitials(userData.name)}</Text>
-                      )}
-                  </View>
+        <View style={styles.contentWrapper}>
+            <View style={[styles.header, { backgroundColor: theme.background }]}>
+                <TouchableOpacity onPress={() => navigation.goBack()}>
+                    <Ionicons name="arrow-back-outline" size={28} color={theme.text} />
                 </TouchableOpacity>
-                {isEditing ? (
-                    <TextInput style={[styles.nameInput, {color: theme.text, borderColor: theme.hairline}]} value={userData.name} onChangeText={text => handleInputChange('name', text)}/>
-                ) : (
-                    <Text style={[styles.name, { color: theme.text }]}>{userData.name}</Text>
-                )}
-                 {isEditing ? (
-                    <TextInput style={[styles.emailInput, {color: theme.text, borderColor: theme.hairline}]} value={userData.email} onChangeText={text => handleInputChange('email', text)}/>
-                ) : (
+                <Text style={[styles.headerTitle, { color: theme.text }]}>Profile</Text>
+                <TouchableOpacity onPress={toggleSidebar}>
+                    <Ionicons name="menu" size={28} color={theme.primary} />
+                </TouchableOpacity>
+            </View>
+
+            <ScrollView contentContainerStyle={styles.scrollContent}>
+                <View style={[styles.profileHeader, { backgroundColor: theme.surface }]}>
+                    <TouchableOpacity style={styles.avatarContainer} disabled={!isEditing} onPress={handlePickImage}>
+                        <View style={[styles.avatar, {backgroundColor: theme.primary, justifyContent: 'center', alignItems: 'center'}]}>
+                            {isEditing ? (
+                                <Ionicons name="camera-outline" size={40} color="white" />
+                            ) : userData.profilePicture ? (
+                                <Image source={{ uri: userData.profilePicture }} style={styles.avatarImage} />
+                            ) : (
+                                <Text style={styles.avatarInitials}>{getInitials(userData.name)}</Text>
+                            )}
+                        </View>
+                    </TouchableOpacity>
+                    {isEditing ? (
+                        <TextInput style={[styles.nameInput, {color: theme.text, borderColor: theme.hairline}]} value={userData.name} onChangeText={text => handleInputChange('name', text)}/>
+                    ) : (
+                        <Text style={[styles.name, { color: theme.text }]}>{userData.name}</Text>
+                    )}
                     <Text style={[styles.email, { color: theme.textSecondary }]}>{userData.email}</Text>
-                )}
-            </View>
-
-            <View style={[styles.card, { backgroundColor: theme.surface }]}>
-                <Text style={[styles.cardTitle, { color: theme.text }]}>About Me</Text>
-                {isEditing ? (
-                    <TextInput multiline style={[styles.bioInput, {color: theme.text, borderColor: theme.hairline}]} value={userData.bio} onChangeText={text => handleInputChange('bio', text)}/>
-                ) : (
-                    <Text style={[styles.bio, { color: theme.textSecondary }]}>{userData.bio}</Text>
-                )}
-            </View>
-
-            <View style={[styles.card, { backgroundColor: theme.surface }]}>
-                <View style={styles.infoRow}>
-                    <Ionicons name="location-outline" size={20} color={theme.textSecondary} />
-                    <Text style={[styles.infoText, { color: theme.text }]}>Lives in {userData.location}</Text>
                 </View>
-                <View style={styles.infoRow}>
-                    <Ionicons name="calendar-outline" size={20} color={theme.textSecondary} />
-                    <Text style={[styles.infoText, { color: theme.text }]}>Joined {userData.joined}</Text>
-                </View>
-            </View>
 
-            <TouchableOpacity 
-                style={[styles.editButton, { backgroundColor: theme.primary }]} 
-                onPress={() => setIsEditing(!isEditing)}
-            >
-                <Ionicons name={isEditing ? "checkmark-done-outline" : "pencil-outline"} size={20} color="white" />
-                <Text style={styles.editButtonText}>{isEditing ? 'Save Changes' : 'Edit Profile'}</Text>
-            </TouchableOpacity>
-        </ScrollView>
-      </Animated.View>
+                <View style={[styles.card, { backgroundColor: theme.surface }]}>
+                    <Text style={[styles.cardTitle, { color: theme.text }]}>About Me</Text>
+                    {isEditing ? (
+                        <TextInput multiline style={[styles.bioInput, {color: theme.text, borderColor: theme.hairline}]} value={userData.bio} onChangeText={text => handleInputChange('bio', text)}/>
+                    ) : (
+                        <Text style={[styles.bio, { color: theme.textSecondary }]}>{userData.bio || 'Tell us about yourself...'}</Text>
+                    )}
+                </View>
+
+                <TouchableOpacity 
+                    style={[styles.editButton, { backgroundColor: theme.primary }]} 
+                    onPress={handleEditPress}
+                >
+                    <Ionicons name={isEditing ? "checkmark-done-outline" : "pencil-outline"} size={20} color="white" />
+                    <Text style={styles.editButtonText}>{isEditing ? 'Save Changes' : 'Edit Profile'}</Text>
+                </TouchableOpacity>
+            </ScrollView>
+        </View>
+      </KeyboardAvoidingView>
+      <Sidebar isVisible={sidebarVisible} onClose={toggleSidebar} activeScreen="Profile" />
     </SafeAreaView>
   );
 }
@@ -158,50 +160,24 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  sidebarContainer: {
-      position: 'absolute',
-      left: 0,
-      top: 0,
-      bottom: 0,
-      width: 250, // Match the animation offset
-      zIndex: 1,
-  },
-  overlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.1)',
-    zIndex: 100, 
-  },
-  screen: {
-    flex: 1,
-    borderRadius: 30,
-    overflow: 'hidden',
-    paddingTop: Platform.OS === 'android' ? 25 : 0,
-    position: 'absolute',
-    top: 0,
-    bottom: 0,
-    left: 0,
-    right: 0,
-    zIndex: 20,
-  },
+  contentWrapper: { flex: 1 },
   header: {
-     flexDirection: "row",
-     justifyContent: "space-between",
-     alignItems: "center",
-     paddingVertical: 10,
-     paddingHorizontal: 20,
-     borderBottomWidth: 1,
-     borderBottomColor: '#E0E0E0',
-   },
-   headerTitle: {
-     fontSize: 22,
-     fontWeight: "bold",
-   },
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E0E0E0',
+  },
+  headerTitle: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    flex: 1,
+    textAlign: 'center'
+  },
   scrollContent: {
     padding: 20,
+    paddingBottom: 50, 
   },
   profileHeader: {
     alignItems: 'center',
@@ -217,19 +193,19 @@ const styles = StyleSheet.create({
     height: 120,
     borderRadius: 60,
     marginBottom: 15,
+    overflow: 'hidden',
+    justifyContent: 'center',
+    alignItems: 'center'
+  },
+  avatarImage: {
+    width: '100%',
+    height: '100%',
   },
   avatarInitials: {
       fontSize: 48,
       fontWeight: 'bold',
-      color: 'white'
-  },
-  cameraIcon: {
-      position: 'absolute',
-      bottom: 15,
-      right: 5,
-      backgroundColor: 'rgba(0,0,0,0.6)',
-      padding: 8,
-      borderRadius: 15,
+      color: 'white',
+      textAlign: 'center',
   },
   name: {
     fontSize: 26,
@@ -242,14 +218,6 @@ const styles = StyleSheet.create({
    nameInput: {
     fontSize: 26,
     fontWeight: 'bold',
-    borderBottomWidth: 1,
-    textAlign: 'center',
-    padding: 5,
-    width: '80%'
-  },
-  emailInput: {
-    fontSize: 16,
-    marginTop: 4,
     borderBottomWidth: 1,
     textAlign: 'center',
     padding: 5,
@@ -276,15 +244,7 @@ const styles = StyleSheet.create({
       borderRadius: 5,
       padding: 10,
       minHeight: 100,
-  },
-  infoRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginVertical: 8,
-  },
-  infoText: {
-    fontSize: 16,
-    marginLeft: 15,
+      textAlignVertical: 'top',
   },
   editButton: {
     flexDirection: 'row',

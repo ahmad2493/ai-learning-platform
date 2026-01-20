@@ -3,11 +3,13 @@ const crypto = require('crypto');
 const nodemailer = require('nodemailer');
 const User = require('../models/User');
 const { generateToken } = require('../utils/jwt');
-const { validateEmail } = require('../middleware/validateEmail');
+const { validateEmail } = require('../utils/validateEmail');
 const generateUserId = require('../utils/generateUserId');
+// -- changes i did or added
 const { createOTP, verifyOTP } = require('../utils/otpHelper');
 const { sendOTPEmail } = require('../utils/emailService');
 
+// --
 // Email configuration
 const transporter = nodemailer.createTransport({
   service: 'gmail',
@@ -149,7 +151,7 @@ exports.registerUser = async (req, res) => {
 };
 
 
-// Login user
+
 // Login user
 exports.loginUser = async (req, res) => {
   try {
@@ -162,8 +164,8 @@ exports.loginUser = async (req, res) => {
         message: 'Email and password are required',
       });
     }
-
-    // ✅ Email format validation (USING EXISTING MIDDLEWARE)
+  // -- implemented on my side..
+    //  Email format validation (USING EXISTING MIDDLEWARE)
     const emailError = validateEmail(email);
     if (emailError) {
       return res.status(400).json({
@@ -211,7 +213,10 @@ exports.loginUser = async (req, res) => {
       data: {
         user: {
           user_id: user.user_id,
-          name: user.name, // ✅ Fixed: use 'name' instead of first_name/last_name
+          //implemented on my side
+          //name: user.name, // ✅ Fixed: use 'name' instead of first_name/last_name
+          first_name: user.first_name,
+          last_name: user.last_name,
           email: user.email,
           role_name: user.role_name,
           profile_photo_url: user.profile_photo_url,
@@ -329,6 +334,38 @@ exports.resetPassword = async (req, res) => {
   }
 };
 
+exports.updatePassword = async (req, res) => {
+    const { email, password } = req.body;
+
+    if (!email || !password) {
+        return res.status(400).json({ success: false, message: 'Email and password are required.' });
+    }
+
+    if (password.length < 5) {
+      return res.status(400).json({
+        success: false,
+        message: 'Password must be at least 5 characters long.',
+      });
+    }
+
+    try {
+        const user = await User.findOne({ email: email.toLowerCase() });
+
+        if (!user) {
+            return res.status(404).json({ success: false, message: "User not found." });
+        }
+
+        const hashedPassword = await bcrypt.hash(password, 10);
+        user.password = hashedPassword;
+        user.updated_at = new Date();
+        await user.save();
+
+        res.status(200).json({ success: true, message: "Password updated successfully." });
+    } catch (error) {
+        console.error("Update password error:", error);
+        res.status(500).json({ success: false, message: "An internal error occurred." });
+    }
+};
 // Get current user
 exports.getCurrentUser = async (req, res) => {
   try {
@@ -354,91 +391,7 @@ exports.getCurrentUser = async (req, res) => {
   }
 };
 
-// OTP
-
-// Request Password Reset (Step 1: Send OTP)
-exports.forgotPassword = async (req, res) => {
-    try {
-        const { email } = req.body;
-
-        // Validate email
-        if (!email) {
-            return res.status(400).json({
-                success: false,
-                message: 'Email is required'
-            });
-        }
-
-        // Check if user exists
-        const user = await User.findOne({ email: email });
-        
-        if (!user) {
-            return res.status(404).json({
-                success: false,
-                message: 'No account found with this email address'
-            });
-        }
-
-        // Generate and save OTP
-        const otp = await createOTP(user._id, email, 'PASSWORD_RESET');
-
-        // Send OTP via email
-        await sendOTPEmail(email, otp, 'PASSWORD_RESET');
-
-        res.status(200).json({
-            success: true,
-            message: 'OTP sent to your email address. Valid for 60 seconds.',
-            email: email
-        });
-
-    } catch (error) {
-        console.error('Forgot password error:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Error processing request',
-            error: error.message
-        });
-    }
-};
-
-// Verify OTP (Step 2: Verify the OTP)
-exports.verifyResetOTP = async (req, res) => {
-    try {
-        const { email, otp } = req.body;
-
-        // Validate inputs
-        if (!email || !otp) {
-            return res.status(400).json({
-                success: false,
-                message: 'Email and OTP are required'
-            });
-        }
-
-        // Verify OTP
-        const verification = await verifyOTP(email, otp, 'PASSWORD_RESET');
-
-        if (!verification.success) {
-            return res.status(400).json({
-                success: false,
-                message: verification.message
-            });
-        }
-
-        res.status(200).json({
-            success: true,
-            message: 'OTP verified successfully. You can now reset your password.',
-            userId: verification.userId
-        });
-
-    } catch (error) {
-        console.error('OTP verification error:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Error verifying OTP',
-            error: error.message
-        });
-    }
-};
+// -- all what i added more
 
 // Reset Password (Step 3: Set new password)
 exports.resetPassword = async (req, res) => {
@@ -511,3 +464,4 @@ exports.resetPassword = async (req, res) => {
         });
     }
 };
+// --

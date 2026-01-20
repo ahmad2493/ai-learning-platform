@@ -5,16 +5,16 @@ import {
   StyleSheet,
   TextInput,
   TouchableOpacity,
-  SafeAreaView,
   ScrollView,
-  Alert,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../utils/ThemeContext";
 import { BASE_URL } from "../utils/apiConfig";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as WebBrowser from "expo-web-browser";
 import * as Linking from "expo-linking";
+import CustomAlert from "../components/CustomAlert";
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -22,56 +22,71 @@ export default function SignInScreen({ navigation }) {
   const { theme } = useTheme();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [errors, setErrors] = useState({});
+  const [alertVisible, setAlertVisible] = useState(false);
+  const [alertConfig, setAlertConfig] = useState({
+    title: "",
+    message: "",
+    type: "error",
+  });
+
+  const showAlert = (title, message, type = "error") => {
+    setAlertConfig({ title, message, type });
+    setAlertVisible(true);
+  };
+
+  const validateFields = () => {
+    const newErrors = {};
+    if (!email) newErrors.email = true;
+    if (!password) newErrors.password = true;
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
 
   // Handle deep link callback from OAuth
   useEffect(() => {
     const handleDeepLink = async (event) => {
       const { path, queryParams } = Linking.parse(event.url);
-      
-      if (path === 'auth/callback' && queryParams?.token) {
+
+      if (path === "auth/callback" && queryParams?.token) {
         try {
-          await AsyncStorage.setItem('authToken', queryParams.token);
-          
+          await AsyncStorage.setItem("authToken", queryParams.token);
+
           if (queryParams.user_id) {
-            await AsyncStorage.setItem('user_id', queryParams.user_id);
+            await AsyncStorage.setItem("user_id", queryParams.user_id);
           }
-          
+
           // Fetch full user data
-          const response = await fetch(`${BASE_URL}/auth/me`, {
-            method: 'GET',
+          const response = await fetch(`${BASE_URL}/api/auth/me`, {
+            method: "GET",
             headers: {
-              'Authorization': `Bearer ${queryParams.token}`,
-              'Content-Type': 'application/json',
+              Authorization: `Bearer ${queryParams.token}`,
+              "Content-Type": "application/json",
             },
           });
 
           const userData = await response.json();
-          
+
           if (userData.success && userData.data.user) {
             const user = userData.data.user;
-            await AsyncStorage.setItem('userName', user.name || `${user.first_name || ''} ${user.last_name || ''}`.trim());
-            await AsyncStorage.setItem('userEmail', user.email);
+            await AsyncStorage.setItem(
+              "userName",
+              user.name ||
+                `${user.first_name || ""} ${user.last_name || ""}`.trim(),
+            );
+            await AsyncStorage.setItem("userEmail", user.email);
+            showAlert("Success", "Login successful!", "success");
+          } else {
+            showAlert("Error", "Failed to fetch user data");
           }
-          
-          Alert.alert('Success', 'Login successful!', [
-            {
-              text: 'OK',
-              onPress: () => {
-                navigation.reset({
-                  index: 0,
-                  routes: [{ name: "Settings" }],
-                });
-              }
-            }
-          ]);
         } catch (error) {
-          console.error('Error handling OAuth callback:', error);
-          Alert.alert('Error', 'Failed to complete login');
+          console.error("Error handling OAuth callback:", error);
+          showAlert("Error", "Failed to complete login");
         }
       }
     };
 
-    const subscription = Linking.addEventListener('url', handleDeepLink);
+    const subscription = Linking.addEventListener("url", handleDeepLink);
 
     Linking.getInitialURL().then((url) => {
       if (url) {
@@ -85,14 +100,10 @@ export default function SignInScreen({ navigation }) {
   }, [navigation]);
 
   const handleSignIn = async () => {
-    // only empty check (backend validates email)
-    if (!email || !password) {
-      Alert.alert("Error", "Email and password are required");
-      return;
-    }
+    if (!validateFields()) return;
 
     try {
-      const response = await fetch(`${BASE_URL}/auth/login`, {
+      const response = await fetch(`${BASE_URL}/api/auth/login`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -106,31 +117,42 @@ export default function SignInScreen({ navigation }) {
       const result = await response.json();
 
       if (!response.ok) {
-        Alert.alert("Error", result.message);
+        showAlert("Error", result.message);
         return;
       }
 
       // SUCCESS
-      const { token, user } = result.data;
+      const { token } = result.data;
 
       // Store token with consistent key name
       await AsyncStorage.setItem("authToken", token);
 
-      // Store individual user fields for easy access
-      if (user) {
+      // Fetch full user data
+      const meResponse = await fetch(`${BASE_URL}/api/auth/me`, {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      });
+
+      const meData = await meResponse.json();
+
+      if (meData.success && meData.data.user) {
+        const user = meData.data.user;
         await AsyncStorage.setItem("user_id", user.user_id);
-        await AsyncStorage.setItem("userName", user.name || `${user.first_name || ''} ${user.last_name || ''}`.trim());
+        await AsyncStorage.setItem(
+          "userName",
+          user.name ||
+            `${user.first_name || ""} ${user.last_name || ""}`.trim(),
+        );
         await AsyncStorage.setItem("userEmail", user.email);
       }
 
-      navigation.reset({
-        index: 0,
-        routes: [{ name: "Settings" }],
-      });
-
+      showAlert("Success", "Login successful!", "success");
     } catch (error) {
       console.error("Login error:", error);
-      Alert.alert("Error", "Server error. Try again.");
+      showAlert("Error", "Server error. Try again.");
     }
   };
 
@@ -144,23 +166,23 @@ export default function SignInScreen({ navigation }) {
 
   const handleGoogleSignIn = async () => {
     try {
-      const authUrl = `${BASE_URL}/auth/google/signin`;
-      
-      console.log('Opening Google OAuth URL:', authUrl);
-      
+      const authUrl = `${BASE_URL}/api/auth/google/signin`;
+
+      console.log("Opening Google OAuth URL:", authUrl);
+
       const result = await WebBrowser.openAuthSessionAsync(
         authUrl,
-        'darsgah://auth/callback'
+        "darsgah://auth/callback",
       );
 
-      console.log('OAuth result:', result);
+      console.log("OAuth result:", result);
 
-      if (result.type === 'cancel') {
-        Alert.alert('Cancelled', 'Google sign-in was cancelled');
+      if (result.type === "cancel") {
+        showAlert("Cancelled", "Google sign-in was cancelled");
       }
     } catch (error) {
-      console.error('Google Sign In Error:', error);
-      Alert.alert('Error', 'Failed to sign in with Google');
+      console.error("Google Sign In Error:", error);
+      showAlert("Error", "Failed to sign in with Google");
     }
   };
 
@@ -173,6 +195,18 @@ export default function SignInScreen({ navigation }) {
     <SafeAreaView
       style={[styles.container, { backgroundColor: theme.background }]}
     >
+      <CustomAlert
+        visible={alertVisible}
+        title={alertConfig.title}
+        message={alertConfig.message}
+        type={alertConfig.type}
+        onClose={() => {
+          setAlertVisible(false);
+          if (alertConfig.type === "success") {
+            navigation.navigate("StudentDashboard");
+          }
+        }}
+      />
       <ScrollView contentContainerStyle={styles.scrollContent}>
         {/* Header Section */}
         <View style={styles.header}>
@@ -220,14 +254,18 @@ export default function SignInScreen({ navigation }) {
                 styles.input,
                 {
                   backgroundColor: theme.inputBackground,
-                  borderColor: theme.inputBorder,
+                  borderColor: errors.email ? "red" : theme.inputBorder,
                   color: theme.text,
                 },
               ]}
               placeholder="Email Address"
               placeholderTextColor={theme.textSecondary}
               value={email}
-              onChangeText={setEmail}
+              onChangeText={(text) => {
+                setEmail(text);
+                if (errors.email)
+                  setErrors((prev) => ({ ...prev, email: false }));
+              }}
               keyboardType="email-address"
               autoCapitalize="none"
             />
@@ -236,14 +274,18 @@ export default function SignInScreen({ navigation }) {
                 styles.input,
                 {
                   backgroundColor: theme.inputBackground,
-                  borderColor: theme.inputBorder,
+                  borderColor: errors.password ? "red" : theme.inputBorder,
                   color: theme.text,
                 },
               ]}
               placeholder="Password"
               placeholderTextColor={theme.textSecondary}
               value={password}
-              onChangeText={setPassword}
+              onChangeText={(text) => {
+                setPassword(text);
+                if (errors.password)
+                  setErrors((prev) => ({ ...prev, password: false }));
+              }}
               secureTextEntry
             />
 

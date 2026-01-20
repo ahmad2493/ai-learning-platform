@@ -1,153 +1,259 @@
-import React, { useState } from 'react';
+import React, { useState } from "react";
 import {
   View,
   Text,
   StyleSheet,
   TextInput,
   TouchableOpacity,
-  SafeAreaView,
   ScrollView,
-} from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { useTheme } from '../utils/ThemeContext';
-import { BASE_URL } from '../utils/apiConfig';
-import * as WebBrowser from 'expo-web-browser';
+  Modal,
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { Ionicons } from "@expo/vector-icons";
+import { useTheme } from "../utils/ThemeContext";
+import { BASE_URL } from "../utils/apiConfig";
+import CustomAlert from "../components/CustomAlert";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { termsAndConditionsText } from "../constants/legalText";
 
 export default function SignUpScreen({ navigation }) {
   const { theme } = useTheme();
-  const [fullName, setFullName] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
+  const [fullName, setFullName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [agreeToTerms, setAgreeToTerms] = useState(false);
+  const [alertVisible, setAlertVisible] = useState(false);
+  const [alertConfig, setAlertConfig] = useState({
+    title: "",
+    message: "",
+    type: "error",
+  });
+  const [errors, setErrors] = useState({});
+  const [isModalVisible, setModalVisible] = useState(false);
 
-const handleSignUp = async () => {
-  if (!agreeToTerms) {
-    alert("You must agree to the Terms & Conditions");
-    return;
-  }
-
-  if (password !== confirmPassword) {
-    alert("Passwords do not match");
-    return;
-  }
-
-  try {
-    const response = await fetch(`${BASE_URL}/auth/register`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        email: email,
-        password: password,
-        name: fullName
-      }),
-    });
-
-    const data = await response.json();
-    
-    if (data.success) {
-      alert("Registration successful!");
-      // Navigate to SignIn or Settings
-      navigation.navigate("SignIn");
-    } else {
-      alert(data.message || "Registration failed");
-    }
-  } catch (error) {
-    alert("An error occurred. Please try again.");
-  }
-};
-
-
-  const handleSignIn = () => {
-    navigation.navigate('SignIn');
+  const showAlert = (title, message, type = "error") => {
+    setAlertConfig({ title, message, type });
+    setAlertVisible(true);
   };
 
-  const handleGoogleSignIn = async () => {
-    const authUrl = `${BASE_URL}/auth/google/signup`;
-    await WebBrowser.openAuthSessionAsync(authUrl);
-};
+  const validateFields = () => {
+    const newErrors = {};
+    if (!fullName) newErrors.fullName = true;
+    if (!email) newErrors.email = true;
+    if (!password) newErrors.password = true;
+    if (!confirmPassword) newErrors.confirmPassword = true;
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
 
+  const handleSignUp = async () => {
+    if (!validateFields()) return;
+
+    if (!agreeToTerms) {
+      showAlert("Error", "You must agree to the Terms & Conditions");
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      showAlert("Error", "Passwords do not match");
+      return;
+    }
+
+    try {
+      const response = await fetch(`${BASE_URL}/api/auth/register`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          email: email,
+          password: password,
+          name: fullName,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        const { token, user } = data.data;
+        await AsyncStorage.setItem("authToken", token);
+        if (user) {
+          await AsyncStorage.setItem("user_id", user.user_id);
+          await AsyncStorage.setItem(
+            "userName",
+            user.name ||
+              `${user.first_name || ""} ${user.last_name || ""}`.trim()
+          );
+          await AsyncStorage.setItem("userEmail", user.email);
+        }
+        showAlert("Success", "Registration successful!", "success");
+      } else {
+        showAlert("Registration failed", data.message || "Please try again.");
+      }
+    } catch (error) {
+      console.error("SignUp error:", error);
+      showAlert("Error", "An error occurred. Please try again.");
+    }
+  };
+
+  const handleSignIn = () => {
+    navigation.navigate("SignIn");
+  };
+
+  const handleGoogleSignIn = () => {
+    // Handle Google sign in
+    console.log("Google Sign In");
+  };
 
   const handleFacebookSignIn = () => {
     // Handle Facebook sign in
-    console.log('Facebook Sign In');
+    console.log("Facebook Sign In");
+  };
+
+  const closeModal = () => {
+    setModalVisible(false);
+  };
+  
+  const handleAcceptAndClose = () => {
+    setAgreeToTerms(true);
+    closeModal();
   };
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
+    <SafeAreaView
+      style={[styles.container, { backgroundColor: theme.background }]}
+    >
+      <CustomAlert
+        visible={alertVisible}
+        title={alertConfig.title}
+        message={alertConfig.message}
+        type={alertConfig.type}
+        onClose={() => {
+          setAlertVisible(false);
+          if (alertConfig.type === "success") {
+            navigation.navigate("OtpVerification", { email: email });
+          }
+        }}
+      />
       <ScrollView contentContainerStyle={styles.scrollContent}>
         {/* Header Section */}
         <View style={styles.header}>
           <Ionicons name="book" size={50} color={theme.primary} />
-          <Text style={[styles.title, { color: theme.text }]}>Join DarsGah</Text>
-          <Text style={[styles.subtitle, { color: theme.textSecondary }]}>Learn smarter, achieve more.</Text>
+          <Text style={[styles.title, { color: theme.text }]}>
+            Join DarsGah
+          </Text>
+          <Text style={[styles.subtitle, { color: theme.textSecondary }]}>
+            Learn smarter, achieve more.
+          </Text>
         </View>
 
         {/* White Card Container */}
         <View style={[styles.card, { backgroundColor: theme.surface }]}>
           {/* Tabs */}
-          <View style={[styles.tabsContainer, { backgroundColor: theme.inputBackground }]}>
-            <TouchableOpacity style={[styles.tab, styles.activeTab, { backgroundColor: theme.primary }]}>
+          <View
+            style={[
+              styles.tabsContainer,
+              { backgroundColor: theme.inputBackground },
+            ]}
+          >
+            <TouchableOpacity
+              style={[
+                styles.tab,
+                styles.activeTab,
+                { backgroundColor: theme.primary },
+              ]}
+            >
               <Text style={styles.activeTabText}>Sign Up</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.tab, styles.inactiveTab]}
               onPress={handleSignIn}
             >
-              <Text style={[styles.inactiveTabText, { color: theme.primary }]}>Sign In</Text>
+              <Text style={[styles.inactiveTabText, { color: theme.primary }]}>
+                Sign In
+              </Text>
             </TouchableOpacity>
           </View>
 
           {/* Form Fields */}
           <View style={styles.form}>
             <TextInput
-              style={[styles.input, { 
-                backgroundColor: theme.inputBackground, 
-                borderColor: theme.inputBorder,
-                color: theme.text 
-              }]}
+              style={[
+                styles.input,
+                {
+                  backgroundColor: theme.inputBackground,
+                  borderColor: errors.fullName ? "red" : theme.inputBorder,
+                  color: theme.text,
+                },
+              ]}
               placeholder="Full Name"
               placeholderTextColor={theme.textSecondary}
               value={fullName}
-              onChangeText={setFullName}
+              onChangeText={(text) => {
+                setFullName(text);
+                if (errors.fullName)
+                  setErrors((prev) => ({ ...prev, fullName: false }));
+              }}
             />
             <TextInput
-              style={[styles.input, { 
-                backgroundColor: theme.inputBackground, 
-                borderColor: theme.inputBorder,
-                color: theme.text 
-              }]}
+              style={[
+                styles.input,
+                {
+                  backgroundColor: theme.inputBackground,
+                  borderColor: errors.email ? "red" : theme.inputBorder,
+                  color: theme.text,
+                },
+              ]}
               placeholder="Email Address"
               placeholderTextColor={theme.textSecondary}
               value={email}
-              onChangeText={setEmail}
+              onChangeText={(text) => {
+                setEmail(text);
+                if (errors.email)
+                  setErrors((prev) => ({ ...prev, email: false }));
+              }}
               keyboardType="email-address"
               autoCapitalize="none"
             />
             <TextInput
-              style={[styles.input, { 
-                backgroundColor: theme.inputBackground, 
-                borderColor: theme.inputBorder,
-                color: theme.text 
-              }]}
+              style={[
+                styles.input,
+                {
+                  backgroundColor: theme.inputBackground,
+                  borderColor: errors.password ? "red" : theme.inputBorder,
+                  color: theme.text,
+                },
+              ]}
               placeholder="Password"
               placeholderTextColor={theme.textSecondary}
               value={password}
-              onChangeText={setPassword}
+              onChangeText={(text) => {
+                setPassword(text);
+                if (errors.password)
+                  setErrors((prev) => ({ ...prev, password: false }));
+              }}
               secureTextEntry
             />
             <TextInput
-              style={[styles.input, { 
-                backgroundColor: theme.inputBackground, 
-                borderColor: theme.inputBorder,
-                color: theme.text 
-              }]}
+              style={[
+                styles.input,
+                {
+                  backgroundColor: theme.inputBackground,
+                  borderColor: errors.confirmPassword
+                    ? "red"
+                    : theme.inputBorder,
+                  color: theme.text,
+                },
+              ]}
               placeholder="Confirm Password"
               placeholderTextColor={theme.textSecondary}
               value={confirmPassword}
-              onChangeText={setConfirmPassword}
+              onChangeText={(text) => {
+                setConfirmPassword(text);
+                if (errors.confirmPassword)
+                  setErrors((prev) => ({ ...prev, confirmPassword: false }));
+              }}
               secureTextEntry
             />
 
@@ -160,20 +266,28 @@ const handleSignUp = async () => {
                 {agreeToTerms ? (
                   <Ionicons name="checkbox" size={20} color={theme.primary} />
                 ) : (
-                  <Ionicons name="square-outline" size={20} color={theme.textSecondary} />
+                  <Ionicons
+                    name="square-outline"
+                    size={20}
+                    color={theme.textSecondary}
+                  />
                 )}
               </TouchableOpacity>
-              <Text style={[styles.termsText, { color: theme.textSecondary }]}>
-                I agree the{' '}
-                <Text style={[styles.termsLink, { color: theme.primaryLight }]}>Terms & Conditions</Text>
-              </Text>
+              <TouchableOpacity onPress={() => setModalVisible(true)}>
+                <Text style={[styles.termsText, { color: theme.textSecondary }]}>
+                  I agree the{" "}
+                  <Text style={[styles.termsLink, { color: theme.primaryLight }]}>
+                    Terms & Conditions
+                  </Text>
+                </Text>
+              </TouchableOpacity>
             </View>
 
             {/* Create Account Button */}
             <TouchableOpacity
               style={[
                 styles.createAccountButton,
-                { backgroundColor: agreeToTerms ? theme.primary : '#CCCCCC' },
+                { backgroundColor: agreeToTerms ? theme.primary : "#CCCCCC" },
               ]}
               onPress={handleSignUp}
               activeOpacity={0.8}
@@ -184,38 +298,85 @@ const handleSignUp = async () => {
 
             {/* OR Separator */}
             <View style={styles.separator}>
-              <View style={[styles.separatorLine, { backgroundColor: theme.inputBorder }]} />
-              <Text style={[styles.separatorText, { color: theme.textSecondary }]}>OR</Text>
-              <View style={[styles.separatorLine, { backgroundColor: theme.inputBorder }]} />
+              <View
+                style={[
+                  styles.separatorLine,
+                  { backgroundColor: theme.inputBorder },
+                ]}
+              />
+              <Text
+                style={[styles.separatorText, { color: theme.textSecondary }]}
+              >
+                OR
+              </Text>
+              <View
+                style={[
+                  styles.separatorLine,
+                  { backgroundColor: theme.inputBorder },
+                ]}
+              />
             </View>
 
             {/* Social Login Buttons */}
             <TouchableOpacity
-              style={[styles.socialButton, { 
-                backgroundColor: theme.surface, 
-                borderColor: theme.inputBorder 
-              }]}
+              style={[
+                styles.socialButton,
+                {
+                  backgroundColor: theme.surface,
+                  borderColor: theme.inputBorder,
+                },
+              ]}
               onPress={handleGoogleSignIn}
               activeOpacity={0.8}
             >
               <Ionicons name="logo-google" size={24} color="#4285F4" />
-              <Text style={[styles.socialButtonText, { color: theme.text }]}>Continue with Google</Text>
+              <Text style={[styles.socialButtonText, { color: theme.text }]}>
+                Continue with Google
+              </Text>
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={[styles.socialButton, { 
-                backgroundColor: theme.surface, 
-                borderColor: theme.inputBorder 
-              }]}
+              style={[
+                styles.socialButton,
+                {
+                  backgroundColor: theme.surface,
+                  borderColor: theme.inputBorder,
+                },
+              ]}
               onPress={handleFacebookSignIn}
               activeOpacity={0.8}
             >
               <Ionicons name="logo-facebook" size={24} color="#1877F2" />
-              <Text style={[styles.socialButtonText, { color: theme.text }]}>Continue with Facebook</Text>
+              <Text style={[styles.socialButtonText, { color: theme.text }]}>
+                Continue with Facebook
+              </Text>
             </TouchableOpacity>
           </View>
         </View>
       </ScrollView>
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={isModalVisible}
+        onRequestClose={closeModal}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContainer, { backgroundColor: theme.surface }]}>
+            <View style={styles.modalHeader}>
+              <Text style={[styles.modalTitle, { color: theme.text }]}>Terms & Conditions</Text>
+              <TouchableOpacity onPress={closeModal}>
+                <Ionicons name="close-circle" size={30} color={theme.primary} />
+              </TouchableOpacity>
+            </View>
+            <ScrollView style={styles.modalScrollView}>
+              <Text style={[styles.modalText, { color: theme.text }]}>{termsAndConditionsText}</Text>
+            </ScrollView>
+            <TouchableOpacity style={[styles.closeButton, { backgroundColor: theme.primary }]} onPress={handleAcceptAndClose}>
+              <Text style={styles.closeButtonText}>Accept & Close</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -229,12 +390,12 @@ const styles = StyleSheet.create({
     paddingTop: 20,
   },
   header: {
-    alignItems: 'center',
+    alignItems: "center",
     marginBottom: 30,
   },
   title: {
     fontSize: 28,
-    fontWeight: 'bold',
+    fontWeight: "bold",
     marginTop: 15,
     marginBottom: 5,
   },
@@ -247,7 +408,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   tabsContainer: {
-    flexDirection: 'row',
+    flexDirection: "row",
     marginBottom: 25,
     borderRadius: 10,
     padding: 4,
@@ -256,25 +417,25 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: 12,
     borderRadius: 8,
-    alignItems: 'center',
+    alignItems: "center",
   },
   activeTab: {
     // backgroundColor applied inline
   },
   inactiveTab: {
-    backgroundColor: 'transparent',
+    backgroundColor: "transparent",
   },
   activeTabText: {
-    color: '#FFFFFF',
-    fontWeight: 'bold',
+    color: "#FFFFFF",
+    fontWeight: "bold",
     fontSize: 16,
   },
   inactiveTabText: {
-    fontWeight: '600',
+    fontWeight: "600",
     fontSize: 16,
   },
   form: {
-    width: '100%',
+    width: "100%",
   },
   input: {
     borderRadius: 10,
@@ -284,8 +445,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   termsContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     marginBottom: 20,
   },
   checkbox: {
@@ -296,25 +457,25 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   termsLink: {
-    fontWeight: '600',
+    fontWeight: "600",
   },
   createAccountButton: {
     borderRadius: 12,
     paddingVertical: 16,
-    alignItems: 'center',
+    alignItems: "center",
     marginBottom: 20,
   },
   createAccountButtonDisabled: {
     // Applied inline
   },
   createAccountButtonText: {
-    color: '#FFFFFF',
+    color: "#FFFFFF",
     fontSize: 18,
-    fontWeight: 'bold',
+    fontWeight: "bold",
   },
   separator: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     marginVertical: 20,
   },
   separatorLine: {
@@ -326,8 +487,8 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   socialButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     borderWidth: 1,
     borderRadius: 12,
     paddingVertical: 14,
@@ -337,6 +498,54 @@ const styles = StyleSheet.create({
   socialButtonText: {
     marginLeft: 12,
     fontSize: 16,
-    fontWeight: '500',
+    fontWeight: "500",
+  },
+  modalOverlay: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  },
+  modalContainer: {
+    width: '90%',
+    maxHeight: '80%',
+    borderRadius: 20,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E0E0E0',
+    paddingBottom: 10,
+    marginBottom: 10,
+  },
+  modalTitle: {
+    fontSize: 22,
+    fontWeight: 'bold',
+  },
+  modalScrollView: {
+    marginVertical: 10,
+  },
+  modalText: {
+    fontSize: 16,
+    lineHeight: 24,
+  },
+  closeButton: {
+    borderRadius: 10,
+    padding: 15,
+    alignItems: 'center',
+    marginTop: 10,
+  },
+  closeButtonText: {
+    color: 'white',
+    fontSize: 18,
+    fontWeight: 'bold',
   },
 });

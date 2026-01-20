@@ -75,7 +75,7 @@ export default function Sidebar({ isVisible, onClose, activeScreen }) {
         <View style={styles.sidebarTop}>
             <SidebarIcon name="grid-outline" screenName="StudentDashboard" label="Dashboard" />
             <SidebarIcon name="person-circle-outline" screenName="Profile" label="Profile" />
-            <SidebarIcon name="chatbubbles-outline" screenName="AiAssistant" label="AI Assistant" />
+            <SidebarIcon name="chatbubbles-outline" screenName="AiChat" label="AI Chat" />
             <SidebarIcon name="document-text-outline" screenName="TestGenerator" label="Test Generator" />
             <SidebarIcon name="documents-outline" screenName="PastPapers" label="Past Papers" />
             <SidebarIcon name="bar-chart-outline" screenName="CloPerformance" label="Progress" />

@@ -11,6 +11,16 @@ import NotificationsScreen from "../screens/NotificationsScreen";
 import SecurityScreen from "../screens/SecurityScreen";
 import AboutAppScreen from "../screens/AboutAppScreen";
 import AuthCallbackScreen from "../screens/AuthCallbackScreen";
+import StudentDashboardScreen from "../screens/StudentDashboardScreen";
+import ProfileScreen from "../screens/ProfileScreen";
+import AiAssistantScreen from "../screens/AiAssistantScreen";
+import AiChatScreen from "../screens/AiChatScreen";
+import TestGeneratorScreen from "../screens/TestGeneratorScreen";
+import PastPapersScreen from "../screens/PastPapersScreen";
+import CloPerformanceScreen from "../screens/CloPerformanceScreen";
+import ChangePasswordScreen from "../screens/ChangePasswordScreen";
+import OtpVerificationScreen from "../screens/OtpVerificationScreen";
+import ResetPasswordScreen from "../screens/ResetPasswordScreen";
 
 const Stack = createNativeStackNavigator();
 
@@ -41,17 +51,7 @@ export default function AppNavigator() {
         <Stack.Screen
           name="ForgotPassword"
           component={ForgotPasswordScreen}
-          options={{
-            headerShown: true,
-            title: "Forgot Password",
-            headerStyle: {
-              backgroundColor: "#F0F8E8",
-            },
-            headerTintColor: "#2D5016",
-            headerTitleStyle: {
-              fontWeight: "bold",
-            },
-          }}
+          options={{ headerShown: false }}
         />
         <Stack.Screen
           name="Settings"
@@ -80,6 +80,72 @@ export default function AppNavigator() {
           options={{
             headerShown: false,
           }}
+        />
+        <Stack.Screen
+          name="StudentDashboard"
+          component={StudentDashboardScreen}
+          options={{
+            headerShown: false,
+          }}
+        />
+        <Stack.Screen
+          name="Profile"
+          component={ProfileScreen}
+          options={{
+            headerShown: false,
+          }}
+        />
+        <Stack.Screen
+          name="AiAssistant"
+          component={AiAssistantScreen}
+          options={{
+            headerShown: false,
+          }}
+        />
+        <Stack.Screen
+          name="AiChat"
+          component={AiChatScreen}
+          options={{
+            headerShown: false,
+          }}
+        />
+        <Stack.Screen
+          name="TestGenerator"
+          component={TestGeneratorScreen}
+          options={{
+            headerShown: false,
+          }}
+        />
+        <Stack.Screen
+          name="PastPapers"
+          component={PastPapersScreen}
+          options={{
+            headerShown: false,
+          }}
+        />
+        <Stack.Screen
+          name="CloPerformance"
+          component={CloPerformanceScreen}
+          options={{
+            headerShown: false,
+          }}
+        />
+        <Stack.Screen
+          name="ChangePassword"
+          component={ChangePasswordScreen}
+          options={{
+            headerShown: false,
+          }}
+        />
+        <Stack.Screen
+          name="OtpVerification"
+          component={OtpVerificationScreen}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="ResetPassword"
+          component={ResetPasswordScreen}
+          options={{ headerShown: false }}
         />
       </Stack.Navigator>
     </NavigationContainer>
