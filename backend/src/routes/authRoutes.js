@@ -4,34 +4,33 @@ const router = express.Router();
 const authController = require('../controllers/authController');
 const { authenticateToken } = require('../middleware/auth');
 const { generateToken } = require('../utils/jwt');
+
 console.log('authController:', authController);
 
-// Regular authentication routes
+// ==================== REGULAR AUTHENTICATION ROUTES ====================
 router.post('/register', authController.registerUser);
 router.post('/login', authController.loginUser);
+
+// ==================== FORGOT PASSWORD ROUTES (OTP-BASED) ====================
 router.post('/forgot-password', authController.forgotPassword);
-//router.post('/reset-password/:token', authController.resetPassword);
-//router.post('/forgot-password', authController.forgotPassword);
 router.post('/verify-reset-otp', authController.verifyResetOTP);
 router.post('/reset-password', authController.resetPassword);
 
+// ==================== UPDATE PASSWORD ====================
 router.post('/update-password', authController.updatePassword);
-//router.post('/update-password',authController.updatePassword);
 
-
-// Get current user
+// ==================== GET CURRENT USER ====================
 router.get('/me', authenticateToken, authController.getCurrentUser);
 
-// Logout
+// ==================== LOGOUT ====================
 router.post('/logout', authenticateToken, (req, res) => {
-  // Optional: If you track sessions in DB, invalidate them here
-  // For now, just return success (token invalidation handled on client)
   res.json({
     success: true,
     message: 'Logged out successfully',
   });
 });
 
+// ==================== GOOGLE OAUTH ROUTES ====================
 // Google OAuth - Sign In
 router.get(
   '/google/signin',
@@ -65,10 +64,8 @@ router.get(
 
       const token = generateToken(req.user);
       
-      // Redirect to mobile app with deep link
       const mobileRedirect = `darsgah://auth/callback?token=${token}&user_id=${req.user.user_id}`;
       
-      // Send HTML page that will close the browser and return to app
       res.send(`
         <!DOCTYPE html>
         <html>
@@ -149,12 +146,10 @@ router.get(
             </style>
             <script>
               window.onload = function() {
-                // Try to redirect to the app
                 setTimeout(function() {
                   window.location.href = "${mobileRedirect}";
                 }, 1000);
                 
-                // Try to close the window after redirect
                 setTimeout(function() {
                   window.close();
                 }, 2000);
