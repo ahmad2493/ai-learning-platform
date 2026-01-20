@@ -1,0 +1,76 @@
+const crypto = require('crypto');
+const Otp = require('../models/Otp');
+
+// Generate 6-digit OTP
+const generateOTP = () => {
+    return crypto.randomInt(100000, 999999).toString();
+};
+
+// Create and save OTP
+const createOTP = async (userId, email, otpType) => {
+    try {
+        // Invalidate any existing OTPs for this user and type
+        await Otp.updateMany(
+            { 
+                user_id: userId, 
+                otp_type: otpType,
+                is_used: false 
+            },
+            { 
+                is_used: true 
+            }
+        );
+
+        // Generate new OTP
+        const otp = generateOTP();
+        
+        // Set expiry to 60 seconds from now
+        const expiresAt = new Date(Date.now() + 60 * 1000);
+
+        // Save OTP to database
+        const otpRecord = new Otp({
+            user_id: userId,
+            email: email,
+            otp: otp,
+            otp_type: otpType,
+            expires_at: expiresAt
+        });
+
+        await otpRecord.save();
+        
+        return otp;
+    } catch (error) {
+        throw new Error('Error creating OTP: ' + error.message);
+    }
+};
+
+// Verify OTP
+const verifyOTP = async (email, otp, otpType) => {
+    try {
+        const otpRecord = await Otp.findOne({
+            email: email,
+            otp: otp,
+            otp_type: otpType,
+            is_used: false,
+            expires_at: { $gt: new Date() }
+        });
+
+        if (!otpRecord) {
+            return { success: false, message: 'Invalid or expired OTP' };
+        }
+
+        // Mark OTP as used
+        otpRecord.is_used = true;
+        await otpRecord.save();
+
+        return { success: true, userId: otpRecord.user_id };
+    } catch (error) {
+        throw new Error('Error verifying OTP: ' + error.message);
+    }
+};
+
+module.exports = {
+    generateOTP,
+    createOTP,
+    verifyOTP
+};
