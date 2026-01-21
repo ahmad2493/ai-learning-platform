@@ -47,7 +47,7 @@ export default function ResetPasswordScreen({ navigation, route }) {
     if (!validateFields()) return;
 
     try {
-      const response = await fetch(`${BASE_URL}/api/auth/update-password`, {
+      const response = await fetch(`${BASE_URL}/auth/update-password`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

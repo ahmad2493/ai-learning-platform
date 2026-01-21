@@ -1,23 +1,16 @@
-// routes/StudentRoutes.js
 const express = require('express');
 const router = express.Router();
-const {
-  changeName,
-  changeEmail,
-  changePhone,
-  changeAddress,
-  setPassword,
-  verifyPassword,
-  changePassword
-} = require('../controllers/StudentController');
+const studentController = require('../controllers/StudentController');
 
-router.patch('/:id/change_name', changeName);
-router.patch('/:id/change_email', changeEmail);
-router.patch('/:id/change_phone', changePhone);
-router.patch('/:id/change_address', changeAddress);
+// Profile updates
+router.patch('/:id/name', studentController.changeName);
+router.patch('/:id/email', studentController.changeEmail);
+//router.patch('/:id/phone', studentController.changePhone);
+//router.patch('/:id/address', studentController.changeAddress);
 
-router.patch('/:id/set_password', setPassword);
-router.patch('/:id/verify_password', verifyPassword);
-router.patch('/:id/change_password', changePassword);
+// Password management
+router.patch('/:id/password/set', studentController.setPassword);
+router.patch('/:id/password/verify', studentController.verifyPassword);
+router.patch('/:id/password/change', studentController.changePassword);
 
 module.exports = router;

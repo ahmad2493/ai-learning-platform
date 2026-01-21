@@ -13,7 +13,6 @@ import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../utils/ThemeContext";
 import { BASE_URL } from "../utils/apiConfig";
 import CustomAlert from "../components/CustomAlert";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { termsAndConditionsText } from "../constants/legalText";
 
 export default function SignUpScreen({ navigation }) {
@@ -31,6 +30,7 @@ export default function SignUpScreen({ navigation }) {
   });
   const [errors, setErrors] = useState({});
   const [isModalVisible, setModalVisible] = useState(false);
+  const [tempUserId, setTempUserId] = useState(""); // Store temp user ID
 
   const showAlert = (title, message, type = "error") => {
     setAlertConfig({ title, message, type });
@@ -48,51 +48,73 @@ export default function SignUpScreen({ navigation }) {
   };
 
   const handleSignUp = async () => {
-    if (!validateFields()) return;
+    console.log('🚀 [SIGNUP] ========== SIGNUP PROCESS STARTED ==========');
+    console.log('🚀 [SIGNUP] BASE_URL:', BASE_URL);
+    console.log('🚀 [SIGNUP] Full endpoint:', `${BASE_URL}/auth/register`);
+    
+    if (!validateFields()) {
+      console.log('❌ [SIGNUP] Validation failed - missing fields');
+      return;
+    }
 
     if (!agreeToTerms) {
+      console.log('❌ [SIGNUP] Terms not agreed');
       showAlert("Error", "You must agree to the Terms & Conditions");
       return;
     }
 
     if (password !== confirmPassword) {
+      console.log('❌ [SIGNUP] Passwords do not match');
       showAlert("Error", "Passwords do not match");
       return;
     }
 
+    const requestBody = {
+      email: email,
+      password: password,
+      confirmPassword: confirmPassword,
+      name: fullName,
+    };
+
+    console.log('📤 [SIGNUP] Request body:', requestBody);
+
     try {
+      console.log('🌐 [SIGNUP] Sending fetch request...');
+      
       const response = await fetch(`${BASE_URL}/auth/register`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          "ngrok-skip-browser-warning": "true", // Skip ngrok warning page
         },
-        body: JSON.stringify({
-          email: email,
-          password: password,
-          name: fullName,
-        }),
+        body: JSON.stringify(requestBody),
       });
 
+      console.log('📥 [SIGNUP] Response received');
+      console.log('📥 [SIGNUP] Response status:', response.status);
+      console.log('📥 [SIGNUP] Response ok:', response.ok);
+      console.log('📥 [SIGNUP] Response headers:', response.headers);
+
       const data = await response.json();
+      console.log('📥 [SIGNUP] Response data:', JSON.stringify(data, null, 2));
 
       if (data.success) {
-        const { token, user } = data.data;
-        await AsyncStorage.setItem("authToken", token);
-        if (user) {
-          await AsyncStorage.setItem("user_id", user.user_id);
-          await AsyncStorage.setItem(
-            "userName",
-            user.name ||
-              `${user.first_name || ""} ${user.last_name || ""}`.trim()
-          );
-          await AsyncStorage.setItem("userEmail", user.email);
-        }
-        showAlert("Success", "Registration successful!", "success");
+        console.log('✅ [SIGNUP] Registration successful!');
+        console.log('✅ [SIGNUP] TempUserId:', data.data.tempUserId);
+        
+        // Store tempUserId for OTP verification
+        setTempUserId(data.data.tempUserId);
+        
+        showAlert("Success", data.message, "success");
+        // Navigation will happen in alert onClose
       } else {
+        console.log('❌ [SIGNUP] Registration failed:', data.message);
         showAlert("Registration failed", data.message || "Please try again.");
       }
     } catch (error) {
-      console.error("SignUp error:", error);
+      console.error("❌ [SIGNUP] Fetch error:", error);
+      console.error("❌ [SIGNUP] Error message:", error.message);
+      console.error("❌ [SIGNUP] Error stack:", error.stack);
       showAlert("Error", "An error occurred. Please try again.");
     }
   };
@@ -102,12 +124,10 @@ export default function SignUpScreen({ navigation }) {
   };
 
   const handleGoogleSignIn = () => {
-    // Handle Google sign in
     console.log("Google Sign In");
   };
 
   const handleFacebookSignIn = () => {
-    // Handle Facebook sign in
     console.log("Facebook Sign In");
   };
 
@@ -132,7 +152,22 @@ export default function SignUpScreen({ navigation }) {
         onClose={() => {
           setAlertVisible(false);
           if (alertConfig.type === "success") {
-            navigation.navigate("OtpVerification", { email: email });
+            console.log('🧭 [SIGNUP] Navigating to OTP verification screen');
+            console.log('🧭 [SIGNUP] Navigation params:', {
+              email,
+              name: fullName,
+              tempUserId,
+              verificationType: "REGISTRATION"
+            });
+            
+            // Navigate to OTP verification screen with data
+            navigation.navigate("OtpVerification", { 
+              email: email,
+              name: fullName,
+              password: password,
+              tempUserId: tempUserId,
+              verificationType: "REGISTRATION" // To differentiate from password reset
+            });
           }
         }}
       />
@@ -419,9 +454,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     alignItems: "center",
   },
-  activeTab: {
-    // backgroundColor applied inline
-  },
+  activeTab: {},
   inactiveTab: {
     backgroundColor: "transparent",
   },
@@ -464,9 +497,6 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     alignItems: "center",
     marginBottom: 20,
-  },
-  createAccountButtonDisabled: {
-    // Applied inline
   },
   createAccountButtonText: {
     color: "#FFFFFF",

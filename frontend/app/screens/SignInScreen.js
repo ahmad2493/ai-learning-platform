@@ -62,6 +62,7 @@ export default function SignInScreen({ navigation }) {
             headers: {
               Authorization: `Bearer ${queryParams.token}`,
               "Content-Type": "application/json",
+              "ngrok-skip-browser-warning": "true",
             },
           });
 
@@ -100,13 +101,22 @@ export default function SignInScreen({ navigation }) {
   }, [navigation]);
 
   const handleSignIn = async () => {
-    if (!validateFields()) return;
+    console.log('🔐 [SIGNIN] ========== SIGNIN PROCESS STARTED ==========');
+    console.log('🔐 [SIGNIN] Email:', email);
+
+    if (!validateFields()) {
+      console.log('❌ [SIGNIN] Validation failed');
+      return;
+    }
 
     try {
+      console.log('🌐 [SIGNIN] Sending login request...');
+
       const response = await fetch(`${BASE_URL}/auth/login`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          "ngrok-skip-browser-warning": "true",
         },
         body: JSON.stringify({
           email,
@@ -114,29 +124,37 @@ export default function SignInScreen({ navigation }) {
         }),
       });
 
+      console.log('📥 [SIGNIN] Response status:', response.status);
+
       const result = await response.json();
+      console.log('📥 [SIGNIN] Response data:', result);
 
       if (!response.ok) {
+        console.log('❌ [SIGNIN] Login failed:', result.message);
         showAlert("Error", result.message);
         return;
       }
 
       // SUCCESS
       const { token } = result.data;
+      console.log('✅ [SIGNIN] Login successful, token received');
 
       // Store token with consistent key name
       await AsyncStorage.setItem("authToken", token);
 
       // Fetch full user data
+      console.log('📥 [SIGNIN] Fetching user data...');
       const meResponse = await fetch(`${BASE_URL}/auth/me`, {
         method: "GET",
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
+          "ngrok-skip-browser-warning": "true",
         },
       });
 
       const meData = await meResponse.json();
+      console.log('📥 [SIGNIN] User data:', meData);
 
       if (meData.success && meData.data.user) {
         const user = meData.data.user;
@@ -147,11 +165,13 @@ export default function SignInScreen({ navigation }) {
             `${user.first_name || ""} ${user.last_name || ""}`.trim(),
         );
         await AsyncStorage.setItem("userEmail", user.email);
+        console.log('✅ [SIGNIN] User data saved to AsyncStorage');
       }
 
       showAlert("Success", "Login successful!", "success");
     } catch (error) {
-      console.error("Login error:", error);
+      console.error('❌ [SIGNIN] Login error:', error);
+      console.error('❌ [SIGNIN] Error message:', error.message);
       showAlert("Error", "Server error. Try again.");
     }
   };

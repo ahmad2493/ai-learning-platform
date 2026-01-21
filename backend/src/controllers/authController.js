@@ -41,10 +41,10 @@ const sendResetPasswordEmail = async (email, resetToken) => {
   await transporter.sendMail(mailOptions);
 };
 
-// ==================== REGISTER USER ====================
+// ==================== REGISTER USER - STEP 1: SEND OTP ====================
 exports.registerUser = async (req, res) => {
   try {
-    let { email, password, name } = req.body;
+    let { email, password, name, confirmPassword } = req.body;
 
     // Normalize Input
     email = email ? email.trim().toLowerCase() : '';
@@ -58,10 +58,32 @@ exports.registerUser = async (req, res) => {
       });
     }
 
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email is required.',
+      });
+    }
+
     if (!password) {
       return res.status(400).json({
         success: false,
         message: 'Password is required.',
+      });
+    }
+
+    if (!confirmPassword) {
+      return res.status(400).json({
+        success: false,
+        message: 'Confirm password is required.',
+      });
+    }
+
+    // Check if passwords match
+    if (password !== confirmPassword) {
+      return res.status(400).json({
+        success: false,
+        message: 'Passwords do not match.',
       });
     }
 
@@ -82,6 +104,69 @@ exports.registerUser = async (req, res) => {
     }
 
     // Uniqueness Check
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email already registered.',
+      });
+    }
+
+    // Generate temporary user ID for OTP
+    const tempUserId = crypto.randomBytes(16).toString('hex');
+
+    // Generate and send OTP
+    const otp = await createOTP(tempUserId, email, 'REGISTRATION');
+    await sendOTPEmail(email, otp, 'REGISTRATION');
+
+    return res.status(200).json({
+      success: true,
+      message: 'OTP sent to your email. Valid for 30 seconds.',
+      data: {
+        email: email,
+        tempUserId: tempUserId, // Send this back to complete registration later
+      },
+    });
+
+  } catch (error) {
+    console.error('Registration error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Server error during registration.',
+      error: error.message
+    });
+  }
+};
+
+
+// ==================== REGISTER USER - STEP 2: VERIFY OTP & CREATE ACCOUNT ====================
+exports.verifyRegistrationOTP = async (req, res) => {
+  try {
+    let { email, otp, name, password, tempUserId } = req.body;
+
+    // Normalize
+    email = email ? email.trim().toLowerCase() : '';
+    name = name ? name.trim() : '';
+
+    // Validate inputs
+    if (!email || !otp || !name || !password || !tempUserId) {
+      return res.status(400).json({
+        success: false,
+        message: 'All fields are required',
+      });
+    }
+
+    // Verify OTP
+    const verification = await verifyOTP(email, otp, 'REGISTRATION');
+
+    if (!verification.success) {
+      return res.status(400).json({
+        success: false,
+        message: verification.message,
+      });
+    }
+
+    // Check again if email is already registered (race condition check)
     const existingUser = await User.findOne({ email });
     if (existingUser) {
       return res.status(400).json({
@@ -120,7 +205,7 @@ exports.registerUser = async (req, res) => {
 
     return res.status(201).json({
       success: true,
-      message: 'Registration successful. Please complete your profile.',
+      message: 'Registration successful! You can now sign in.',
       data: {
         user: {
           user_id: user.user_id,
@@ -133,10 +218,11 @@ exports.registerUser = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Registration error:', error);
+    console.error('OTP verification error:', error);
     return res.status(500).json({
       success: false,
-      message: 'Server error during registration.',
+      message: 'Server error during verification.',
+      error: error.message
     });
   }
 };
@@ -146,75 +232,60 @@ exports.loginUser = async (req, res) => {
   try {
     const { email, password } = req.body;
 
-    // Validate fields
+    // Validation
     if (!email || !password) {
       return res.status(400).json({
         success: false,
-        message: 'Email and password are required',
+        message: 'Please provide email and password'
       });
     }
 
-    // Email format validation
-    const emailError = validateEmail(email);
-    if (emailError) {
-      return res.status(400).json({
-        success: false,
-        message: emailError,
-      });
-    }
-
-    // Find user
+    // Find user by email
     const user = await User.findOne({ email: email.toLowerCase() });
+    
     if (!user) {
       return res.status(401).json({
         success: false,
-        message: 'Invalid credentials',
-      });
-    }
-
-    // Check if account is active
-    if (user.status !== 'Active') {
-      return res.status(403).json({
-        success: false,
-        message: 'Account is not active',
+        message: 'Invalid email or password'
       });
     }
 
     // Check password
-    const isValidPassword = await bcrypt.compare(password, user.password);
-    if (!isValidPassword) {
+    const isPasswordValid = await bcrypt.compare(password, user.password);
+    
+    if (!isPasswordValid) {
       return res.status(401).json({
         success: false,
-        message: 'Invalid credentials',
+        message: 'Invalid email or password'
       });
     }
 
-    // Generate token
+    // Generate JWT token
     const token = generateToken(user);
 
-    // Update user
-    user.updated_at = new Date();
-    await user.save();
+    // Return user data (exclude password)
+    const userData = {
+      user_id: user.user_id,
+      name: user.name,
+      email: user.email,
+      role_name: user.role_name,
+      profile_photo_url: user.profile_photo_url
+    };
 
     res.status(200).json({
       success: true,
       message: 'Login successful',
       data: {
-        user: {
-          user_id: user.user_id,
-          name: user.name,
-          email: user.email,
-          role_name: user.role_name,
-          profile_photo_url: user.profile_photo_url,
-        },
-        token,
-      },
+        user: userData,
+        token
+      }
     });
+
   } catch (error) {
     console.error('Login error:', error);
     res.status(500).json({
       success: false,
-      message: 'Login failed',
+      message: 'Server error during login'
     });
   }
 };
@@ -250,7 +321,7 @@ exports.forgotPassword = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      message: 'OTP sent to your email address. Valid for 60 seconds.',
+      message: 'OTP sent to your email address. Valid for 30 seconds.',
       email: email
     });
 
@@ -444,4 +515,15 @@ exports.getCurrentUser = async (req, res) => {
       message: 'Failed to fetch user data',
     });
   }
+};
+
+module.exports = {
+  registerUser: exports.registerUser,
+  verifyRegistrationOTP: exports.verifyRegistrationOTP,
+  loginUser: exports.loginUser,
+  forgotPassword: exports.forgotPassword,
+  verifyResetOTP: exports.verifyResetOTP,
+  resetPassword: exports.resetPassword,
+  updatePassword: exports.updatePassword,
+  getCurrentUser: exports.getCurrentUser
 };

@@ -37,42 +37,48 @@ export default function ChangePasswordScreen({ navigation }) {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSaveChanges = async () => {
-    if (!validate()) return;
+ const handleSaveChanges = async () => {
+  if (!validate()) return;
 
-    const token = await AsyncStorage.getItem('authToken');
-    const userId = await AsyncStorage.getItem('user_id');
+  const token = await AsyncStorage.getItem('authToken');
+  const mongoUserId = await AsyncStorage.getItem('mongo_user_id'); // <-- MongoDB _id
 
-    if (!token || !userId) {
-      showAlert('Error', 'You are not logged in.');
-      return;
-    }
+  if (!token || !mongoUserId) {
+    showAlert('Error', 'You are not logged in.');
+    return;
+  }
 
-    try {
-      const response = await fetch(`${BASE_URL}/students/${userId}/change_password`, {
+  try {
+    const response = await fetch(
+      `${BASE_URL}/students/${mongoUserId}/password/change`, // send ObjectId now
+      {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
+          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
-          currentPassword,
-          newPassword,
+          current_password: currentPassword,
+          new_password: newPassword,
+          confirm_password: confirmPassword,
         }),
-      });
-
-      const data = await response.json();
-
-      if (response.ok && data.success) {
-        showAlert('Success', 'Your password has been changed successfully.', 'success');
-      } else {
-        showAlert('Update Failed', data.message || 'An error occurred.');
       }
-    } catch (error) {
-      console.error("Change password error:", error);
-      showAlert('Error', 'A server error occurred. Please try again.');
+    );
+
+    const data = await response.json();
+
+    if (response.ok && data.success) {
+      showAlert('Success', data.message, 'success');
+    } else {
+      showAlert('Update Failed', data.message || 'Something went wrong');
     }
-  };
+  } catch (error) {
+    console.error(error);
+    showAlert('Error', 'Server error. Try again later.');
+  }
+};
+
+
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>

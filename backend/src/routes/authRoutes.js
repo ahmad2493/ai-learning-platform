@@ -8,7 +8,8 @@ const { generateToken } = require('../utils/jwt');
 console.log('authController:', authController);
 
 // ==================== REGULAR AUTHENTICATION ROUTES ====================
-router.post('/register', authController.registerUser);
+router.post('/register', authController.registerUser); // Step 1: Send OTP
+router.post('/verify-registration-otp', authController.verifyRegistrationOTP); // Step 2: Verify OTP & Create Account
 router.post('/login', authController.loginUser);
 
 // ==================== FORGOT PASSWORD ROUTES (OTP-BASED) ====================
@@ -31,7 +32,6 @@ router.post('/logout', authenticateToken, (req, res) => {
 });
 
 // ==================== GOOGLE OAUTH ROUTES ====================
-// Google OAuth - Sign In
 router.get(
   '/google/signin',
   passport.authenticate('google', {
@@ -40,7 +40,6 @@ router.get(
   })
 ); 
 
-// Google OAuth - Sign Up
 router.get(
   '/google/signup',
   passport.authenticate('google', {
@@ -49,7 +48,6 @@ router.get(
   })
 );
 
-// Google OAuth Callback
 router.get(
   '/google/callback',
   passport.authenticate('google', {
@@ -63,7 +61,6 @@ router.get(
       }
 
       const token = generateToken(req.user);
-      
       const mobileRedirect = `darsgah://auth/callback?token=${token}&user_id=${req.user.user_id}`;
       
       res.send(`
@@ -149,7 +146,6 @@ router.get(
                 setTimeout(function() {
                   window.location.href = "${mobileRedirect}";
                 }, 1000);
-                
                 setTimeout(function() {
                   window.close();
                 }, 2000);
@@ -178,5 +174,6 @@ router.get(
     }
   }
 );
+
 
 module.exports = router;

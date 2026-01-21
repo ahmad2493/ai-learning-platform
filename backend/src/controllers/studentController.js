@@ -116,75 +116,9 @@ async function changeEmail(req, res) {
   }
 }
 
-/* ============================================
-   CHANGE PHONE NUMBER
-   ============================================ */
-async function changePhone(req, res) {
-  try {
-    let { phone } = req.body;
-    if (!phone) return res.status(400).json({ success: false, message: 'Phone number is required.', data: {} });
 
-    phone = phone.trim();
-    const pattern = /^03\d{2}-\d{7}$/;
-    if (!pattern.test(phone)) {
-      return res.status(400).json({ success: false, message: "Invalid phone format. Use '03xx-xxxxxxx'.", data: {} });
-    }
 
-    const formattedPhone = '+92' + phone.replace('-', '').slice(1); // +92 3xx.... stored as +92xxxxxxxxx
 
-    const student = await fetchStudentWithUser(req.params.id);
-    if (!student) return res.status(404).json({ success: false, message: 'Student not found.', data: {} });
-
-    const user = student.user_id;
-    if (!user) return res.status(500).json({ success: false, message: 'Linked user missing.', data: {} });
-
-    // optional uniqueness check
-    const existing = await User.findOne({ contact_no: formattedPhone });
-    if (existing && existing._id.toString() !== user._id.toString()) {
-      return res.status(400).json({ success: false, message: 'Phone number already in use by another account.', data: {} });
-    }
-
-    if (user.contact_no === formattedPhone) {
-      return res.status(400).json({ success: false, message: 'Current phone number is already like this.', data: {} });
-    }
-
-    user.contact_no = formattedPhone;
-    user.updated_at = new Date();
-    await user.save();
-
-    return res.status(200).json({ success: true, message: 'Phone number updated successfully.', data: student });
-  } catch (error) {
-    console.error('🔥 Error updating phone:', error);
-    return res.status(500).json({ success: false, message: 'Server error while updating phone number.', data: {} });
-  }
-}
-
-/* ============================================
-   CHANGE ADDRESS
-   ============================================ */
-async function changeAddress(req, res) {
-  try {
-    let { address } = req.body;
-    if (!address) return res.status(400).json({ success: false, message: 'Address is required.', data: {} });
-
-    address = address.trim();
-
-    const student = await fetchStudentWithUser(req.params.id);
-    if (!student) return res.status(404).json({ success: false, message: 'Student not found.', data: {} });
-
-    const user = student.user_id;
-    if (!user) return res.status(500).json({ success: false, message: 'Linked user missing.', data: {} });
-
-    user.address = address;
-    user.updated_at = new Date();
-    await user.save();
-
-    return res.status(200).json({ success: true, message: 'Address updated successfully.', data: student });
-  } catch (error) {
-    console.error('Error updating address:', error);
-    return res.status(500).json({ success: false, message: 'Server error while updating address.', data: {} });
-  }
-}
 
 /* ============================================
    SET PASSWORD
@@ -247,49 +181,98 @@ async function verifyPassword(req, res) {
 /* ============================================
    CHANGE PASSWORD
    ============================================ */
+
 async function changePassword(req, res) {
   try {
-    const { new_password, confirm_password } = req.body;
-    if (!new_password || !confirm_password) {
-      return res.status(400).json({ success: false, message: 'Both new password and confirm password are required.', data: {} });
+    console.log("Request parameters: ", req.params);
+    const { id } = req.params; // id is MongoDB ObjectId
+    const { current_password, new_password, confirm_password } = req.body;
+
+    console.log("Entering changePassword...");
+
+    // 1️⃣ Validate input
+    if (!current_password || !new_password || !confirm_password) {
+      return res.status(400).json({
+        success: false,
+        message: 'All fields are required.',
+        data: {},
+      });
     }
+
     if (new_password !== confirm_password) {
-      return res.status(400).json({ success: false, message: 'Passwords do not match.', data: {} });
-    }
-    if (new_password.length < 6) {
-      return res.status(400).json({ success: false, message: 'Password must be at least 6 characters long.', data: {} });
-    }
-
-    const student = await fetchStudentWithUser(req.params.id);
-    if (!student) return res.status(404).json({ success: false, message: 'Student not found.', data: {} });
-
-    const user = student.user_id;
-    if (!user) return res.status(500).json({ success: false, message: 'Linked user missing.', data: {} });
-
-    const isSameAsOld = await bcrypt.compare(new_password, user.password);
-    if (isSameAsOld) {
-      return res.status(400).json({ success: false, message: 'New password cannot be same as current password.', data: {} });
+      return res.status(400).json({
+        success: false,
+        message: 'Passwords do not match.',
+        data: {},
+      });
     }
 
-    const saltRounds = 12;
-    const hashedPassword = await bcrypt.hash(new_password, saltRounds);
+    if (new_password.length < 5) {
+      return res.status(400).json({
+        success: false,
+        message: 'Password must be at least 5 characters long.',
+        data: {},
+      });
+    }
+
+    // 2️⃣ Find user by MongoDB _id
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ success: false, message: 'Invalid user ID.' });
+    }
+
+    const user = await User.findById(id);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found.', data: {} });
+    }
+
+    // 3️⃣ Verify current password
+    const isCorrect = await bcrypt.compare(current_password, user.password);
+    if (!isCorrect) {
+      return res.status(400).json({
+        success: false,
+        message: 'Current password is incorrect.',
+        data: {},
+      });
+    }
+
+    // 4️⃣ Prevent reuse of old password
+    const isSame = await bcrypt.compare(new_password, user.password);
+    if (isSame) {
+      return res.status(400).json({
+        success: false,
+        message: 'New password cannot be same as old password.',
+        data: {},
+      });
+    }
+
+    // 5️⃣ Hash new password and update
+    const hashedPassword = await bcrypt.hash(new_password, 12);
+    console.log("Hashed Password:", hashedPassword);
 
     user.password = hashedPassword;
     user.updated_at = new Date();
     await user.save();
 
-    return res.status(200).json({ success: true, message: 'Password changed successfully.', data: {} });
+    return res.status(200).json({
+      success: true,
+      message: 'Password changed successfully.',
+      data: {},
+    });
+
   } catch (error) {
-    console.error('Error changing password:', error);
-    return res.status(500).json({ success: false, message: 'Server error while changing password.', data: {} });
+    console.error('Change password error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Server error while changing password.',
+      data: {},
+    });
   }
 }
+
 
 module.exports = {
   changeName,
   changeEmail,
-  changePhone,
-  changeAddress,
   setPassword,
   verifyPassword,
   changePassword
