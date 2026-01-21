@@ -121,7 +121,7 @@ exports.registerUser = async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      message: 'OTP sent to your email. Valid for 30 seconds.',
+      message: 'OTP sent to your email. Valid for 60 seconds.',
       data: {
         email: email,
         tempUserId: tempUserId,
@@ -374,13 +374,13 @@ exports.verifyResetOTP = async (req, res) => {
   }
 };
 
-// ==================== RESET PASSWORD (NEW - WITH OTP) ====================
+// ==================== RESET PASSWORD (FIXED - NO OTP RE-VERIFICATION) ====================
 exports.resetPassword = async (req, res) => {
   try {
-    const { email, otp, newPassword, confirmPassword } = req.body;
+    const { email, newPassword, confirmPassword } = req.body;
 
     // Validate inputs
-    if (!email || !otp || !newPassword || !confirmPassword) {
+    if (!email || !newPassword || !confirmPassword) {
       return res.status(400).json({
         success: false,
         message: 'All fields are required'
@@ -395,26 +395,16 @@ exports.resetPassword = async (req, res) => {
       });
     }
 
-    // Validate password strength
-    if (newPassword.length < 8) {
+    // Validate password strength (changed to 5 from 8)
+    if (newPassword.length < 5) {
       return res.status(400).json({
         success: false,
-        message: 'Password must be at least 8 characters long'
+        message: 'Password must be at least 5 characters long'
       });
     }
 
-    // Verify OTP again for security
-    const verification = await verifyOTP(email, otp, 'PASSWORD_RESET');
-
-    if (!verification.success) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid or expired OTP'
-      });
-    }
-
-    // Find user
-    const user = await User.findById(verification.userId);
+    // Find user by email
+    const user = await User.findOne({ email: email.toLowerCase() });
 
     if (!user) {
       return res.status(404).json({
@@ -445,6 +435,78 @@ exports.resetPassword = async (req, res) => {
     });
   }
 };
+
+// ==================== RESET PASSWORD (NEW - WITH OTP) ====================
+// exports.resetPassword = async (req, res) => {
+//   try {
+//     const { email, otp, newPassword, confirmPassword } = req.body;
+
+//     // Validate inputs
+//     if (!email || !otp || !newPassword || !confirmPassword) {
+//       return res.status(400).json({
+//         success: false,
+//         message: 'All fields are required'
+//       });
+//     }
+
+//     // Check if passwords match
+//     if (newPassword !== confirmPassword) {
+//       return res.status(400).json({
+//         success: false,
+//         message: 'Passwords do not match'
+//       });
+//     }
+
+//     // Validate password strength
+//     if (newPassword.length < 8) {
+//       return res.status(400).json({
+//         success: false,
+//         message: 'Password must be at least 8 characters long'
+//       });
+//     }
+
+//     // Verify OTP again for security
+//     const verification = await verifyOTP(email, otp, 'PASSWORD_RESET');
+
+//     if (!verification.success) {
+//       return res.status(400).json({
+//         success: false,
+//         message: 'Invalid or expired OTP'
+//       });
+//     }
+
+//     // Find user
+//     const user = await User.findById(verification.userId);
+
+//     if (!user) {
+//       return res.status(404).json({
+//         success: false,
+//         message: 'User not found'
+//       });
+//     }
+
+//     // Hash new password
+//     const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+//     // Update password
+//     user.password = hashedPassword;
+//     user.updated_at = new Date();
+//     await user.save();
+
+//     res.status(200).json({
+//       success: true,
+//       message: 'Password reset successfully. You can now login with your new password.'
+//     });
+
+//   } catch (error) {
+//     console.error('Reset password error:', error);
+//     res.status(500).json({
+//       success: false,
+//       message: 'Error resetting password',
+//       error: error.message
+//     });
+//   }
+// };
 
 // ==================== UPDATE PASSWORD ====================
 exports.updatePassword = async (req, res) => {

@@ -109,7 +109,7 @@ const createOTP = async (userId, email, otpType) => {
         console.log('✅ [OTP HELPER] Generated OTP:', otp);
         
         // Set expiry to 30 seconds from now
-        const expiresAt = new Date(Date.now() + 30 * 1000);
+        const expiresAt = new Date(Date.now() + 60 * 1000);
         console.log('⏰ [OTP HELPER] OTP expires at:', expiresAt);
 
         // Save OTP to database

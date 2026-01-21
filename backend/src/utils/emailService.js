@@ -84,8 +84,8 @@ const sendOTPEmail = async (email, otp, purpose) => {
             : 'Password Reset - OTP Code';
         
         const message = purpose === 'REGISTRATION'
-            ? `Your OTP for email verification is: ${otp}\n\nThis OTP will expire in 30 seconds.`  // ✅ FIXED: Changed from 60 to 30
-            : `Your OTP for password reset is: ${otp}\n\nThis OTP will expire in 30 seconds.`;  // ✅ FIXED: Changed from 60 to 30
+            ? `Your OTP for email verification is: ${otp}\n\nThis OTP will expire in 60 seconds.`  // ✅ FIXED: Changed from 60 to 30
+            : `Your OTP for password reset is: ${otp}\n\nThis OTP will expire in 60 seconds.`;  // ✅ FIXED: Changed from 60 to 30
 
         const mailOptions = {
             from: process.env.EMAIL_USER,
@@ -97,7 +97,7 @@ const sendOTPEmail = async (email, otp, purpose) => {
                     <h2>${subject}</h2>
                     <p>Your OTP code is:</p>
                     <h1 style="color: #4CAF50; font-size: 32px; letter-spacing: 5px;">${otp}</h1>
-                    <p style="color: #f44336;">⏰ This OTP will expire in 30 seconds.</p>
+                    <p style="color: #f44336;">⏰ This OTP will expire in 60 seconds.</p>
                     <p>If you didn't request this, please ignore this email.</p>
                 </div>
             `

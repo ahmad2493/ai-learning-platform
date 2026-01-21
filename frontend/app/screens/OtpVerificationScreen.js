@@ -16,7 +16,7 @@ import { BASE_URL } from '../utils/apiConfig';
 export default function OtpVerificationScreen({ navigation, route }) {
   const { theme } = useTheme();
   const [otp, setOtp] = useState(new Array(6).fill(''));
-  const [timer, setTimer] = useState(30);
+  const [timer, setTimer] = useState(60); // ✅ Changed from 30 to 60 seconds
   const [isVerifying, setIsVerifying] = useState(false);
   const [isResending, setIsResending] = useState(false);
   const inputs = useRef([]);
@@ -64,7 +64,7 @@ export default function OtpVerificationScreen({ navigation, route }) {
     
     console.log('🔐 [OTP SCREEN] Verifying OTP:', code);
     console.log('🔐 [OTP SCREEN] Email:', email);
-    console.log('🔐 [OTP SCREEN] TempUserId:', tempUserId);
+    console.log('🔐 [OTP SCREEN] Verification Type:', verificationType);
 
     if (code.length !== 6) {
       Alert.alert("Invalid OTP", "Please enter a 6-digit OTP.");
@@ -74,46 +74,78 @@ export default function OtpVerificationScreen({ navigation, route }) {
     setIsVerifying(true);
 
     try {
-      console.log('🌐 [OTP SCREEN] Sending verification request...');
+      if (verificationType === 'REGISTRATION') {
+        // Registration OTP verification
+        console.log('🌐 [OTP SCREEN] Verifying registration OTP...');
 
-      const response = await fetch(`${BASE_URL}/auth/verify-registration-otp`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'ngrok-skip-browser-warning': 'true',
-        },
-        body: JSON.stringify({
-          email: email,
-          otp: code,
-          name: name,
-          password: password,
-          tempUserId: tempUserId
-        }),
-      });
+        const response = await fetch(`${BASE_URL}/auth/verify-registration-otp`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'ngrok-skip-browser-warning': 'true',
+          },
+          body: JSON.stringify({
+            email: email,
+            otp: code,
+            name: name,
+            password: password,
+            tempUserId: tempUserId
+          }),
+        });
 
-      console.log('📥 [OTP SCREEN] Response status:', response.status);
+        const data = await response.json();
+        console.log('📥 [OTP SCREEN] Registration response:', data);
 
-      const data = await response.json();
-      console.log('📥 [OTP SCREEN] Response data:', data);
+        if (data.success) {
+          console.log('✅ [OTP SCREEN] Registration OTP verified!');
+          Alert.alert(
+            "Success!", 
+            "Your account has been created successfully!",
+            [
+              {
+                text: "OK",
+                onPress: () => navigation.navigate('SignIn')
+              }
+            ]
+          );
+        } else {
+          console.log('❌ [OTP SCREEN] Verification failed:', data.message);
+          Alert.alert("Verification Failed", data.message || "Invalid OTP. Please try again.");
+          setOtp(new Array(6).fill(''));
+          inputs.current[0]?.focus();
+        }
+      } else if (verificationType === 'PASSWORD_RESET') {
+        // Password reset OTP verification
+        console.log('🌐 [OTP SCREEN] Verifying password reset OTP...');
 
-      if (data.success) {
-        console.log('✅ [OTP SCREEN] OTP verified successfully!');
-        Alert.alert(
-          "Success!", 
-          "Your account has been created successfully!",
-          [
-            {
-              text: "OK",
-              onPress: () => navigation.navigate('SignIn')
-            }
-          ]
-        );
-      } else {
-        console.log('❌ [OTP SCREEN] Verification failed:', data.message);
-        Alert.alert("Verification Failed", data.message || "Invalid OTP. Please try again.");
-        // Clear OTP inputs
-        setOtp(new Array(6).fill(''));
-        inputs.current[0]?.focus();
+        const response = await fetch(`${BASE_URL}/auth/verify-reset-otp`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'ngrok-skip-browser-warning': 'true',
+          },
+          body: JSON.stringify({
+            email: email,
+            otp: code,
+          }),
+        });
+
+        const data = await response.json();
+        console.log('📥 [OTP SCREEN] Password reset response:', data);
+
+        if (data.success) {
+          console.log('✅ [OTP SCREEN] Password reset OTP verified!');
+          // Navigate to reset password screen with email and OTP
+          navigation.navigate('ResetPassword', {
+            email: email,
+            otp: code,
+          });
+        } else {
+          console.log('❌ [OTP SCREEN] Verification failed:', data.message);
+          Alert.alert("Verification Failed", data.message || "Invalid OTP. Please try again.");
+          setOtp(new Array(6).fill(''));
+          inputs.current[0]?.focus();
+        }
       }
     } catch (error) {
       console.error('❌ [OTP SCREEN] Verification error:', error);
@@ -127,30 +159,44 @@ export default function OtpVerificationScreen({ navigation, route }) {
     if (timer > 0) return;
 
     console.log('📧 [OTP SCREEN] Resending OTP to:', email);
+    console.log('📧 [OTP SCREEN] Verification type:', verificationType);
     setIsResending(true);
 
     try {
-      const response = await fetch(`${BASE_URL}/auth/register`, {
+      let endpoint = '';
+      let requestBody = {};
+
+      if (verificationType === 'REGISTRATION') {
+        endpoint = '/auth/register';
+        requestBody = {
+          email: email,
+          password: password,
+          confirmPassword: password,
+          name: name,
+        };
+      } else if (verificationType === 'PASSWORD_RESET') {
+        endpoint = '/auth/forgot-password';
+        requestBody = {
+          email: email,
+        };
+      }
+
+      const response = await fetch(`${BASE_URL}${endpoint}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'ngrok-skip-browser-warning': 'true',
         },
-        body: JSON.stringify({
-          email: email,
-          password: password,
-          confirmPassword: password,
-          name: name,
-        }),
+        body: JSON.stringify(requestBody),
       });
 
       const data = await response.json();
       console.log('📥 [OTP SCREEN] Resend response:', data);
 
       if (data.success) {
-        setTimer(30);
+        setTimer(60); // ✅ Reset to 60 seconds
         setOtp(new Array(6).fill(''));
-        Alert.alert("OTP Sent", "A new OTP has been sent to your email.");
+        Alert.alert("OTP Sent", "A new verification code has been sent to your email.");
       } else {
         Alert.alert("Error", data.message || "Failed to resend OTP.");
       }
