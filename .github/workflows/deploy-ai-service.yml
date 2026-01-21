@@ -80,5 +80,5 @@ jobs:
         uses: azure/webapps-deploy@v3
         with:
           app-name: 'Darsgah-Rag'
-          resource-group: 'FYP'
+          resource-group-name: 'FYP'
           images: ${{ steps.registry.outputs.image }}
