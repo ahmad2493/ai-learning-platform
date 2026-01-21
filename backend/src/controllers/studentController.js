@@ -1,4 +1,5 @@
 // controllers/StudentController.js
+const mongoose = require('mongoose'); // ✅ ADDED - Required for ObjectId validation
 const Student = require('../models/Student');
 const User = require('../models/User');
 const bcrypt = require('bcrypt');
@@ -116,10 +117,6 @@ async function changeEmail(req, res) {
   }
 }
 
-
-
-
-
 /* ============================================
    SET PASSWORD
    ============================================ */
@@ -181,14 +178,13 @@ async function verifyPassword(req, res) {
 /* ============================================
    CHANGE PASSWORD
    ============================================ */
-
 async function changePassword(req, res) {
   try {
-    console.log("Request parameters: ", req.params);
+    console.log("🔐 [CHANGE PASSWORD] Request parameters:", req.params);
     const { id } = req.params; // id is MongoDB ObjectId
     const { current_password, new_password, confirm_password } = req.body;
 
-    console.log("Entering changePassword...");
+    console.log("🔐 [CHANGE PASSWORD] Entering changePassword...");
 
     // 1️⃣ Validate input
     if (!current_password || !new_password || !confirm_password) {
@@ -225,6 +221,8 @@ async function changePassword(req, res) {
       return res.status(404).json({ success: false, message: 'User not found.', data: {} });
     }
 
+    console.log("✅ [CHANGE PASSWORD] User found:", user.email);
+
     // 3️⃣ Verify current password
     const isCorrect = await bcrypt.compare(current_password, user.password);
     if (!isCorrect) {
@@ -234,6 +232,8 @@ async function changePassword(req, res) {
         data: {},
       });
     }
+
+    console.log("✅ [CHANGE PASSWORD] Current password verified");
 
     // 4️⃣ Prevent reuse of old password
     const isSame = await bcrypt.compare(new_password, user.password);
@@ -247,11 +247,13 @@ async function changePassword(req, res) {
 
     // 5️⃣ Hash new password and update
     const hashedPassword = await bcrypt.hash(new_password, 12);
-    console.log("Hashed Password:", hashedPassword);
+    console.log("🔐 [CHANGE PASSWORD] Password hashed successfully");
 
     user.password = hashedPassword;
     user.updated_at = new Date();
     await user.save();
+
+    console.log("✅ [CHANGE PASSWORD] Password changed successfully");
 
     return res.status(200).json({
       success: true,
@@ -260,7 +262,7 @@ async function changePassword(req, res) {
     });
 
   } catch (error) {
-    console.error('Change password error:', error);
+    console.error('❌ [CHANGE PASSWORD] Error:', error);
     return res.status(500).json({
       success: false,
       message: 'Server error while changing password.',
@@ -268,7 +270,6 @@ async function changePassword(req, res) {
     });
   }
 }
-
 
 module.exports = {
   changeName,

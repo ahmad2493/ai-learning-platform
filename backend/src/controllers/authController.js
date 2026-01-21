@@ -124,7 +124,7 @@ exports.registerUser = async (req, res) => {
       message: 'OTP sent to your email. Valid for 30 seconds.',
       data: {
         email: email,
-        tempUserId: tempUserId, // Send this back to complete registration later
+        tempUserId: tempUserId,
       },
     });
 
@@ -506,7 +506,16 @@ exports.getCurrentUser = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      data: { user },
+      data: { 
+        user: {
+          _id: user._id,  // ✅ ADDED - MongoDB ObjectId for change password
+          user_id: user.user_id,
+          name: user.name,
+          email: user.email,
+          role_name: user.role_name,
+          profile_photo_url: user.profile_photo_url,
+        }
+      },
     });
   } catch (error) {
     console.error('Get user error:', error);

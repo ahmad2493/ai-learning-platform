@@ -70,6 +70,8 @@ export default function SignInScreen({ navigation }) {
 
           if (userData.success && userData.data.user) {
             const user = userData.data.user;
+            await AsyncStorage.setItem("user_id", user.user_id);
+            await AsyncStorage.setItem("mongo_user_id", user._id); // ✅ ADDED
             await AsyncStorage.setItem(
               "userName",
               user.name ||
@@ -158,7 +160,8 @@ export default function SignInScreen({ navigation }) {
 
       if (meData.success && meData.data.user) {
         const user = meData.data.user;
-        await AsyncStorage.setItem("user_id", user.user_id);
+        await AsyncStorage.setItem("user_id", user.user_id); // Custom ID (USR000035)
+        await AsyncStorage.setItem("mongo_user_id", user._id); // ✅ ADDED - MongoDB ObjectId
         await AsyncStorage.setItem(
           "userName",
           user.name ||
@@ -166,6 +169,8 @@ export default function SignInScreen({ navigation }) {
         );
         await AsyncStorage.setItem("userEmail", user.email);
         console.log('✅ [SIGNIN] User data saved to AsyncStorage');
+        console.log('✅ [SIGNIN] Stored user_id:', user.user_id);
+        console.log('✅ [SIGNIN] Stored mongo_user_id:', user._id);
       }
 
       showAlert("Success", "Login successful!", "success");
