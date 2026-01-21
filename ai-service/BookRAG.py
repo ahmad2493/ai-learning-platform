@@ -16,7 +16,7 @@ load_dotenv()
 
 
 class BookRAG:
-    def __init__(self, markdown_file, persist_dir="./chroma_physicsBook9"):
+    def __init__(self, markdown_file, persist_dir="/mnt/chroma/chromadb_physicsBook9"):
         self.markdown_file = markdown_file
         self.persist_dir = persist_dir
         self.math_vectorstore = None
@@ -41,6 +41,9 @@ class BookRAG:
         chunks = splitter.split_documents(documents)
         return chunks
 
+    # --------------------------------------------------
+    # Separate Chunks based on content
+    # --------------------------------------------------
     def separate_chunks(self, chunks):
         math_chunks = []
         text_chunks = []
@@ -64,7 +67,7 @@ class BookRAG:
             self.math_vectorstore = Chroma.from_documents(
                 documents=math_chunks,
                 embedding=math_embeddings,
-                persist_directory=os.path.join(self.persist_dir, "math"),
+                persist_directory= os.path.join(self.persist_dir, "math"),
                 collection_name="math_docs"
             )
 
@@ -100,105 +103,283 @@ class BookRAG:
                 collection_name="text_docs"
             )
 
-    def dual_retrieve(self, question, k=5):
-        # Extract numbers (e.g., "3.2" from "Example 3.2")
-        number_matches = re.findall(r'\d+\.?\d*', question)
+    # --------------------------------------------------
+    # Map Reference Queries to their category e.g SQ, MCQ
+    # --------------------------------------------------
+    def parse_reference_query(self, question):
+        question_lower = question.lower()
 
-        ref_keywords = {'example', 'exercise', 'problem', 'table', 'figure', 'section', 'chapter', 'question', 'ex'}
-        found_ref_keyword = None
-        for kw in ref_keywords:
-            if kw in question.lower():
-                found_ref_keyword = kw
+        # Extended mapping for reference types with their common variations
+        ref_type_mapping = {
+            'short question': ['short question', 'short questions', 'short answer', 'sq', 's.q'],
+            'mcq': ['mcq', 'mcqs', 'multiple choice', 'multiple choice question', 'm.c.q', 'tick'],
+            'example': ['example', 'ex', 'ex.'],
+            'exercise': ['exercise', 'problem', 'prob'],
+            'numerical': ['numerical', 'numerical problem', 'numerical problems'],
+            'table': ['table', 'tab', 'tab.'],
+            'figure': ['figure', 'fig', 'fig.'],
+            'activity': ['activity', 'act', 'act.'],
+            'constructed response': ['constructed response', 'constructed'],
+            'comprehensive': ['comprehensive', 'comprehensive question'],
+            'topic': ['topic', 'top', 'topic.'],
+            'chapter': ['chapter', 'ch', 'ch.'],
+            'question': ['question', 'q', 'q.']
+        }
+
+        found_ref_type = None
+        matched_keyword = None
+
+        # Find which reference type is mentioned
+        for ref_type, variations in ref_type_mapping.items():
+            for variation in variations:
+                # Use word boundaries to avoid false matches
+                pattern = rf'\b{re.escape(variation)}\b'
+                if re.search(pattern, question_lower):
+                    found_ref_type = ref_type
+                    matched_keyword = variation
+                    break
+            if found_ref_type:
                 break
 
-        # If we have numbers or reference keywords, use keyword-based filtering
-        if number_matches or found_ref_keyword:
-            return self.keyword_filtered_retrieve(question, number_matches, found_ref_keyword, k)
+        # This regex captures numbers like "1.2" as a single match
+        decimal_numbers = re.findall(r'\d+\.\d+', question)
+
+        # If no decimal numbers, try to construct them from context
+        if not decimal_numbers and found_ref_type:
+            # Try to find the "X.Y" pattern near the reference keyword
+            keyword_pos = question_lower.find(matched_keyword)
+            if keyword_pos != -1:
+                context = question[keyword_pos:keyword_pos + 30]
+                decimal_match = re.search(r'\b(\d+)\.(\d+)\b', context)
+                if decimal_match:
+                    decimal_numbers = [decimal_match.group(0)]
+
+        if not decimal_numbers:
+            decimal_numbers = re.findall(r'\d+', question)
+
+        return {
+            'ref_type': found_ref_type,
+            'matched_keyword': matched_keyword,
+            'numbers': decimal_numbers,
+            'original_query': question
+        }
+
+    # --------------------------------------------------
+    # Decide Retrieval Method i.e. Keyword or Semantic
+    # --------------------------------------------------
+    def dual_retrieve(self, question, k=5):
+        parsed = self.parse_reference_query(question)
+
+        # If we have a reference type or numbers, use keyword-based filtering
+        if parsed['ref_type'] or parsed['numbers']:
+            return self.keyword_filtered_retrieve(question, parsed, k)
         else:
-            # Fall back to semantic similarity
             return self.semantic_retrieve(question, k)
 
-    def keyword_filtered_retrieve(self, question, number_matches, found_ref_keyword, k):
-        candidate_docs = []
+    # --------------------------------------------------
+    # Keyword Retrieval
+    # --------------------------------------------------
+    def keyword_filtered_retrieve(self, question, parsed_info, k):
+        results = []
 
+        ref_type = parsed_info['ref_type']
+        numbers = parsed_info['numbers']
+        matched_keyword = parsed_info['matched_keyword']
+        full_ref_number = numbers[0] if len(numbers) == 1 else '.'.join(numbers[:2])
         if self.math_vectorstore:
-            all_math = self.math_vectorstore.similarity_search(question, k=1000)
-            candidate_docs.extend([(doc, "math") for doc in all_math])
+            all_math = self.math_vectorstore.similarity_search(question, k=k * 10)
+            results.extend([(doc, "math") for doc in all_math])
 
         if self.text_vectorstore:
-            all_text = self.text_vectorstore.similarity_search(question, k=1000)
-            candidate_docs.extend([(doc, "text") for doc in all_text])
+            all_text = self.text_vectorstore.similarity_search(question, k=k * 10)
+            results.extend([(doc, "text") for doc in all_text])
 
         filtered = []
         seen = set()
 
-        for doc, source_type in candidate_docs:
+        for doc, source_type in results:
             doc_hash = hash(doc.page_content)
             if doc_hash in seen:
                 continue
             seen.add(doc_hash)
 
             doc_content = doc.page_content
-            first_line = doc_content.split('\n')[0]
+            lines = doc_content.split('\n')
+            first_line = lines[0] if lines else ""
 
-            matches = False
-            match_score = 0
+            # Look for section headers in more lines
+            header_context = '\n'.join(lines[:10]).lower()
 
-            # HIGHEST PRIORITY: Case-insensitive exact match of "Example 3.2" in the header
-            if found_ref_keyword and number_matches:
-                for num in number_matches:
-                    # Create a pattern that matches the keyword (case-insensitive) followed by a number
-                    pattern = rf'{found_ref_keyword}\s*{re.escape(num)}'
+            final_score = 0.0
+            match_found = False
+
+            #PRIORITY 1: EXACT REFERENCE MATCH IN HEADER
+            if ref_type and numbers:
+                exact_patterns = []
+
+                if ref_type == 'example':
+                    exact_patterns = [
+                        rf'##\s*example\s+{re.escape(full_ref_number)}\b',
+                        rf'##\s*ex\.?\s+{re.escape(full_ref_number)}\b'
+                    ]
+                elif ref_type == 'table':
+                    exact_patterns = [
+                        rf'##\s*table\s+{re.escape(full_ref_number)}\b',
+                        rf'##\s*tab\.?\s+{re.escape(full_ref_number)}\b'
+                    ]
+                elif ref_type == 'figure':
+                    exact_patterns = [
+                        rf'##\s*Fig\.?\s+{re.escape(full_ref_number)}\b',
+                        rf'##\s*fig\.?\s+{re.escape(full_ref_number)}\b'
+                    ]
+                elif ref_type == 'activity':
+                    exact_patterns = [
+                        rf'##\s*activity\s*{re.escape(full_ref_number)}\b',
+                        rf'##\s*act\.?\s*{re.escape(full_ref_number)}\b'
+                    ]
+                elif ref_type == 'topic':
+                    exact_patterns = [
+                        rf'##\s*{re.escape(full_ref_number)}\s',
+                        rf'##{re.escape(full_ref_number)}\s',
+                    ]
+
+                for pattern in exact_patterns:
                     if re.search(pattern, first_line, re.IGNORECASE):
-                        match_score += 1000
-                        matches = True
+                        final_score += 100.0  # VERY HIGH score for exact header match
+                        match_found = True
                         break
-            # HIGH PRIORITY: Reference pattern anywhere in content
-            if found_ref_keyword and not matches:
-                for num in number_matches:
-                    pattern = rf'{found_ref_keyword}\s*{re.escape(num)}'
+
+            #PRIORITY 2: SECTION-BASED QUESTIONS (Short Questions, MCQs)
+            if ref_type == 'short question' and numbers:
+                if re.search(r'short\s+(answer\s+)?question', header_context):
+                    final_score += 50.0
+                    match_found = True
+
+                    # Match patterns like "1.4." or "1.4" or "- 1.4"
+                    number_patterns = [
+                        rf'^\s*-?\s*{re.escape(full_ref_number)}[\.\s]',
+                        rf'\b{re.escape(full_ref_number)}[\.\s]',
+                    ]
+
+                    for pattern in number_patterns:
+                        if re.search(pattern, doc_content, re.MULTILINE):
+                            final_score += 30.0
+                            break
+
+            elif ref_type == 'mcq' and numbers:
+                if re.search(r'(multiple\s+choice|mcq|tick.*correct)', header_context):
+                    final_score += 50.0
+                    match_found = True
+
+                    full_ref_number = numbers[0] if len(numbers) == 1 else '.'.join(numbers[:2])
+
+                    number_patterns = [
+                        rf'^\s*-?\s*{re.escape(full_ref_number)}[\.\s]',
+                        rf'\b{re.escape(full_ref_number)}[\.\s]',
+                    ]
+
+                    for pattern in number_patterns:
+                        if re.search(pattern, doc_content, re.MULTILINE):
+                            final_score += 30.0
+                            break
+
+            elif ref_type == 'numerical' and numbers:
+                if re.search(r'numerical\s+problem', header_context):
+                    final_score += 50.0
+                    match_found = True
+
+                    full_ref_number = numbers[0] if len(numbers) == 1 else '.'.join(numbers[:2])
+
+                    number_patterns = [
+                        rf'^\s*-?\s*{re.escape(full_ref_number)}[\.\s]',
+                        rf'\b{re.escape(full_ref_number)}[\.\s]',
+                    ]
+
+                    for pattern in number_patterns:
+                        if re.search(pattern, doc_content, re.MULTILINE):
+                            final_score += 30.0
+                            break
+
+            elif ref_type == 'topic' and numbers:
+                match_found = False
+                full_ref_number = numbers[0] if len(numbers) == 1 else '.'.join(numbers[:2])
+
+                header_pattern = rf'^##\s+{re.escape(full_ref_number)}\s+\S'
+                if re.search(header_pattern, doc_content, re.MULTILINE):
+                    final_score += 200.0
+                    match_found = True
+                elif not match_found:
+                    list_pattern = rf'^\s*-\s*{re.escape(full_ref_number)}\s+\w'
+                    if re.search(list_pattern, doc_content, re.MULTILINE):
+                        final_score += 50.0  # Lower score for list items
+                        match_found = True
+                if not match_found:
+                    number_patterns = [
+                        rf'^\s*-?\s*{re.escape(full_ref_number)}[\.\s]',
+                        rf'\b{re.escape(full_ref_number)}[\.\s]',
+                    ]
+                    for pattern in number_patterns:
+                        if re.search(pattern, doc_content, re.MULTILINE):
+                            final_score += 20.0
+                            match_found = True
+                            break
+            elif ref_type == 'figure' and numbers:
+                if re.search(rf'\bFig\.?\s+{re.escape(full_ref_number)}\b',doc_content):
+                    final_score += 50.0
+                    match_found = True
+
+            #PRIORITY 3: GENERAL REFERENCE IN CONTENT
+            if not match_found and ref_type and numbers:
+                full_ref_number = numbers[0] if len(numbers) == 1 else '.'.join(numbers[:2])
+
+                # Generic patterns for any reference type
+                content_patterns = [
+                    rf'\b{re.escape(ref_type)}\s+{re.escape(full_ref_number)}\b',
+                    rf'\b{re.escape(matched_keyword)}\s+{re.escape(full_ref_number)}\b'
+                ]
+
+                for pattern in content_patterns:
                     if re.search(pattern, doc_content, re.IGNORECASE):
-                        match_score += 500
-                        matches = True
+                        final_score += 10.0
+                        match_found = True
                         break
 
-            # MEDIUM PRIORITY: Number match in header
-            if number_matches and not matches:
-                for num in number_matches:
-                    if num in first_line:
-                        match_score += 100
-                        matches = True
-                        break
+            # PRIORITY 4: NUMBER MATCH ONLY
+            if not match_found and numbers:
+                full_ref_number = numbers[0] if len(numbers) == 1 else '.'.join(numbers[:2])
 
-            # LOW PRIORITY: Number anywhere in content
-            if number_matches and not matches:
-                for num in number_matches:
-                    if num in doc_content:
-                        match_score += 50
-                        matches = True
-                        break
+                # Check in the first line
+                if full_ref_number in first_line:
+                    final_score += 5.0
+                    match_found = True
+                # Check in content
+                elif full_ref_number in doc_content:
+                    final_score += 2.0
+                    match_found = True
 
-            if matches:
-                filtered.append((doc, match_score, source_type))
+            if match_found:
+                filtered.append((doc, final_score))
 
-        # Sort by match score
         filtered.sort(key=lambda x: x[1], reverse=True)
 
-        # Return top k
         if filtered:
-            return [doc for doc, _, _ in filtered[:k]]
+            return [doc for doc, _ in filtered[:k]]
         else:
             return self.semantic_retrieve(question, k)
 
+    # --------------------------------------------------
+    # Semantic Retrieve
+    # --------------------------------------------------
     def semantic_retrieve(self, question, k):
         results = []
 
         if self.math_vectorstore:
-            math_results = self.math_vectorstore.similarity_search(question, k=k)
+            math_results = self.math_vectorstore.similarity_search(question, k=k * 3)
             results.extend([(doc, "math") for doc in math_results])
 
         if self.text_vectorstore:
-            text_results = self.text_vectorstore.similarity_search(question, k=k)
+            text_results = self.text_vectorstore.similarity_search(question, k=k * 3)
+
             results.extend([(doc, "text") for doc in text_results])
 
         seen = set()
@@ -209,16 +390,34 @@ class BookRAG:
                 continue
             seen.add(doc.page_content)
 
-            score = 0
+            final_score = 0.1
+
+            stopwords = {'what', 'are', 'is', 'the', 'a', 'an', 'in', 'on', 'at', 'to', 'for', 'of', 'and', 'or', 'but',
+                         'be', 'been', 'by', 'do', 'does', 'did', 'will', 'would', 'could', 'should', 'may', 'might',
+                         'must', 'can', 'have', 'has', 'had', 'this', 'that', 'these', 'those'}
+
+            question_words = set(word for word in question.lower().split() if word not in stopwords and len(word) > 2)
+            doc_words = set(doc.page_content.lower().split())
+            keyword_overlap = len(question_words & doc_words)
+            final_score += keyword_overlap * 0.1
+
+            first_line = doc.page_content.split('\n')[0]
+            header = first_line.lstrip("#").strip().lower()
+            normalized_question = question.strip().lower()
+
+            if header == normalized_question:
+                final_score += 2.0
+            elif normalized_question in header:
+                final_score += 1.0
+
             math_keywords = {'formula', 'equation', 'calculate', 'solve', 'derive', 'proof', 'law', 'theorem'}
             if source_type == "math" and any(kw in question.lower() for kw in math_keywords):
-                score += 50
+                final_score += 0.5
 
-            scored.append((doc, score))
+            scored.append((doc, final_score))
 
         scored.sort(key=lambda x: x[1], reverse=True)
         return [doc for doc, _ in scored[:k]]
-
 
     # --------------------------------------------------
     # Setup QA Chain
@@ -241,21 +440,38 @@ class BookRAG:
 
         prompt = PromptTemplate(
             input_variables=["context", "question"],
-            template="""
+            template=r"""
                 Use the context below to answer the question.
-                Pay close attention to mathematical formulas.
-                Do NOT invent formulas. If you get latex in the context, convert it into normal form.
-                Give answers in human readable, neat and clean form. Do not give formulas and scientific notations in latex.
-
+                The context may contain LaTeX, equations, or textbook formatting.
+        
+                Interpret the mathematics correctly, but DO NOT copy the formatting.
+        
+                STRICT FORMAT RULES (MANDATORY):
+                - Do NOT use LaTeX or math blocks.
+                - Do NOT use markdown (no headings, lists, or bold text).
+                - Write all mathematics inline using Unicode symbols (², √, ×).
+                - Do not number steps or label sections.
+                - Do not imitate textbook solution layouts.
+        
+                Required answer structure:
+                Perform mathematical derivations/solution step by step in each line.
+                State given values in sentences.
+                Write formulas inline.
+                Substitute values inline.
+                Compute results.
+                State final answers clearly.
+                BUT THE CONTENT SHOULD BE RELATED TO CONTEXT.
+        
                 Context:
                 {context}
-
+        
                 Question:
                 {question}
-
+        
                 Answer:
                 """
         )
+
         retriever = DualRetriever()
         self.qa_chain = RetrievalQA.from_chain_type(
             llm=llm,
@@ -270,39 +486,20 @@ class BookRAG:
     # --------------------------------------------------
     def ask(self, question):
         result = self.qa_chain.invoke({"query": question})
+        return result['result']
 
-        print("\n" + "=" * 70)
-        print("ANSWER:")
-        print("=" * 70)
-        print(result["result"])
+    # --------------------------------------------------
+    # Prepare RAG Instance
+    # --------------------------------------------------
+    def prepare_rag(self):
+        math_exists = os.path.exists(os.path.join(self.persist_dir, "math"))
+        text_exists = os.path.exists(os.path.join(self.persist_dir, "text"))
 
-
-# ------------------------------------------------------
-# MAIN
-# ------------------------------------------------------
-def main():
-    rag = BookRAG("PhysicsBook_docling.md")
-
-    math_exists = os.path.exists(os.path.join(rag.persist_dir, "math"))
-    text_exists = os.path.exists(os.path.join(rag.persist_dir, "text"))
-
-    if math_exists and text_exists:
-        rag.load_vectorstores()
-    else:
-        chunks = rag.load_and_chunk()
-        rag.create_vectorstores(chunks)
-
-    rag.setup_qa()
-
-    while True:
-        print("\n" + "=" * 70)
-        q = input("Ask a question ('exit' to quit): ").strip()
-
-        if q.lower() in ["exit", "quit"]:
-            break
+        if math_exists and text_exists:
+            self.load_vectorstores()
         else:
-            rag.ask(q)
+            chunks = self.load_and_chunk()
+            self.create_vectorstores(chunks)
 
+        self.setup_qa()
 
-if __name__ == "__main__":
-    main()
