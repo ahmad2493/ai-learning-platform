@@ -6,30 +6,94 @@ import {
   TouchableOpacity,
   ScrollView,
   Platform,
+  Image,
+  ActivityIndicator,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../utils/ThemeContext";
 import Sidebar from "./SidebarComponent";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { BASE_URL } from "../utils/apiConfig";
 
 export default function SettingsScreen({ navigation }) {
   const { theme } = useTheme();
   const [sidebarVisible, setSidebarVisible] = useState(false);
   const [userName, setUserName] = useState("User");
   const [userEmail, setUserEmail] = useState("");
+  const [profilePicture, setProfilePicture] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const loadUserData = async () => {
+    loadUserData();
+
+    // Refresh profile data when screen comes into focus
+    const unsubscribe = navigation.addListener('focus', () => {
+      loadUserData();
+    });
+
+    return unsubscribe;
+  }, [navigation]);
+
+  const loadUserData = async () => {
+    try {
+      setLoading(true);
+      
+      // Load from AsyncStorage first
       const name = await AsyncStorage.getItem("userName");
       const email = await AsyncStorage.getItem("userEmail");
+      const mongoId = await AsyncStorage.getItem("mongo_user_id");
+      const token = await AsyncStorage.getItem("authToken");
+
       if (name) setUserName(name);
       if (email) setUserEmail(email);
-    };
-    loadUserData();
-  }, []);
+
+      // Fetch profile data from backend to get profile picture
+      if (mongoId) {
+        await fetchProfileData(mongoId, token);
+      }
+    } catch (error) {
+      console.error("❌ [SETTINGS] Error loading user data:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchProfileData = async (userId, token) => {
+    try {
+      const headers = {
+        "Content-Type": "application/json",
+        "ngrok-skip-browser-warning": "true",
+      };
+
+      if (token) {
+        headers["Authorization"] = `Bearer ${token}`;
+      }
+
+      const response = await fetch(`${BASE_URL}/profile/${userId}`, {
+        method: "GET",
+        headers: headers,
+      });
+
+      const result = await response.json();
+
+      if (result.success && result.data) {
+        // Update profile picture
+        setProfilePicture(result.data.profile_photo_url);
+        
+        // Update name if it's different (in case it was updated in profile screen)
+        if (result.data.name) {
+          setUserName(result.data.name);
+          await AsyncStorage.setItem("userName", result.data.name);
+        }
+      }
+    } catch (error) {
+      console.error("❌ [SETTINGS] Error fetching profile data:", error);
+    }
+  };
 
   const getInitials = (name) => {
+    if (!name) return "";
     const names = name.split(" ");
     return names
       .map((n) => n[0])
@@ -72,9 +136,18 @@ export default function SettingsScreen({ navigation }) {
                   { backgroundColor: theme.primary },
                 ]}
               >
-                <Text style={styles.profileInitials}>
-                  {getInitials(userName)}
-                </Text>
+                {loading ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : profilePicture ? (
+                  <Image
+                    source={{ uri: profilePicture }}
+                    style={styles.profileImageFull}
+                  />
+                ) : (
+                  <Text style={styles.profileInitials}>
+                    {getInitials(userName)}
+                  </Text>
+                )}
               </View>
             </View>
             <View style={styles.profileInfo}>
@@ -198,11 +271,16 @@ const styles = StyleSheet.create({
     marginRight: 15,
   },
   profileImage: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
+    width: 70,
+    height: 70,
+    borderRadius: 35,
     justifyContent: "center",
     alignItems: "center",
+    overflow: "hidden",
+  },
+  profileImageFull: {
+    width: "100%",
+    height: "100%",
   },
   profileInitials: {
     fontSize: 24,

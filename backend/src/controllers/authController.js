@@ -2,6 +2,7 @@ const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 const nodemailer = require('nodemailer');
 const User = require('../models/User');
+const Student = require('../models/Student'); // ✅ IMPORT STUDENT MODEL
 const { generateToken } = require('../utils/jwt');
 const { validateEmail } = require('../utils/validateEmail');
 const generateUserId = require('../utils/generateUserId');
@@ -138,6 +139,18 @@ exports.registerUser = async (req, res) => {
   }
 };
 
+// ✅ HELPER FUNCTION TO GENERATE STUDENT ID
+const generateStudentId = async () => {
+  const lastStudent = await Student.findOne().sort({ student_id: -1 });
+  
+  if (!lastStudent) {
+    return 'STU001';
+  }
+  
+  const lastNumber = parseInt(lastStudent.student_id.replace('STU', ''));
+  const newNumber = lastNumber + 1;
+  return `STU${String(newNumber).padStart(3, '0')}`;
+};
 
 // ==================== REGISTER USER - STEP 2: VERIFY OTP & CREATE ACCOUNT ====================
 exports.verifyRegistrationOTP = async (req, res) => {
@@ -181,6 +194,8 @@ exports.verifyRegistrationOTP = async (req, res) => {
     // Generate User ID
     const user_id = await generateUserId();
 
+    console.log('👤 [REGISTRATION] Creating user...');
+
     // Create User
     const user = await User.create({
       user_id,
@@ -195,11 +210,40 @@ exports.verifyRegistrationOTP = async (req, res) => {
       dob: new Date('2000-01-01'),
       address: 'Not Provided',
       status: 'Active',
-      profile_photo_url: 'default-avatar.png',
-      twoFactorEnabled: false, // ✅ Default to false
+      profile_photo_url: null, // ✅ Changed from 'default-avatar.png' to null
+      twoFactorEnabled: false,
       created_at: new Date(),
       updated_at: new Date(),
     });
+
+    console.log('✅ [REGISTRATION] User created with _id:', user._id);
+
+    // ✅ CREATE CORRESPONDING STUDENT RECORD
+    try {
+      const student_id = await generateStudentId();
+      
+      console.log('🎓 [REGISTRATION] Creating student record...');
+      
+      const student = await Student.create({
+        student_id: student_id,
+        user_id: user._id, // ✅ Link to User's MongoDB _id
+        grade: 10, // Default grade
+        bio: '', // Empty bio initially
+        board: 'Not Specified', // Default board
+        personal_preferences: 'Not Specified', // Default preferences
+        registration_date: new Date(),
+        guardian_name: 'Not Provided', // Default guardian name
+        guardian_contact_no: '0000000000', // Default guardian contact
+      });
+
+      console.log('✅ [REGISTRATION] Student record created:', student.student_id);
+
+    } catch (studentError) {
+      console.error('❌ [REGISTRATION] Error creating student record:', studentError);
+      // If student creation fails, delete the user to maintain data consistency
+      await User.findByIdAndDelete(user._id);
+      throw new Error('Failed to create student record');
+    }
 
     // Generate Token
     const token = generateToken(user);
@@ -209,6 +253,7 @@ exports.verifyRegistrationOTP = async (req, res) => {
       message: 'Registration successful! You can now sign in.',
       data: {
         user: {
+          _id: user._id.toString(),
           user_id: user.user_id,
           name: user.name,
           email: user.email,
@@ -219,7 +264,7 @@ exports.verifyRegistrationOTP = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('OTP verification error:', error);
+    console.error('❌ [REGISTRATION] OTP verification error:', error);
     return res.status(500).json({
       success: false,
       message: 'Server error during verification.',
@@ -276,7 +321,7 @@ exports.loginUser = async (req, res) => {
 
       return res.status(200).json({
         success: true,
-        requiresTwoFactor: true, // ✅ Flag to indicate 2FA is required
+        requiresTwoFactor: true,
         message: 'OTP sent to your email for two-factor authentication',
         data: {
           email: email,
@@ -293,7 +338,7 @@ exports.loginUser = async (req, res) => {
 
     // Return user data (exclude password)
     const userData = {
-      _id:user._id.toString(),
+      _id: user._id.toString(),
       user_id: user.user_id,
       name: user.name,
       email: user.email,
@@ -362,7 +407,7 @@ exports.verifyTwoFactorOTP = async (req, res) => {
 
     // Return user data (exclude password)
     const userData = {
-      _id:user._id.toString(),
+      _id: user._id.toString(),
       user_id: user.user_id,
       name: user.name,
       email: user.email,
@@ -543,7 +588,7 @@ exports.resetPassword = async (req, res) => {
       });
     }
 
-    // Validate password strength (changed to 5 from 8)
+    // Validate password strength
     if (newPassword.length < 5) {
       return res.status(400).json({
         success: false,
@@ -583,7 +628,6 @@ exports.resetPassword = async (req, res) => {
     });
   }
 };
-
 
 // ==================== UPDATE PASSWORD ====================
 exports.updatePassword = async (req, res) => {
@@ -653,7 +697,7 @@ exports.getCurrentUser = async (req, res) => {
           email: user.email,
           role_name: user.role_name,
           profile_photo_url: user.profile_photo_url,
-          twoFactorEnabled: user.twoFactorEnabled || false, // ✅ Include 2FA status
+          twoFactorEnabled: user.twoFactorEnabled || false,
         }
       },
     });
@@ -670,8 +714,8 @@ module.exports = {
   registerUser: exports.registerUser,
   verifyRegistrationOTP: exports.verifyRegistrationOTP,
   loginUser: exports.loginUser,
-  verifyTwoFactorOTP: exports.verifyTwoFactorOTP, // ✅ NEW
-  toggleTwoFactor: exports.toggleTwoFactor, // ✅ NEW
+  verifyTwoFactorOTP: exports.verifyTwoFactorOTP,
+  toggleTwoFactor: exports.toggleTwoFactor,
   forgotPassword: exports.forgotPassword,
   verifyResetOTP: exports.verifyResetOTP,
   resetPassword: exports.resetPassword,

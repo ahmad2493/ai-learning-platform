@@ -33,6 +33,19 @@ export default function ResetPasswordScreen({ navigation, route }) {
   const showAlert = (title, message, type = "error") => {
     setAlertConfig({ title, message, type });
     setAlertVisible(true);
+
+    // ✅ AUTO-CLOSE SUCCESS ALERTS AFTER 2 SECONDS
+    if (type === "success") {
+      setTimeout(() => {
+        setAlertVisible(false);
+        handleSuccessNavigation();
+      }, 2000); // 2 seconds for success messages
+    }
+  };
+
+  const handleSuccessNavigation = () => {
+    console.log('🧭 [RESET PASSWORD] Navigating to Sign In');
+    navigation.navigate("SignIn");
   };
 
   const validateFields = () => {
@@ -89,7 +102,11 @@ export default function ResetPasswordScreen({ navigation, route }) {
 
       if (response.ok && data.success) {
         console.log('✅ [RESET PASSWORD] Password reset successful');
-        showAlert("Success", "Your password has been reset successfully! You can now sign in with your new password.", "success");
+        showAlert(
+          "Success", 
+          "Your password has been reset successfully!",
+          "success"
+        );
       } else {
         console.log('❌ [RESET PASSWORD] Failed:', data.message);
         showAlert("Reset Failed", data.message || "Please try again.");
@@ -111,9 +128,9 @@ export default function ResetPasswordScreen({ navigation, route }) {
         type={alertConfig.type}
         onClose={() => {
           setAlertVisible(false);
+          // Only navigate on manual close (button tap)
           if (alertConfig.type === "success") {
-            console.log('🧭 [RESET PASSWORD] Navigating to Sign In');
-            navigation.navigate("SignIn");
+            handleSuccessNavigation();
           }
         }}
       />

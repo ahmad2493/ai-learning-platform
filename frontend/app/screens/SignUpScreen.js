@@ -30,7 +30,7 @@ export default function SignUpScreen({ navigation }) {
   });
   const [errors, setErrors] = useState({});
   const [isModalVisible, setModalVisible] = useState(false);
-  const [tempUserId, setTempUserId] = useState(""); // Store temp user ID
+  const [tempUserId, setTempUserId] = useState("");
 
   const showAlert = (title, message, type = "error") => {
     setAlertConfig({ title, message, type });
@@ -85,28 +85,33 @@ export default function SignUpScreen({ navigation }) {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "ngrok-skip-browser-warning": "true", // Skip ngrok warning page
+          "ngrok-skip-browser-warning": "true",
         },
         body: JSON.stringify(requestBody),
       });
 
       console.log('📥 [SIGNUP] Response received');
       console.log('📥 [SIGNUP] Response status:', response.status);
-      console.log('📥 [SIGNUP] Response ok:', response.ok);
-      console.log('📥 [SIGNUP] Response headers:', response.headers);
 
       const data = await response.json();
       console.log('📥 [SIGNUP] Response data:', JSON.stringify(data, null, 2));
 
       if (data.success) {
-        console.log('✅ [SIGNUP] Registration successful!');
+        console.log('✅ [SIGNUP] OTP sent successfully!');
         console.log('✅ [SIGNUP] TempUserId:', data.data.tempUserId);
         
         // Store tempUserId for OTP verification
         setTempUserId(data.data.tempUserId);
         
-        showAlert("Success", data.message, "success");
-        // Navigation will happen in alert onClose
+        // ✅ NAVIGATE DIRECTLY TO OTP SCREEN WITHOUT SUCCESS ALERT
+        console.log('🧭 [SIGNUP] Navigating to OTP verification screen');
+        navigation.navigate("OtpVerification", { 
+          email: email,
+          name: fullName,
+          password: password,
+          tempUserId: data.data.tempUserId,
+          verificationType: "REGISTRATION"
+        });
       } else {
         console.log('❌ [SIGNUP] Registration failed:', data.message);
         showAlert("Registration failed", data.message || "Please try again.");
@@ -114,7 +119,6 @@ export default function SignUpScreen({ navigation }) {
     } catch (error) {
       console.error("❌ [SIGNUP] Fetch error:", error);
       console.error("❌ [SIGNUP] Error message:", error.message);
-      console.error("❌ [SIGNUP] Error stack:", error.stack);
       showAlert("Error", "An error occurred. Please try again.");
     }
   };
@@ -144,32 +148,13 @@ export default function SignUpScreen({ navigation }) {
     <SafeAreaView
       style={[styles.container, { backgroundColor: theme.background }]}
     >
+      {/* Only show alert for ERRORS, not success */}
       <CustomAlert
         visible={alertVisible}
         title={alertConfig.title}
         message={alertConfig.message}
         type={alertConfig.type}
-        onClose={() => {
-          setAlertVisible(false);
-          if (alertConfig.type === "success") {
-            console.log('🧭 [SIGNUP] Navigating to OTP verification screen');
-            console.log('🧭 [SIGNUP] Navigation params:', {
-              email,
-              name: fullName,
-              tempUserId,
-              verificationType: "REGISTRATION"
-            });
-            
-            // Navigate to OTP verification screen with data
-            navigation.navigate("OtpVerification", { 
-              email: email,
-              name: fullName,
-              password: password,
-              tempUserId: tempUserId,
-              verificationType: "REGISTRATION" // To differentiate from password reset
-            });
-          }
-        }}
+        onClose={() => setAlertVisible(false)}
       />
       <ScrollView contentContainerStyle={styles.scrollContent}>
         {/* Header Section */}

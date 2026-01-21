@@ -5,7 +5,6 @@ import {
   StyleSheet,
   TextInput,
   TouchableOpacity,
-  Alert,
   ActivityIndicator
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -13,6 +12,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../utils/ThemeContext';
 import { BASE_URL } from '../utils/apiConfig';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import CustomAlert from '../components/CustomAlert';
 
 export default function OtpVerificationScreen({ navigation, route }) {
   const { theme } = useTheme();
@@ -20,6 +20,12 @@ export default function OtpVerificationScreen({ navigation, route }) {
   const [timer, setTimer] = useState(60);
   const [isVerifying, setIsVerifying] = useState(false);
   const [isResending, setIsResending] = useState(false);
+  const [alertVisible, setAlertVisible] = useState(false);
+  const [alertConfig, setAlertConfig] = useState({
+    title: "",
+    message: "",
+    type: "error",
+  });
   const inputs = useRef([]);
 
   // Get parameters from navigation
@@ -33,6 +39,30 @@ export default function OtpVerificationScreen({ navigation, route }) {
     }, 1000);
     return () => clearInterval(interval);
   }, []);
+
+  const showAlert = (title, message, type = "error") => {
+    setAlertConfig({ title, message, type });
+    setAlertVisible(true);
+
+    // ✅ AUTO-CLOSE SUCCESS ALERTS AFTER 2 SECONDS
+    if (type === "success") {
+      setTimeout(() => {
+        setAlertVisible(false);
+        handleSuccessNavigation();
+      }, 2000); // 2 seconds for success messages
+    }
+  };
+
+  const handleSuccessNavigation = () => {
+    // Navigate based on verification type
+    if (verificationType === 'REGISTRATION') {
+      console.log('🧭 [OTP SCREEN] Navigating to SignIn');
+      navigation.navigate('SignIn');
+    } else if (verificationType === 'TWO_FACTOR_LOGIN') {
+      console.log('🧭 [OTP SCREEN] Navigating to StudentDashboard');
+      navigation.replace('StudentDashboard');
+    }
+  };
 
   const handleChange = (text, index) => {
     if (isNaN(text)) return;
@@ -68,7 +98,7 @@ export default function OtpVerificationScreen({ navigation, route }) {
     console.log('🔐 [OTP SCREEN] Verification Type:', verificationType);
 
     if (code.length !== 6) {
-      Alert.alert("Invalid OTP", "Please enter a 6-digit OTP.");
+      showAlert("Invalid OTP", "Please enter a 6-digit OTP.");
       return;
     }
 
@@ -105,19 +135,15 @@ export default function OtpVerificationScreen({ navigation, route }) {
           await AsyncStorage.setItem('userName', user.name);
           await AsyncStorage.setItem('userEmail', user.email);
           
-          Alert.alert(
+          // ✅ SHOW SUCCESS ALERT (will auto-close after 2s)
+          showAlert(
             "Login Successful!", 
             "You have been authenticated successfully.",
-            [
-              {
-                text: "OK",
-                onPress: () => navigation.replace('StudentDashboard')
-              }
-            ]
+            "success"
           );
         } else {
           console.log('❌ [OTP SCREEN] 2FA verification failed:', data.message);
-          Alert.alert("Verification Failed", data.message || "Invalid OTP. Please try again.");
+          showAlert("Verification Failed", data.message || "Invalid OTP. Please try again.");
           setOtp(new Array(6).fill(''));
           inputs.current[0]?.focus();
         }
@@ -145,19 +171,16 @@ export default function OtpVerificationScreen({ navigation, route }) {
 
         if (data.success) {
           console.log('✅ [OTP SCREEN] Registration OTP verified!');
-          Alert.alert(
+          
+          // ✅ SHOW SUCCESS ALERT (will auto-close after 2s)
+          showAlert(
             "Success!", 
             "Your account has been created successfully!",
-            [
-              {
-                text: "OK",
-                onPress: () => navigation.navigate('SignIn')
-              }
-            ]
+            "success"
           );
         } else {
           console.log('❌ [OTP SCREEN] Verification failed:', data.message);
-          Alert.alert("Verification Failed", data.message || "Invalid OTP. Please try again.");
+          showAlert("Verification Failed", data.message || "Invalid OTP. Please try again.");
           setOtp(new Array(6).fill(''));
           inputs.current[0]?.focus();
         }
@@ -182,21 +205,21 @@ export default function OtpVerificationScreen({ navigation, route }) {
 
         if (data.success) {
           console.log('✅ [OTP SCREEN] Password reset OTP verified!');
-          // Navigate to reset password screen with email and OTP
+          // Navigate to reset password screen without alert
           navigation.navigate('ResetPassword', {
             email: email,
             otp: code,
           });
         } else {
           console.log('❌ [OTP SCREEN] Verification failed:', data.message);
-          Alert.alert("Verification Failed", data.message || "Invalid OTP. Please try again.");
+          showAlert("Verification Failed", data.message || "Invalid OTP. Please try again.");
           setOtp(new Array(6).fill(''));
           inputs.current[0]?.focus();
         }
       }
     } catch (error) {
       console.error('❌ [OTP SCREEN] Verification error:', error);
-      Alert.alert("Error", "An error occurred. Please try again.");
+      showAlert("Error", "An error occurred. Please try again.");
     } finally {
       setIsVerifying(false);
     }
@@ -227,7 +250,6 @@ export default function OtpVerificationScreen({ navigation, route }) {
           email: email,
         };
       } else if (verificationType === 'TWO_FACTOR_LOGIN') {
-        // ✅ ADDED: Resend OTP for 2FA login
         endpoint = '/auth/login';
         requestBody = {
           email: email,
@@ -250,13 +272,13 @@ export default function OtpVerificationScreen({ navigation, route }) {
       if (data.success) {
         setTimer(60);
         setOtp(new Array(6).fill(''));
-        Alert.alert("OTP Sent", "A new verification code has been sent to your email.");
+        showAlert("OTP Sent", "A new verification code has been sent to your email.", "success");
       } else {
-        Alert.alert("Error", data.message || "Failed to resend OTP.");
+        showAlert("Error", data.message || "Failed to resend OTP.");
       }
     } catch (error) {
       console.error('❌ [OTP SCREEN] Resend error:', error);
-      Alert.alert("Error", "Failed to resend OTP. Please try again.");
+      showAlert("Error", "Failed to resend OTP. Please try again.");
     } finally {
       setIsResending(false);
     }
@@ -264,11 +286,27 @@ export default function OtpVerificationScreen({ navigation, route }) {
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
+      {/* ✅ CUSTOM ALERT COMPONENT */}
+      <CustomAlert
+        visible={alertVisible}
+        title={alertConfig.title}
+        message={alertConfig.message}
+        type={alertConfig.type}
+        onClose={() => {
+          setAlertVisible(false);
+          // Only navigate on manual close (button tap)
+          if (alertConfig.type === "success") {
+            handleSuccessNavigation();
+          }
+        }}
+      />
+
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()}>
           <Ionicons name="arrow-back-outline" size={28} color={theme.text} />
         </TouchableOpacity>
       </View>
+
       <View style={styles.content}>
         <Ionicons name="shield-checkmark-outline" size={80} color={theme.primary} />
         <Text style={[styles.title, {color: theme.text}]}>

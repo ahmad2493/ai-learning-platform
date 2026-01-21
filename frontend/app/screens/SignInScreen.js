@@ -33,6 +33,19 @@ export default function SignInScreen({ navigation }) {
   const showAlert = (title, message, type = "error") => {
     setAlertConfig({ title, message, type });
     setAlertVisible(true);
+
+    // ✅ AUTO-CLOSE SUCCESS ALERTS AFTER 2 SECONDS
+    if (type === "success") {
+      setTimeout(() => {
+        setAlertVisible(false);
+        handleSuccessNavigation();
+      }, 2000); // 2 seconds for success messages
+    }
+  };
+
+  const handleSuccessNavigation = () => {
+    console.log('🧭 [SIGNIN] Navigating to StudentDashboard');
+    navigation.navigate("StudentDashboard");
   };
 
   const validateFields = () => {
@@ -235,8 +248,9 @@ export default function SignInScreen({ navigation }) {
         type={alertConfig.type}
         onClose={() => {
           setAlertVisible(false);
+          // Only navigate on manual close (button tap)
           if (alertConfig.type === "success") {
-            navigation.navigate("StudentDashboard");
+            handleSuccessNavigation();
           }
         }}
       />

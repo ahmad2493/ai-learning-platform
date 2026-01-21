@@ -79,6 +79,13 @@ app.use('/api/admins', adminRoutes);
 const studentRoutes = require('./src/routes/studentRoutes');
 app.use('/api/students', studentRoutes);
 
+const profileRoutes = require('./src/routes/profileRoutes');
+app.use('/api/profile', profileRoutes);
+
+console.log('AWS Access Key:', process.env.AWS_ACCESS_KEY_ID ? 'Loaded' : 'Missing');
+console.log('AWS Secret Key:', process.env.AWS_SECRET_ACCESS_KEY ? 'Loaded' : 'Missing');
+console.log('AWS Region:', process.env.AWS_REGION );
+
 // Health check
 app.get('/', (req, res) => {
   res.json({ 

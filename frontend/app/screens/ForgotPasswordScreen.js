@@ -28,6 +28,22 @@ export default function ForgotPasswordScreen({ navigation }) {
   const showAlert = (title, message, type = "error") => {
     setAlertConfig({ title, message, type });
     setAlertVisible(true);
+
+    // ✅ AUTO-CLOSE SUCCESS ALERTS AFTER 2 SECONDS
+    if (type === "success") {
+      setTimeout(() => {
+        setAlertVisible(false);
+        handleSuccessNavigation();
+      }, 2000); // 2 seconds for success messages
+    }
+  };
+
+  const handleSuccessNavigation = () => {
+    console.log('🧭 [FORGOT PASSWORD] Navigating to OTP screen');
+    navigation.navigate('OtpVerification', {
+      email: email.toLowerCase(),
+      verificationType: 'PASSWORD_RESET',
+    });
   };
 
   const handleSendOTP = async () => {
@@ -70,7 +86,7 @@ export default function ForgotPasswordScreen({ navigation }) {
         console.log('✅ [FORGOT PASSWORD] OTP sent successfully');
         showAlert(
           "OTP Sent", 
-          "A verification code has been sent to your email. It will expire in 60 seconds.",
+          "A verification code has been sent to your email.",
           "success"
         );
       } else {
@@ -94,13 +110,9 @@ export default function ForgotPasswordScreen({ navigation }) {
         type={alertConfig.type}
         onClose={() => {
           setAlertVisible(false);
+          // Only navigate on manual close (button tap)
           if (alertConfig.type === "success") {
-            // Navigate to OTP verification screen
-            console.log('🧭 [FORGOT PASSWORD] Navigating to OTP screen');
-            navigation.navigate('OtpVerification', {
-              email: email.toLowerCase(),
-              verificationType: 'PASSWORD_RESET',
-            });
+            handleSuccessNavigation();
           }
         }}
       />

@@ -13,7 +13,7 @@ const userSchema = new mongoose.Schema(
         dob: {type: Date, required: true},
         address: {type: String, required: true},
         status: {type: String, required: true},
-        profile_photo_url: {type: String, required: true},
+        profile_photo_url: {type: String, default:null},
         // Password reset fields
         resetPasswordToken: { type: String },
         resetPasswordExpires: { type: Date },
