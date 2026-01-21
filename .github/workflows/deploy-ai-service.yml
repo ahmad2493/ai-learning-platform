@@ -1,5 +1,5 @@
-# Deploy FastAPI AI Service to DarsGah-Rag Azure Web App
-name: Build and deploy FastAPI to Azure Web App - DarsGah-Rag
+# Deploy FastAPI AI Service to Darsgah-Rag Azure Web App
+name: Build and deploy FastAPI to Azure Web App - Darsgah-Rag
 
 on:
   push:
@@ -76,8 +76,8 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Deploy to Azure Web App - DarsGah-Rag
+      - name: Deploy to Azure Web App - Darsgah-Rag
         uses: azure/webapps-deploy@v3
         with:
-          app-name: 'DarsGah-Rag'
+          app-name: 'Darsgah-Rag'
           images: ${{ steps.registry.outputs.image }}
