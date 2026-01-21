@@ -71,7 +71,7 @@ export default function SignInScreen({ navigation }) {
           if (userData.success && userData.data.user) {
             const user = userData.data.user;
             await AsyncStorage.setItem("user_id", user.user_id);
-            await AsyncStorage.setItem("mongo_user_id", user._id); // ✅ ADDED
+            await AsyncStorage.setItem("mongo_user_id", user._id);
             await AsyncStorage.setItem(
               "userName",
               user.name ||
@@ -137,11 +137,23 @@ export default function SignInScreen({ navigation }) {
         return;
       }
 
-      // SUCCESS
+      // ✅ CHECK IF 2FA IS REQUIRED
+      if (result.requiresTwoFactor) {
+        console.log('🔐 [SIGNIN] 2FA Required - Navigating to OTP screen');
+        navigation.navigate('OtpVerification', {
+          email: email,
+          password: password, // ✅ Pass password for resend functionality
+          verificationType: 'TWO_FACTOR_LOGIN'
+        });
+        return;
+      }
+
+      // ✅ NORMAL LOGIN (2FA NOT ENABLED)
+      console.log('✅ [SIGNIN] Normal login (no 2FA)');
       const { token } = result.data;
       console.log('✅ [SIGNIN] Login successful, token received');
 
-      // Store token with consistent key name
+      // Store token
       await AsyncStorage.setItem("authToken", token);
 
       // Fetch full user data
@@ -160,8 +172,8 @@ export default function SignInScreen({ navigation }) {
 
       if (meData.success && meData.data.user) {
         const user = meData.data.user;
-        await AsyncStorage.setItem("user_id", user.user_id); // Custom ID (USR000035)
-        await AsyncStorage.setItem("mongo_user_id", user._id); // ✅ ADDED - MongoDB ObjectId
+        await AsyncStorage.setItem("user_id", user.user_id);
+        await AsyncStorage.setItem("mongo_user_id", user._id);
         await AsyncStorage.setItem(
           "userName",
           user.name ||
@@ -169,14 +181,11 @@ export default function SignInScreen({ navigation }) {
         );
         await AsyncStorage.setItem("userEmail", user.email);
         console.log('✅ [SIGNIN] User data saved to AsyncStorage');
-        console.log('✅ [SIGNIN] Stored user_id:', user.user_id);
-        console.log('✅ [SIGNIN] Stored mongo_user_id:', user._id);
       }
 
       showAlert("Success", "Login successful!", "success");
     } catch (error) {
       console.error('❌ [SIGNIN] Login error:', error);
-      console.error('❌ [SIGNIN] Error message:', error.message);
       showAlert("Error", "Server error. Try again.");
     }
   };
@@ -212,7 +221,6 @@ export default function SignInScreen({ navigation }) {
   };
 
   const handleFacebookSignIn = () => {
-    // Handle Facebook sign in
     console.log("Facebook Sign In");
   };
 
@@ -435,9 +443,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     alignItems: "center",
   },
-  activeTab: {
-    // backgroundColor applied inline
-  },
+  activeTab: {},
   inactiveTab: {
     backgroundColor: "transparent",
   },

@@ -12,6 +12,10 @@ router.post('/register', authController.registerUser); // Step 1: Send OTP
 router.post('/verify-registration-otp', authController.verifyRegistrationOTP); // Step 2: Verify OTP & Create Account
 router.post('/login', authController.loginUser);
 
+// ==================== TWO-FACTOR AUTHENTICATION ROUTES ====================
+router.post('/verify-2fa-otp', authController.verifyTwoFactorOTP); // ✅ NEW
+router.post('/toggle-2fa', authenticateToken, authController.toggleTwoFactor); // ✅ NEW
+
 // ==================== FORGOT PASSWORD ROUTES (OTP-BASED) ====================
 router.post('/forgot-password', authController.forgotPassword);
 router.post('/verify-reset-otp', authController.verifyResetOTP);

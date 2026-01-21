@@ -19,6 +19,7 @@ const userSchema = new mongoose.Schema(
         resetPasswordExpires: { type: Date },
         // Google OAuth
         googleId: { type: String },
+        twoFactorEnabled: { type: Boolean, default: false },
         created_at: {type: Date, required: true, default: Date.now},
         updated_at: {type: Date, required: true, default: Date.now}
     }

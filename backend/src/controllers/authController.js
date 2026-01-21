@@ -196,6 +196,7 @@ exports.verifyRegistrationOTP = async (req, res) => {
       address: 'Not Provided',
       status: 'Active',
       profile_photo_url: 'default-avatar.png',
+      twoFactorEnabled: false, // ✅ Default to false
       created_at: new Date(),
       updated_at: new Date(),
     });
@@ -227,10 +228,12 @@ exports.verifyRegistrationOTP = async (req, res) => {
   }
 };
 
-// ==================== LOGIN USER ====================
+// ==================== LOGIN USER (WITH 2FA SUPPORT) ====================
 exports.loginUser = async (req, res) => {
   try {
     const { email, password } = req.body;
+
+    console.log('🔐 [LOGIN] Login attempt for:', email);
 
     // Validation
     if (!email || !password) {
@@ -260,11 +263,106 @@ exports.loginUser = async (req, res) => {
       });
     }
 
+    console.log('✅ [LOGIN] Password verified');
+    console.log('🔐 [LOGIN] 2FA Enabled:', user.twoFactorEnabled);
+
+    // Check if 2FA is enabled
+    if (user.twoFactorEnabled) {
+      console.log('📧 [LOGIN] 2FA is enabled, sending OTP...');
+      
+      // Generate and send OTP for 2FA
+      const otp = await createOTP(user._id, email, 'TWO_FACTOR_LOGIN');
+      await sendOTPEmail(email, otp, 'TWO_FACTOR_LOGIN');
+
+      return res.status(200).json({
+        success: true,
+        requiresTwoFactor: true, // ✅ Flag to indicate 2FA is required
+        message: 'OTP sent to your email for two-factor authentication',
+        data: {
+          email: email,
+          userId: user._id
+        }
+      });
+    }
+
+    // If 2FA is not enabled, proceed with normal login
+    console.log('✅ [LOGIN] 2FA not enabled, logging in directly');
+
     // Generate JWT token
     const token = generateToken(user);
 
     // Return user data (exclude password)
     const userData = {
+      _id:user._id.toString(),
+      user_id: user.user_id,
+      name: user.name,
+      email: user.email,
+      role_name: user.role_name,
+      profile_photo_url: user.profile_photo_url
+    };
+
+    res.status(200).json({
+      success: true,
+      requiresTwoFactor: false,
+      message: 'Login successful',
+      data: {
+        user: userData,
+        token
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ [LOGIN] Error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error during login'
+    });
+  }
+};
+
+// ==================== VERIFY 2FA OTP FOR LOGIN ====================
+exports.verifyTwoFactorOTP = async (req, res) => {
+  try {
+    const { email, otp } = req.body;
+
+    console.log('🔐 [2FA LOGIN] Verifying 2FA OTP for:', email);
+
+    // Validate inputs
+    if (!email || !otp) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email and OTP are required'
+      });
+    }
+
+    // Verify OTP
+    const verification = await verifyOTP(email, otp, 'TWO_FACTOR_LOGIN');
+
+    if (!verification.success) {
+      return res.status(400).json({
+        success: false,
+        message: verification.message
+      });
+    }
+
+    console.log('✅ [2FA LOGIN] OTP verified successfully');
+
+    // Find user
+    const user = await User.findById(verification.userId);
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    // Generate JWT token
+    const token = generateToken(user);
+
+    // Return user data (exclude password)
+    const userData = {
+      _id:user._id.toString(),
       user_id: user.user_id,
       name: user.name,
       email: user.email,
@@ -282,10 +380,60 @@ exports.loginUser = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Login error:', error);
+    console.error('❌ [2FA LOGIN] Error:', error);
     res.status(500).json({
       success: false,
-      message: 'Server error during login'
+      message: 'Error verifying 2FA OTP',
+      error: error.message
+    });
+  }
+};
+
+// ==================== TOGGLE TWO-FACTOR AUTHENTICATION ====================
+exports.toggleTwoFactor = async (req, res) => {
+  try {
+    const { userId, enabled } = req.body;
+
+    console.log('🔐 [TOGGLE 2FA] Request:', { userId, enabled });
+
+    if (!userId || enabled === undefined) {
+      return res.status(400).json({
+        success: false,
+        message: 'User ID and enabled status are required'
+      });
+    }
+
+    // Find user by MongoDB _id
+    const user = await User.findById(userId);
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    // Update twoFactorEnabled field
+    user.twoFactorEnabled = enabled;
+    user.updated_at = new Date();
+    await user.save();
+
+    console.log('✅ [TOGGLE 2FA] Updated successfully:', enabled);
+
+    res.status(200).json({
+      success: true,
+      message: `Two-factor authentication ${enabled ? 'enabled' : 'disabled'} successfully`,
+      data: {
+        twoFactorEnabled: user.twoFactorEnabled
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ [TOGGLE 2FA] Error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error toggling two-factor authentication',
+      error: error.message
     });
   }
 };
@@ -321,7 +469,7 @@ exports.forgotPassword = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      message: 'OTP sent to your email address. Valid for 30 seconds.',
+      message: 'OTP sent to your email address. Valid for 60 seconds.',
       email: email
     });
 
@@ -436,77 +584,6 @@ exports.resetPassword = async (req, res) => {
   }
 };
 
-// ==================== RESET PASSWORD (NEW - WITH OTP) ====================
-// exports.resetPassword = async (req, res) => {
-//   try {
-//     const { email, otp, newPassword, confirmPassword } = req.body;
-
-//     // Validate inputs
-//     if (!email || !otp || !newPassword || !confirmPassword) {
-//       return res.status(400).json({
-//         success: false,
-//         message: 'All fields are required'
-//       });
-//     }
-
-//     // Check if passwords match
-//     if (newPassword !== confirmPassword) {
-//       return res.status(400).json({
-//         success: false,
-//         message: 'Passwords do not match'
-//       });
-//     }
-
-//     // Validate password strength
-//     if (newPassword.length < 8) {
-//       return res.status(400).json({
-//         success: false,
-//         message: 'Password must be at least 8 characters long'
-//       });
-//     }
-
-//     // Verify OTP again for security
-//     const verification = await verifyOTP(email, otp, 'PASSWORD_RESET');
-
-//     if (!verification.success) {
-//       return res.status(400).json({
-//         success: false,
-//         message: 'Invalid or expired OTP'
-//       });
-//     }
-
-//     // Find user
-//     const user = await User.findById(verification.userId);
-
-//     if (!user) {
-//       return res.status(404).json({
-//         success: false,
-//         message: 'User not found'
-//       });
-//     }
-
-//     // Hash new password
-//     const hashedPassword = await bcrypt.hash(newPassword, 10);
-
-//     // Update password
-//     user.password = hashedPassword;
-//     user.updated_at = new Date();
-//     await user.save();
-
-//     res.status(200).json({
-//       success: true,
-//       message: 'Password reset successfully. You can now login with your new password.'
-//     });
-
-//   } catch (error) {
-//     console.error('Reset password error:', error);
-//     res.status(500).json({
-//       success: false,
-//       message: 'Error resetting password',
-//       error: error.message
-//     });
-//   }
-// };
 
 // ==================== UPDATE PASSWORD ====================
 exports.updatePassword = async (req, res) => {
@@ -570,12 +647,13 @@ exports.getCurrentUser = async (req, res) => {
       success: true,
       data: { 
         user: {
-          _id: user._id,  // ✅ ADDED - MongoDB ObjectId for change password
+          _id: user._id,
           user_id: user.user_id,
           name: user.name,
           email: user.email,
           role_name: user.role_name,
           profile_photo_url: user.profile_photo_url,
+          twoFactorEnabled: user.twoFactorEnabled || false, // ✅ Include 2FA status
         }
       },
     });
@@ -592,6 +670,8 @@ module.exports = {
   registerUser: exports.registerUser,
   verifyRegistrationOTP: exports.verifyRegistrationOTP,
   loginUser: exports.loginUser,
+  verifyTwoFactorOTP: exports.verifyTwoFactorOTP, // ✅ NEW
+  toggleTwoFactor: exports.toggleTwoFactor, // ✅ NEW
   forgotPassword: exports.forgotPassword,
   verifyResetOTP: exports.verifyResetOTP,
   resetPassword: exports.resetPassword,

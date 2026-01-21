@@ -12,11 +12,12 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../utils/ThemeContext';
 import { BASE_URL } from '../utils/apiConfig';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function OtpVerificationScreen({ navigation, route }) {
   const { theme } = useTheme();
   const [otp, setOtp] = useState(new Array(6).fill(''));
-  const [timer, setTimer] = useState(60); // ✅ Changed from 30 to 60 seconds
+  const [timer, setTimer] = useState(60);
   const [isVerifying, setIsVerifying] = useState(false);
   const [isResending, setIsResending] = useState(false);
   const inputs = useRef([]);
@@ -74,7 +75,53 @@ export default function OtpVerificationScreen({ navigation, route }) {
     setIsVerifying(true);
 
     try {
-      if (verificationType === 'REGISTRATION') {
+      if (verificationType === 'TWO_FACTOR_LOGIN') {
+        // Two-factor authentication login
+        console.log('🌐 [OTP SCREEN] Verifying 2FA login OTP...');
+
+        const response = await fetch(`${BASE_URL}/auth/verify-2fa-otp`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'ngrok-skip-browser-warning': 'true',
+          },
+          body: JSON.stringify({
+            email: email,
+            otp: code,
+          }),
+        });
+
+        const data = await response.json();
+        console.log('📥 [OTP SCREEN] 2FA login response:', data);
+
+        if (data.success) {
+          console.log('✅ [OTP SCREEN] 2FA login successful!');
+          // Save token and user data
+          await AsyncStorage.setItem('authToken', data.data.token);
+          
+          const user = data.data.user;
+          await AsyncStorage.setItem('user_id', user.user_id);
+          await AsyncStorage.setItem('mongo_user_id', user._id);
+          await AsyncStorage.setItem('userName', user.name);
+          await AsyncStorage.setItem('userEmail', user.email);
+          
+          Alert.alert(
+            "Login Successful!", 
+            "You have been authenticated successfully.",
+            [
+              {
+                text: "OK",
+                onPress: () => navigation.replace('StudentDashboard')
+              }
+            ]
+          );
+        } else {
+          console.log('❌ [OTP SCREEN] 2FA verification failed:', data.message);
+          Alert.alert("Verification Failed", data.message || "Invalid OTP. Please try again.");
+          setOtp(new Array(6).fill(''));
+          inputs.current[0]?.focus();
+        }
+      } else if (verificationType === 'REGISTRATION') {
         // Registration OTP verification
         console.log('🌐 [OTP SCREEN] Verifying registration OTP...');
 
@@ -179,6 +226,13 @@ export default function OtpVerificationScreen({ navigation, route }) {
         requestBody = {
           email: email,
         };
+      } else if (verificationType === 'TWO_FACTOR_LOGIN') {
+        // ✅ ADDED: Resend OTP for 2FA login
+        endpoint = '/auth/login';
+        requestBody = {
+          email: email,
+          password: password,
+        };
       }
 
       const response = await fetch(`${BASE_URL}${endpoint}`, {
@@ -194,7 +248,7 @@ export default function OtpVerificationScreen({ navigation, route }) {
       console.log('📥 [OTP SCREEN] Resend response:', data);
 
       if (data.success) {
-        setTimer(60); // ✅ Reset to 60 seconds
+        setTimer(60);
         setOtp(new Array(6).fill(''));
         Alert.alert("OTP Sent", "A new verification code has been sent to your email.");
       } else {
@@ -217,7 +271,9 @@ export default function OtpVerificationScreen({ navigation, route }) {
       </View>
       <View style={styles.content}>
         <Ionicons name="shield-checkmark-outline" size={80} color={theme.primary} />
-        <Text style={[styles.title, {color: theme.text}]}>Verify Your Email</Text>
+        <Text style={[styles.title, {color: theme.text}]}>
+          {verificationType === 'TWO_FACTOR_LOGIN' ? 'Two-Factor Authentication' : 'Verify Your Email'}
+        </Text>
         <Text style={[styles.subtitle, {color: theme.textSecondary}]}>
           Enter the 6-digit code sent to {email || 'your email'}.
         </Text>
@@ -304,6 +360,7 @@ const styles = StyleSheet.create({
     fontSize: 28,
     fontWeight: 'bold',
     marginVertical: 15,
+    textAlign: 'center',
   },
   subtitle: {
     fontSize: 16,
