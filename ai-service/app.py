@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
-from BookRag import BookRAG
+from BookRAG import BookRAG
 
 app = FastAPI(title="BookRAG API")
 
