@@ -77,6 +77,22 @@ PORT=5000
 node server.js
 ```
 
+## Code Quality
+
+This project uses ESLint for code linting and Prettier for code formatting.
+
+### Linting
+```bash
+npm run lint          # Checks for code quality issues (ESLint)
+npm run lint:fix      # Automatically fixes ESLint issues where possible
+```
+
+### Formatting
+```bash
+npm run format        # Formats all code with Prettier
+npm run format:check  # Checks if code is properly formatted
+```
+
 ## API Endpoints
 
 ### Authentication
