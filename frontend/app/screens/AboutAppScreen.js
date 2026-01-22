@@ -1,3 +1,14 @@
+/**
+ * About App Screen - App Information
+ * Author: Momna Butt (BCSF22M021)
+ * 
+ * Functionality:
+ * - Displays app information and version details
+ * - Shows terms and conditions
+ * - Provides app credits and team information
+ * - Displays legal text and privacy information
+ */
+
 import React, { useState } from "react";
 import {
   View,

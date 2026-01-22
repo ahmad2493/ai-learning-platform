@@ -1,3 +1,14 @@
+/**
+ * Enrollment Model - Course Enrollment Schema
+ * Author: Muhammad Abubakar (BCSF22M006)
+ * 
+ * Functionality:
+ * - Defines student-course enrollment relationship
+ * - Tracks enrollment status and grades
+ * - Stores enrollment dates and remarks
+ * - Links students to courses via references
+ */
+
 const mongoose = require('mongoose');
 const EnrollmentSchema = new mongoose.Schema(
     {

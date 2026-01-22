@@ -1,3 +1,14 @@
+/**
+ * Past Papers Screen - Past Papers Access
+ * Author: Momna Butt (BCSF22M021)
+ * 
+ * Functionality:
+ * - Displays past papers by subject and chapter
+ * - Allows filtering and searching past papers
+ * - Provides access to historical test papers
+ * - Integrates with backend for paper retrieval
+ */
+
 import React, { useState } from 'react';
 import {
   View,

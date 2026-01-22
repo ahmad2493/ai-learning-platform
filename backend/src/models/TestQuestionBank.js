@@ -1,3 +1,14 @@
+/**
+ * Test Question Bank Model - Test Questions Schema
+ * Author: Muhammad Abubakar (BCSF22M006)
+ * 
+ * Functionality:
+ * - Stores test questions with options and answers
+ * - Tracks student answers and correctness
+ * - Links questions to tests via test_id reference
+ * - Stores question explanations and marks
+ */
+
 const mongoose = require('mongoose');
 const TestQuestionBankSchema = new mongoose.Schema(
     {

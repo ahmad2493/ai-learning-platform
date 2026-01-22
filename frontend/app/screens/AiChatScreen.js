@@ -1,3 +1,16 @@
+/**
+ * AI Chat Screen - Chat Interface for AI Assistant
+ * Author: Momna Butt (BCSF22M021)
+ * 
+ * Functionality:
+ * - Real-time chat interface for interacting with AI assistant
+ * - Sends questions to FastAPI AI service
+ * - Displays AI responses with loading states
+ * - Manages chat history and message state
+ * - Provides suggested prompts for quick questions
+ * - Handles keyboard interactions and scrolling
+ */
+
 import React, { useState, useRef, useEffect } from 'react';
 import {
   View,

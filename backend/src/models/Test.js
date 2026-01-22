@@ -1,3 +1,14 @@
+/**
+ * Test Model - Test Schema Definition
+ * Author: Muhammad Abubakar (BCSF22M006)
+ * 
+ * Functionality:
+ * - Defines test data structure
+ * - Links tests to courses and students
+ * - Tracks test chapters, topics, and marks
+ * - Stores test status and creation date
+ */
+
 const mongoose = require('mongoose');
 const TestSchema = new mongoose.Schema(
     {

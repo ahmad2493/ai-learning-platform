@@ -1,3 +1,15 @@
+/**
+ * Authentication Routes - API Endpoint Definitions
+ * Author: Muhammad Abubakar (BCSF22M006)
+ * 
+ * Functionality:
+ * - Defines all authentication-related API routes
+ * - Handles user registration, login, and OAuth
+ * - Manages password reset and OTP verification
+ * - Implements two-factor authentication endpoints
+ * - Protects routes with authentication middleware
+ */
+
 const express = require('express');
 const passport = require('passport');
 const router = express.Router();

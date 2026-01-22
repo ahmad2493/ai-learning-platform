@@ -1,3 +1,15 @@
+/**
+ * Test Generator Screen - Test Creation Interface
+ * Author: Momna Butt (BCSF22M021)
+ * 
+ * Functionality:
+ * - Interface for generating practice tests
+ * - Allows selection of test type (structured/prompt-based)
+ * - Configures question types (MCQ, Short, Long)
+ * - Submits test generation requests to backend
+ * - Displays test generation results
+ */
+
 import React, { useState } from 'react';
 import {
   View,

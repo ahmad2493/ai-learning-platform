@@ -1,3 +1,14 @@
+/**
+ * Profile Controller - User Profile Management
+ * Author: Muhammad Abubakar (BCSF22M006)
+ * 
+ * Functionality:
+ * - Handles user profile retrieval and updates
+ * - Manages profile picture uploads to S3
+ * - Updates user and student profile information
+ * - Validates profile data and permissions
+ */
+
 const User = require('../models/User');
 const Student = require('../models/Student');
 

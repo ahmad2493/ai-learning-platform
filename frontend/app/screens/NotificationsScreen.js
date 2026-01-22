@@ -1,3 +1,14 @@
+/**
+ * Notifications Screen - Notification Preferences
+ * Author: Momna Butt (BCSF22M021)
+ * 
+ * Functionality:
+ * - Manages notification preferences and settings
+ * - Allows users to enable/disable notification types
+ * - Controls reminders and course update notifications
+ * - Saves notification preferences
+ */
+
 import React, { useState } from "react";
 import {
   View,

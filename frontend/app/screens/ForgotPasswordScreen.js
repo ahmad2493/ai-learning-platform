@@ -1,3 +1,14 @@
+/**
+ * Forgot Password Screen - Password Recovery
+ * Author: Momna Butt (BCSF22M021)
+ * 
+ * Functionality:
+ * - Initiates password reset process
+ * - Sends OTP to user's email
+ * - Validates email input
+ * - Navigates to OTP verification screen
+ */
+
 import React, { useState } from "react";
 import {
   View,

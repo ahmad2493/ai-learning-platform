@@ -1,3 +1,15 @@
+/**
+ * App Navigator - Navigation Configuration
+ * Author: Momna Butt (BCSF22M021)
+ * 
+ * Functionality:
+ * - Configures React Navigation for the mobile app
+ * - Defines screen routes and navigation structure
+ * - Manages navigation stack and screen transitions
+ * - Handles authentication-based navigation flow
+ * - Provides navigation context to all screens
+ */
+
 import React from "react";
 import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";

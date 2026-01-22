@@ -1,3 +1,13 @@
+/**
+ * Profile Routes - Profile API Endpoints
+ * Author: Muhammad Abubakar (BCSF22M006)
+ * 
+ * Functionality:
+ * - Defines profile-related API routes
+ * - Handles profile retrieval and updates
+ * - Manages profile picture uploads with file validation
+ */
+
 const express = require('express');
 const router = express.Router();
 const upload = require('../middleware/uploadProfile');

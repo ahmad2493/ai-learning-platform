@@ -1,3 +1,14 @@
+/**
+ * Custom Alert Component - Reusable Alert Dialog
+ * Author: Momna Butt (BCSF22M021)
+ * 
+ * Functionality:
+ * - Displays custom alert dialogs with animations
+ * - Supports different alert types (success, error, warning, info)
+ * - Provides user-friendly notification system
+ * - Handles modal display and dismissal
+ */
+
 import React, { useEffect, useRef } from 'react';
 import {
   View,

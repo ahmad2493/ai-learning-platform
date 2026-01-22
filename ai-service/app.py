@@ -1,3 +1,15 @@
+"""
+FastAPI Application - AI Service Entry Point
+Authors: 
+  - Sajeela Safdar (BCSF22M001) - AI Development
+
+Functionality:
+  - FastAPI web server for AI question answering service
+  - Initializes RAG system with physics textbook
+  - Provides REST API endpoint for question answering
+  - Handles question requests and returns AI-generated answers
+"""
+
 from fastapi import FastAPI
 from pydantic import BaseModel
 from BookRAG import BookRAG

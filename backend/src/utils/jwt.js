@@ -1,3 +1,14 @@
+/**
+ * JWT Utility Functions
+ * Author: Muhammad Abubakar (BCSF22M006)
+ * 
+ * Functionality:
+ * - Generates JWT tokens for user authentication
+ * - Verifies JWT tokens and handles expiration
+ * - Extracts tokens from Authorization headers
+ * - Manages token payload (user ID, email, role)
+ */
+
 const jwt = require('jsonwebtoken');
 
 /**

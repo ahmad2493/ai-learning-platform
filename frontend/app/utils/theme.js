@@ -1,3 +1,14 @@
+/**
+ * Theme Configuration - Color Schemes
+ * Author: Momna Butt (BCSF22M021)
+ * 
+ * Functionality:
+ * - Defines light and dark theme color palettes
+ * - Provides consistent color scheme across the app
+ * - Supports theme switching functionality
+ * - Exports theme getter function for dynamic theme access
+ */
+
 // Theme colors for light and dark modes
 export const lightTheme = {
   // Background colors

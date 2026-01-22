@@ -1,3 +1,17 @@
+"""
+BookRAG - Retrieval-Augmented Generation System
+Author: Sajeela Safdar (BCSF22M001)
+
+Functionality:
+  - Implements dual vector store RAG system (MathBERT + OpenAI embeddings)
+  - Loads and chunks physics textbook markdown content
+  - Separates mathematical and textual content for specialized embeddings
+  - Creates/loads ChromaDB vector stores for semantic search
+  - Parses reference queries (MCQ, Short Questions, Examples, etc.)
+  - Implements hybrid retrieval (keyword + semantic) for optimal results
+  - Generates context-aware answers using LLM with retrieved context
+"""
+
 import os
 from typing import List
 import re

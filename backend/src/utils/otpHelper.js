@@ -1,3 +1,15 @@
+/**
+ * OTP Helper - One-Time Password Management
+ * Author: Muhammad Abubakar (BCSF22M006)
+ * 
+ * Functionality:
+ * - Generates 6-digit OTP codes for password reset
+ * - Creates and stores OTP in database with expiration
+ * - Verifies OTP validity and expiration
+ * - Invalidates used OTPs to prevent reuse
+ * - Manages OTP lifecycle (creation, verification, expiration)
+ */
+
 // const crypto = require('crypto');
 // const Otp = require('../models/Otp');
 

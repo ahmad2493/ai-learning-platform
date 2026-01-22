@@ -1,3 +1,15 @@
+/**
+ * Sign Up Screen - User Registration
+ * Author: Momna Butt (BCSF22M021)
+ * 
+ * Functionality:
+ * - User registration interface with form validation
+ * - Collects user information (name, email, password, etc.)
+ * - Handles OTP verification for email confirmation
+ * - Displays terms and conditions
+ * - Navigates to login after successful registration
+ */
+
 import React, { useState } from "react";
 import {
   View,

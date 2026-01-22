@@ -1,3 +1,14 @@
+/**
+ * Course Content Model - Course Material Schema
+ * Author: Muhammad Abubakar (BCSF22M006)
+ * 
+ * Functionality:
+ * - Defines course content structure (chapters, topics)
+ * - Links content to courses via course_id reference
+ * - Organizes content by chapter and topic numbers
+ * - Tracks content creation timestamps
+ */
+
 const mongoose = require('mongoose');
 const CourseContentSchema = new mongoose.Schema(
     {

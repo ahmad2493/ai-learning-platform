@@ -1,3 +1,15 @@
+/**
+ * Student Dashboard Screen
+ * Author: Momna Butt (BCSF22M021)
+ * 
+ * Functionality:
+ * - Main dashboard interface for students
+ * - Displays course overview and quick access to features
+ * - Shows performance metrics and learning progress
+ * - Navigation hub to other app features (AI Assistant, Tests, etc.)
+ * - Responsive UI with theme support
+ */
+
 import React, { useState, useEffect, useRef } from 'react';
 import {
   View,

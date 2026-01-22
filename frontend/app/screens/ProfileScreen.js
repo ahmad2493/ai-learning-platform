@@ -1,3 +1,15 @@
+/**
+ * Profile Screen - User Profile Management
+ * Author: Momna Butt (BCSF22M021)
+ * 
+ * Functionality:
+ * - Displays and edits user profile information
+ * - Handles profile picture upload and display
+ * - Updates user details (name, email, etc.)
+ * - Integrates with image picker for photo selection
+ * - Manages profile data synchronization with backend
+ */
+
 import React, { useState, useEffect } from 'react';
 import {
   View,

@@ -1,3 +1,14 @@
+/**
+ * Security Screen - Security Settings
+ * Author: Momna Butt (BCSF22M021)
+ * 
+ * Functionality:
+ * - Manages two-factor authentication (2FA) settings
+ * - Enables/disables 2FA for user account
+ * - Displays security options and preferences
+ * - Handles security-related API calls
+ */
+
 import React, { useState, useEffect } from 'react';
 import {
   View,

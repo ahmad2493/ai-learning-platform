@@ -1,3 +1,12 @@
+# GitHub Actions Workflow - Node.js Backend Deployment
+# Author: Muhammad Ahmad (BCSF22M002) - DevOps
+# 
+# Functionality:
+# - Builds Node.js backend application
+# - Runs npm install and tests
+# - Deploys to Azure Web App (DarsGah)
+# - Triggers on push to main branch
+
 # Docs for the Azure Web Apps Deploy action: https://github.com/Azure/webapps-deploy
 # More GitHub Actions for Azure: https://github.com/Azure/actions
 

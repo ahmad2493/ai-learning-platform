@@ -1,3 +1,15 @@
+/**
+ * Student Model - Student Schema Definition
+ * Author: Muhammad Abubakar (BCSF22M006)
+ * 
+ * Functionality:
+ * - Defines student-specific data schema
+ * - Links to base User model via user_id reference
+ * - Stores academic information (grade, board)
+ * - Manages guardian contact information
+ * - Tracks registration date and preferences
+ */
+
 const mongoose = require('mongoose');
 const Student= new mongoose.Schema(
     {

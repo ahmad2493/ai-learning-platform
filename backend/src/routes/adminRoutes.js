@@ -1,3 +1,14 @@
+/**
+ * Admin Routes - Administrative API Endpoints
+ * Author: Muhammad Abubakar (BCSF22M006)
+ * 
+ * Functionality:
+ * - Defines admin-only API routes
+ * - Handles student account management (suspend/activate)
+ * - Provides endpoints for viewing all students
+ * - Manages administrative operations
+ */
+
 // routes/AdminRoutes.js
 const express = require('express');
 const router = express.Router();

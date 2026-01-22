@@ -1,3 +1,15 @@
+/**
+ * Student Controller - Student Management Operations
+ * Author: Muhammad Abubakar (BCSF22M006)
+ * 
+ * Functionality:
+ * - Handles student profile management (name, email, password changes)
+ * - Manages student course enrollments
+ * - Processes student test submissions and results
+ * - Retrieves student dashboard data
+ * - Validates student operations and permissions
+ */
+
 // controllers/StudentController.js
 const mongoose = require('mongoose'); // ✅ ADDED - Required for ObjectId validation
 const Student = require('../models/Student');

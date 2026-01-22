@@ -1,3 +1,16 @@
+"""
+PDF Reader - PDF to Markdown Converter
+Author: Sajeela Safdar (BCSF22M001)
+
+Functionality:
+  - Converts PDF documents to markdown format for RAG processing
+  - Uses Docling library for advanced PDF parsing
+  - Processes PDFs in batches to handle large documents
+  - Extracts text, tables, and mathematical content
+  - Optimizes memory usage with garbage collection
+  - Supports CUDA acceleration for faster processing
+"""
+
 import gc
 import time
 import torch

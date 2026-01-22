@@ -1,3 +1,16 @@
+/**
+ * Authentication Controller
+ * Author: Muhammad Abubakar (BCSF22M006)
+ * 
+ * Functionality:
+ * - Handles user registration and login
+ * - Manages password hashing and verification
+ * - Implements OTP-based password reset flow
+ * - Sends email notifications for password reset
+ * - Generates JWT tokens for authenticated sessions
+ * - Validates user credentials and email formats
+ */
+
 const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 const nodemailer = require('nodemailer');

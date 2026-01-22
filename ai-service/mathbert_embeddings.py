@@ -1,3 +1,15 @@
+"""
+MathBERT Embeddings - Mathematical Content Embedding Model
+Author: Sajeela Safdar (BCSF22M001), Muhammad Ahmad (BCSF22M002)
+
+Functionality:
+  - Wraps MathBERT model for generating embeddings of mathematical content
+  - Uses Hugging Face transformers (tbs17/MathBERT) for math-aware embeddings
+  - Converts text to vector representations optimized for mathematical formulas
+  - Implements LangChain Embeddings interface for integration with vector stores
+  - Handles tokenization, model inference, and embedding generation
+"""
+
 from langchain.embeddings.base import Embeddings
 from transformers import AutoTokenizer, AutoModel
 import torch
