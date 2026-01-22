@@ -1,0 +1,5 @@
+--- backend/src/utils/s3.js
++++ backend/src/utils/s3.js
+@@ -1 +1 @@
+-const AWS = require('aws-sdk');
++const AWS = require("aws-sdk");

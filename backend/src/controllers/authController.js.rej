@@ -1,0 +1,143 @@
+--- backend/src/controllers/authController.js
++++ backend/src/controllers/authController.js
+@@ -1 +1 @@
+-const bcrypt = require('bcryptjs');
++const bcrypt = require("bcryptjs");
+@@ -2 +2 @@
+-const crypto = require('crypto');
++const crypto = require("crypto");
+@@ -3 +3 @@
+-const nodemailer = require('nodemailer');
++const nodemailer = require("nodemailer");
+@@ -4 +4 @@
+-const User = require('../models/User');
++const User = require("../models/User");
+@@ -5 +5 @@
+-const Student = require('../models/Student'); // â IMPORT STUDENT MODEL
++const Student = require("../models/Student"); // â IMPORT STUDENT MODEL
+@@ -6 +6 @@
+-const { generateToken } = require('../utils/jwt');
++const { generateToken } = require("../utils/jwt");
+@@ -7 +7 @@
+-const { validateEmail } = require('../utils/validateEmail');
++const { validateEmail } = require("../utils/validateEmail");
+@@ -8 +8 @@
+-const generateUserId = require('../utils/generateUserId');
++const generateUserId = require("../utils/generateUserId");
+@@ -9 +9 @@
+-const { createOTP, verifyOTP } = require('../utils/otpHelper');
++const { createOTP, verifyOTP } = require("../utils/otpHelper");
+@@ -10 +10 @@
+-const { sendOTPEmail } = require('../utils/emailService');
++const { sendOTPEmail } = require("../utils/emailService");
+@@ -14 +14 @@
+-  service: 'gmail',
++  service: "gmail",
+@@ -28 +28 @@
+-    subject: 'Password Reset - AI Learning Platform',
++    subject: "Password Reset - AI Learning Platform",
+@@ -51 +51 @@
+-    email = email ? email.trim().toLowerCase() : '';
++    email = email ? email.trim().toLowerCase() : "";
+@@ -52 +52 @@
+-    name = name ? name.trim() : '';
++    name = name ? name.trim() : "";
+@@ -58 +58 @@
+-        message: 'Name is required.',
++        message: "Name is required.",
+@@ -65 +65 @@
+-        message: 'Email is required.',
++        message: "Email is required.",
+@@ -72 +72 @@
+-        message: 'Password is required.',
++        message: "Password is required.",
+@@ -79 +79 @@
+-        message: 'Confirm password is required.',
++        message: "Confirm password is required.",
+@@ -87 +87 @@
+-        message: 'Passwords do not match.',
++        message: "Passwords do not match.",
+@@ -94 +94 @@
+-        message: 'Password must be at least 5 characters long.',
++        message: "Password must be at least 5 characters long.",
+@@ -112 +112 @@
+-        message: 'Email already registered.',
++        message: "Email already registered.",
+@@ -117 +117 @@
+-    const tempUserId = crypto.randomBytes(16).toString('hex');
++    const tempUserId = crypto.randomBytes(16).toString("hex");
+@@ -120 +120 @@
+-    const otp = await createOTP(tempUserId, email, 'REGISTRATION');
++    const otp = await createOTP(tempUserId, email, "REGISTRATION");
+@@ -121 +121 @@
+-    await sendOTPEmail(email, otp, 'REGISTRATION');
++    await sendOTPEmail(email, otp, "REGISTRATION");
+@@ -125 +125 @@
+-      message: 'OTP sent to your email. Valid for 60 seconds.',
++      message: "OTP sent to your email. Valid for 60 seconds.",
+@@ -133 +133 @@
+-    console.error('Registration error:', error);
++    console.error("Registration error:", error);
+@@ -136 +136 @@
+-      message: 'Server error during registration.',
++      message: "Server error during registration.",
+@@ -137 +137 @@
+-      error: error.message
++      error: error.message,
+@@ -147 +147 @@
+-    return 'STU001';
++    return "STU001";
+@@ -150 +150 @@
+-  const lastNumber = parseInt(lastStudent.student_id.replace('STU', ''));
++  const lastNumber = parseInt(lastStudent.student_id.replace("STU", ""));
+@@ -152 +152 @@
+-  return `STU${String(newNumber).padStart(3, '0')}`;
++  return `STU${String(newNumber).padStart(3, "0")}`;
+@@ -168 +168 @@
+-        message: 'All fields are required',
++        message: "All fields are required",
+@@ -173 +173 @@
+-    const verification = await verifyOTP(email, otp, 'REGISTRATION');
++    const verification = await verifyOTP(email, otp, "REGISTRATION");
+@@ -197 +197 @@
+-    console.log('ð¤ [REGISTRATION] Creating user...');
++    console.log("ð¤ [REGISTRATION] Creating user...");
+@@ -202 +202 @@
+-      role_id: 'ROLE001',
++      role_id: "ROLE001",
+@@ -203 +203 @@
+-      role_name: 'Student',
++      role_name: "Student",
+@@ -208 +208 @@
+-      contact_no: '0000000000',
++      contact_no: "0000000000",
+@@ -209 +209 @@
+-      gender: 'Not Specified',
++      gender: "Not Specified",
+@@ -210 +210 @@
+-      dob: new Date('2000-01-01'),
++      dob: new Date("2000-01-01"),
+@@ -211 +211 @@
+-      address: 'Not Provided',
++      address: "Not Provided",
+@@ -212 +212 @@
+-      status: 'Active',
++      status: "Active",
+@@ -219 +219 @@
+-    console.log('â [REGISTRATION] User created with _id:', user._id);
++    console.log("â [REGISTRATION] User created with _id:", user._id);
+@@ -225 +225 @@
+-      console.log('ð [REGISTRATION] Creating student record...');
++      console.log("ð [REGISTRATION] Creating student record...");
+@@ -231 +231 @@
+-        bio: '', // Empty bio initially
++        bio: "", // Empty bio initially
+@@ -232 +232 @@
+-        board: 'Not Specified', // Default board
++        board: "Not Specified", // Default board
+@@ -233 +233 @@
+-        personal_preferences: 'Not Specified', // Default preferences
++        personal_preferences: "Not Specified", // Default preferences
+@@ -235 +235 @@
+-        guardian_name: 'Not Provided', // Default guardian name
++        guardian_name: "Not Provided", // Default guardian name

@@ -1,0 +1,89 @@
+--- backend/src/controllers/ProfileController.js
++++ backend/src/controllers/ProfileController.js
+@@ -1 +1 @@
+-const User = require('../models/User');
++const User = require("../models/User");
+@@ -2 +2 @@
+-const Student = require('../models/Student');
++const Student = require("../models/Student");
+@@ -9 +9 @@
+-    console.log('ð¥ [PROFILE GET] Fetching profile for userId:', userId);
++    console.log("ð¥ [PROFILE GET] Fetching profile for userId:", userId);
+@@ -13 +13 @@
+-      return res.status(404).json({ 
++      return res.status(404).json({
+@@ -14 +14 @@
+-        success: false, 
++        success: false,
+@@ -15 +15 @@
+-        message: 'User not found' 
++        message: "User not found",
+@@ -30 +30 @@
+-        bio: student ? student.bio : '',
++        bio: student ? student.bio : "",
+@@ -34 +34 @@
+-      }
++      },
+@@ -38 +38 @@
+-    console.error('â [PROFILE GET] Error:', err);
++    console.error("â [PROFILE GET] Error:", err);
+@@ -39 +39 @@
+-    res.status(500).json({ 
++    res.status(500).json({
+@@ -41 +41 @@
+-      message: 'Server error' 
++      message: "Server error",
+@@ -65 +65 @@
+-      console.log('â [PROFILE UPDATE] Name updated to:', user.name);
++      console.log("â [PROFILE UPDATE] Name updated to:", user.name);
+@@ -75 +75 @@
+-    if (removeImage === 'true') {
++    if (removeImage === "true") {
+@@ -77 +77 @@
+-      console.log('ðï¸ [PROFILE UPDATE] Profile picture removed');
++      console.log("ðï¸ [PROFILE UPDATE] Profile picture removed");
+@@ -83 +83 @@
+-    console.log('â [PROFILE UPDATE] User saved successfully');
++    console.log("â [PROFILE UPDATE] User saved successfully");
+@@ -93 +93 @@
+-      let newStudentId = 'STU001';
++      let newStudentId = "STU001";
+@@ -96 +96 @@
+-        const lastNumber = parseInt(lastStudent.student_id.replace('STU', ''));
++        const lastNumber = parseInt(lastStudent.student_id.replace("STU", ""));
+@@ -97 +97 @@
+-        newStudentId = `STU${String(lastNumber + 1).padStart(3, '0')}`;
++        newStudentId = `STU${String(lastNumber + 1).padStart(3, "0")}`;
+@@ -105 +105 @@
+-        bio: bio || '',
++        bio: bio || "",
+@@ -106 +106 @@
+-        board: 'Not Specified',
++        board: "Not Specified",
+@@ -107 +107 @@
+-        personal_preferences: 'Not Specified',
++        personal_preferences: "Not Specified",
+@@ -109 +109 @@
+-        guardian_name: 'Not Provided',
++        guardian_name: "Not Provided",
+@@ -110 +110 @@
+-        guardian_contact_no: '0000000000',
++        guardian_contact_no: "0000000000",
+@@ -119 +119 @@
+-        console.log('â [PROFILE UPDATE] Bio updated:', bio);
++        console.log("â [PROFILE UPDATE] Bio updated:", bio);
+@@ -125 +125 @@
+-      message: 'Profile updated successfully',
++      message: "Profile updated successfully",
+@@ -130 +130 @@
+-        bio: student.bio
++        bio: student.bio,
+@@ -135 +135 @@
+-    console.error('â [PROFILE UPDATE] Error:', err);
++    console.error("â [PROFILE UPDATE] Error:", err);
+@@ -138 +138 @@
+-      message: 'Server error',
++      message: "Server error",
+@@ -139 +139 @@
+-      error: err.message 
++      error: err.message,

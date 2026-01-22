@@ -1,0 +1,80 @@
+--- backend/src/routes/authRoutes.js
++++ backend/src/routes/authRoutes.js
+@@ -1 +1 @@
+-const express = require('express');
++const express = require("express");
+@@ -2 +2 @@
+-const passport = require('passport');
++const passport = require("passport");
+@@ -4 +4 @@
+-const authController = require('../controllers/authController');
++const authController = require("../controllers/authController");
+@@ -5 +5 @@
+-const { authenticateToken } = require('../middleware/auth');
++const { authenticateToken } = require("../middleware/auth");
+@@ -6 +6 @@
+-const { generateToken } = require('../utils/jwt');
++const { generateToken } = require("../utils/jwt");
+@@ -8 +8 @@
+-console.log('authController:', authController);
++console.log("authController:", authController);
+@@ -11 +11 @@
+-router.post('/register', authController.registerUser); // Step 1: Send OTP
++router.post("/register", authController.registerUser); // Step 1: Send OTP
+@@ -12 +12 @@
+-router.post('/verify-registration-otp', authController.verifyRegistrationOTP); // Step 2: Verify OTP & Create Account
++router.post("/verify-registration-otp", authController.verifyRegistrationOTP); // Step 2: Verify OTP & Create Account
+@@ -13 +13 @@
+-router.post('/login', authController.loginUser);
++router.post("/login", authController.loginUser);
+@@ -16 +16 @@
+-router.post('/verify-2fa-otp', authController.verifyTwoFactorOTP); // â NEW
++router.post("/verify-2fa-otp", authController.verifyTwoFactorOTP); // â NEW
+@@ -17 +17 @@
+-router.post('/toggle-2fa', authenticateToken, authController.toggleTwoFactor); // â NEW
++router.post("/toggle-2fa", authenticateToken, authController.toggleTwoFactor); // â NEW
+@@ -20 +20 @@
+-router.post('/forgot-password', authController.forgotPassword);
++router.post("/forgot-password", authController.forgotPassword);
+@@ -21 +21 @@
+-router.post('/verify-reset-otp', authController.verifyResetOTP);
++router.post("/verify-reset-otp", authController.verifyResetOTP);
+@@ -22 +22 @@
+-router.post('/reset-password', authController.resetPassword);
++router.post("/reset-password", authController.resetPassword);
+@@ -25 +25 @@
+-router.post('/update-password', authController.updatePassword);
++router.post("/update-password", authController.updatePassword);
+@@ -28 +28 @@
+-router.get('/me', authenticateToken, authController.getCurrentUser);
++router.get("/me", authenticateToken, authController.getCurrentUser);
+@@ -31 +31 @@
+-router.post('/logout', authenticateToken, (req, res) => {
++router.post("/logout", authenticateToken, (req, res) => {
+@@ -34 +34 @@
+-    message: 'Logged out successfully',
++    message: "Logged out successfully",
+@@ -40 +40 @@
+-  '/google/signin',
++  "/google/signin",
+@@ -41 +41 @@
+-  passport.authenticate('google', {
++  passport.authenticate("google", {
+@@ -42 +42 @@
+-    scope: ['profile', 'email'],
++    scope: ["profile", "email"],
+@@ -45 +45 @@
+-); 
++);
+@@ -48 +48 @@
+-  '/google/signup',
++  "/google/signup",
+@@ -56 +56 @@
+-  '/google/callback',
++  "/google/callback",
+@@ -69 +69 @@
+-      
++
+@@ -176 +176 @@
+-      console.error('OAuth callback error:', error);
++      console.error("OAuth callback error:", error);

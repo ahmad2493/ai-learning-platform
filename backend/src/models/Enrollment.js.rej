@@ -1,0 +1,23 @@
+--- backend/src/models/Enrollment.js
++++ backend/src/models/Enrollment.js
+@@ -1 +1 @@
+-const mongoose = require('mongoose');
++const mongoose = require("mongoose");
+@@ -4 +4 @@
+-        enrollment_id : {type: String, required: true, unique: true},
++  enrollment_id: { type: String, required: true, unique: true },
+@@ -8 +8 @@
+-        grade : {type: Number, required: true},
++  grade: { type: Number, required: true },
+@@ -9 +9 @@
+-        enrollment_date : {type: Date, required: true},
++  enrollment_date: { type: Date, required: true },
+@@ -10 +10 @@
+-        remarks : {type: String, required: true},
++  remarks: { type: String, required: true },
+@@ -11 +11 @@
+-        created_at : {type: Date, required: true, default: Date.now},
++  created_at: { type: Date, required: true, default: Date.now },
+@@ -12 +12 @@
+-        updated_at : {type: Date, required: true, default: Date.now}
++  updated_at: { type: Date, required: true, default: Date.now },

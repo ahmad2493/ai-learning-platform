@@ -1,0 +1,89 @@
+--- backend/src/middleware/validateEmail.js
++++ backend/src/middleware/validateEmail.js
+@@ -2 +2 @@
+-  if (!email) return 'Email is required.';
++  if (!email) return "Email is required.";
+@@ -8 +8 @@
+-    return 'Email is too long.';
++    return "Email is too long.";
+@@ -13 +13 @@
+-    return 'Email cannot contain spaces.';
++    return "Email cannot contain spaces.";
+@@ -22 +22 @@
+-  const [local, domain] = email.split('@');
++  const [local, domain] = email.split("@");
+@@ -25 +25 @@
+-    return 'Invalid email format.';
++    return "Invalid email format.";
+@@ -30 +30 @@
+-    return 'Email local part is too long.';
++    return "Email local part is too long.";
+@@ -33 +33 @@
+-  if (local.startsWith('.') || local.endsWith('.')) {
++  if (local.startsWith(".") || local.endsWith(".")) {
+@@ -34 +34 @@
+-    return 'Local part cannot start or end with a dot.';
++    return "Local part cannot start or end with a dot.";
+@@ -37 +37 @@
+-  if (local.includes('..')) {
++  if (local.includes("..")) {
+@@ -38 +38 @@
+-    return 'Local part cannot contain consecutive dots.';
++    return "Local part cannot contain consecutive dots.";
+@@ -41 +41 @@
+-  if (!/^[A-Za-z0-9._+-]+$/.test(local)) {
++  if (!/^[A-Za-z\d._+-]+$/.test(local)) {
+@@ -47 +47 @@
+-    return 'Domain name is too long.';
++    return "Domain name is too long.";
+@@ -50 +50 @@
+-  if (domain.startsWith('.') || domain.endsWith('.')) {
++  if (domain.startsWith(".") || domain.endsWith(".")) {
+@@ -51 +51 @@
+-    return 'Domain cannot start or end with a dot.';
++    return "Domain cannot start or end with a dot.";
+@@ -54 +54 @@
+-  if (domain.includes('..')) {
++  if (domain.includes("..")) {
+@@ -55 +55 @@
+-    return 'Domain cannot contain consecutive dots.';
++    return "Domain cannot contain consecutive dots.";
+@@ -58 +58 @@
+-  const domainLabels = domain.split('.');
++  const domainLabels = domain.split(".");
+@@ -61 +61 @@
+-    return 'Domain must contain a valid TLD.';
++    return "Domain must contain a valid TLD.";
+@@ -65 +65 @@
+-    if (!label) return 'Invalid domain format.';
++    if (!label) return "Invalid domain format.";
+@@ -68 +68 @@
+-      return 'Domain label is too long.';
++      return "Domain label is too long.";
+@@ -71 +71 @@
+-    if (!/^[A-Za-z0-9-]+$/.test(label)) {
++    if (!/^[A-Za-z\d-]+$/.test(label)) {
+@@ -72 +72 @@
+-      return 'Domain labels can only contain letters, numbers, and hyphens.';
++      return "Domain labels can only contain letters, numbers, and hyphens.";
+@@ -75 +75 @@
+-    if (label.startsWith('-') || label.endsWith('-')) {
++    if (label.startsWith("-") || label.endsWith("-")) {
+@@ -76 +76 @@
+-      return 'Domain labels cannot start or end with a hyphen.';
++      return "Domain labels cannot start or end with a hyphen.";
+@@ -84 +84 @@
+-    return 'Invalid top-level domain.';
++    return "Invalid top-level domain.";
+@@ -88 +88 @@
+-  if (local.toLowerCase() === 'admin' || local.toLowerCase() === 'root') {
++  if (local.toLowerCase() === "admin" || local.toLowerCase() === "root") {
+@@ -89 +89 @@
+-    return 'Reserved email address is not allowed.';
++    return "Reserved email address is not allowed.";
+@@ -93 +93 @@
+-  if (/[<>()[\]\\,;:"]/g.test(email)) {
++  if (/[<>()[\]\\,;:"]/.test(email)) {
+@@ -94 +94 @@
+-    return 'Email contains unsafe characters.';
++    return "Email contains unsafe characters.";

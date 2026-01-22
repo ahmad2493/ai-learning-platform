@@ -1,0 +1,53 @@
+--- backend/src/middleware/uploadProfile.js
++++ backend/src/middleware/uploadProfile.js
+@@ -1 +1 @@
+-const multer = require('multer');
++const multer = require("multer");
+@@ -2 +2 @@
+-const { S3Client } = require('@aws-sdk/client-s3');
++const { S3Client } = require("@aws-sdk/client-s3");
+@@ -3 +3 @@
+-const multerS3 = require('multer-s3');
++const multerS3 = require("multer-s3");
+@@ -6 +6 @@
+-    region: process.env.AWS_REGION,
++  region: process.env.AWS_REGION,
+@@ -7 +7 @@
+-    credentials: {
++  credentials: {
+@@ -8 +8 @@
+-        accessKeyId: process.env.AWS_ACCESS_KEY_ID,
++    accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+@@ -9 +9 @@
+-        secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY
++    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+@@ -10 +10 @@
+-    }
++  },
+@@ -14 +14 @@
+-    storage: multerS3({
++  storage: multerS3({
+@@ -15 +15 @@
+-        s3: s3,
++    s3: s3,
+@@ -16 +16 @@
+-        bucket: process.env.AWS_BUCKET_NAME,
++    bucket: process.env.AWS_BUCKET_NAME,
+@@ -17 +17 @@
+-        key: function (req, file, cb) {
++    key: function (req, file, cb) {
+@@ -18 +18 @@
+-            cb(null, `profile_pics/${Date.now()}_${file.originalname}`);
++      cb(null, `profile_pics/${Date.now()}_${file.originalname}`);
+@@ -19 +19 @@
+-        },
++    },
+@@ -20 +20 @@
+-        contentType: multerS3.AUTO_CONTENT_TYPE
++    contentType: multerS3.AUTO_CONTENT_TYPE,
+@@ -21 +21 @@
+-    }),
++  }),
+@@ -22 +22 @@
+-    limits: { fileSize: 5 * 1024 * 1024 }, // 5 MB
++  limits: { fileSize: 5 * 1024 * 1024 }, // 5 MB

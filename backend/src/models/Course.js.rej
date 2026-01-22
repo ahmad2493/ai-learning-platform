@@ -1,0 +1,23 @@
+--- backend/src/models/Course.js
++++ backend/src/models/Course.js
+@@ -1 +1 @@
+-const mongoose = require('mongoose');
++const mongoose = require("mongoose");
+@@ -4 +4 @@
+-        course_id : {type: String, required: true, unique: true},
++  course_id: { type: String, required: true, unique: true },
+@@ -5 +5 @@
+-        class_name : {type: String, required: true},
++  class_name: { type: String, required: true },
+@@ -6 +6 @@
+-        subject_name : {type: String, required: true},
++  subject_name: { type: String, required: true },
+@@ -7 +7 @@
+-        course_description : {type: String, required: true},
++  course_description: { type: String, required: true },
+@@ -8 +8 @@
+-        course_code : {type: String, required: true},
++  course_code: { type: String, required: true },
+@@ -9 +9 @@
+-        created_at : {type: Date, required: true, default: Date.now},
++  created_at: { type: Date, required: true, default: Date.now },

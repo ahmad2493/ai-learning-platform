@@ -1,0 +1,14 @@
+--- backend/src/routes/adminRoutes.js
++++ backend/src/routes/adminRoutes.js
+@@ -2 +2 @@
+-const express = require('express');
++const express = require("express");
+@@ -7 +7 @@
+-router.get('/all_students', getAllStudents);
++router.get("/all_students", getAllStudents);
+@@ -10 +10 @@
+-router.patch('/:id/suspend', suspendStudent);
++router.patch("/:id/suspend", suspendStudent);
+@@ -13 +13 @@
+-router.patch('/:id/activate', activateStudent);
++router.patch("/:id/activate", activateStudent);

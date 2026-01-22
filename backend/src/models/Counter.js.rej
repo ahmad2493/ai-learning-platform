@@ -1,0 +1,11 @@
+--- backend/src/models/Counter.js
++++ backend/src/models/Counter.js
+@@ -2 +2 @@
+-const mongoose = require('mongoose');
++const mongoose = require("mongoose");
+@@ -6 +6 @@
+-  value: { type: Number, default: 0 }
++  value: { type: Number, default: 0 },
+@@ -9 +9 @@
+-module.exports = mongoose.model('Counter', counterSchema);
++module.exports = mongoose.model("Counter", counterSchema);

@@ -1,0 +1,65 @@
+--- backend/src/models/Otp.js
++++ backend/src/models/Otp.js
+@@ -1 +1 @@
+-const mongoose = require('mongoose');
++const mongoose = require("mongoose");
+@@ -4 +4 @@
+-    user_id: {
++  user_id: {
+@@ -5 +5 @@
+-        type: mongoose.Schema.Types.Mixed,  // Supports both ObjectId and string
++    type: mongoose.Schema.Types.Mixed, // Supports both ObjectId and string
+@@ -6 +6 @@
+-        required: true
++    required: true,
+@@ -7 +7 @@
+-    },
++  },
+@@ -8 +8 @@
+-    email: {
++  email: {
+@@ -9 +9 @@
+-        type: String,
++    type: String,
+@@ -10 +10 @@
+-        required: true,
++    required: true,
+@@ -11 +11 @@
+-        lowercase: true,
++    lowercase: true,
+@@ -12 +12 @@
+-        trim: true
++    trim: true,
+@@ -14 +14 @@
+-    otp: {
++  otp: {
+@@ -18 +18 @@
+-    otp_type: {
++  otp_type: {
+@@ -20 +20 @@
+-        enum: ['REGISTRATION', 'PASSWORD_RESET', 'TWO_FACTOR_LOGIN'], // â ADDED TWO_FACTOR_LOGIN
++    enum: ["REGISTRATION", "PASSWORD_RESET", "TWO_FACTOR_LOGIN"], // â ADDED TWO_FACTOR_LOGIN
+@@ -23 +23 @@
+-    is_used: {
++  is_used: {
+@@ -24 +24 @@
+-        type: Boolean,
++    type: Boolean,
+@@ -25 +25 @@
+-        default: false
++    default: false,
+@@ -27 +27 @@
+-    expires_at: {
++  expires_at: {
+@@ -28 +28 @@
+-        type: Date,
++    type: Date,
+@@ -31 +31 @@
+-    created_at: {
++  created_at: {
+@@ -33 +33 @@
+-        default: Date.now
++    default: Date.now,
+@@ -34 +34 @@
+-    }
++  },

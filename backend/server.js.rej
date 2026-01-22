@@ -1,0 +1,125 @@
+--- backend/server.js
++++ backend/server.js
+@@ -1 +1 @@
+-const express = require('express');
++const express = require("express");
+@@ -2 +2 @@
+-const mongoose = require('mongoose');
++const mongoose = require("mongoose");
+@@ -3 +3 @@
+-const cors = require('cors');
++const cors = require("cors");
+@@ -4 +4 @@
+-const session = require('express-session');
++const session = require("express-session");
+@@ -6 +6 @@
+-require('dotenv').config();
++require("dotenv").config();
+@@ -8 +8 @@
+-const passport = require('./src/config/passport'); 
++const passport = require("./src/config/passport");
+@@ -18 +18 @@
+-  origin: function(origin, callback) {
++    origin: function (origin, callback) {
+@@ -19 +19 @@
+-    // Allow requests with no origin (mobile apps, Postman)
++      // Allow requests with no origin (mobile apps, Postman)
+@@ -20 +20 @@
+-    if (!origin) return callback(null, true);
++      if (!origin) return callback(null, true);
+@@ -23 +23 @@
+-    const allowedOrigins = [
++      const allowedOrigins = [
+@@ -24 +24 @@
+-      'http://localhost:5173',
++        "http://localhost:5173",
+@@ -25 +25 @@
+-      'http://192.168.100.12:19006',
++        "http://192.168.100.12:19006",
+@@ -26 +26 @@
+-      'exp://192.168.100.12:8081'
++        "exp://192.168.100.12:8081",
+@@ -27 +27 @@
+-    ];
++      ];
+@@ -31 +31 @@
+-      callback(null, true);
++        callback(null, true);
+@@ -32 +32 @@
+-    } else {
++      } else {
+@@ -33 +33 @@
+-      callback(null, true); // In development, allow all
++        callback(null, true); // In development, allow all
+@@ -34 +34 @@
+-    }
++      }
+@@ -35 +35 @@
+-  },
++    },
+@@ -36 +36 @@
+-  credentials: true,
++    credentials: true,
+@@ -43 +43 @@
+-// Session 
++// Session
+@@ -50 +50 @@
+-      secure: process.env.NODE_ENV === 'production', // true in production
++      secure: process.env.NODE_ENV === "production", // true in production
+@@ -66 +66 @@
+-  .then(() => console.log('MongoDB Connected'))
++  .then(() => console.log("MongoDB Connected"))
+@@ -67 +67 @@
+-  .catch((err) => console.error('MongoDB Connection Error:', err));
++  .catch((err) => console.error("MongoDB Connection Error:", err));
+@@ -73 +73 @@
+-const authRoutes = require('./src/routes/authRoutes');
++const authRoutes = require("./src/routes/authRoutes");
+@@ -74 +74 @@
+-app.use('/api/auth', authRoutes);
++app.use("/api/auth", authRoutes);
+@@ -76 +76 @@
+-const adminRoutes = require('./src/routes/adminRoutes');
++const adminRoutes = require("./src/routes/adminRoutes");
+@@ -77 +77 @@
+-app.use('/api/admins', adminRoutes);
++app.use("/api/admins", adminRoutes);
+@@ -79 +79 @@
+-const studentRoutes = require('./src/routes/studentRoutes');
++const studentRoutes = require("./src/routes/studentRoutes");
+@@ -80 +80 @@
+-app.use('/api/students', studentRoutes);
++app.use("/api/students", studentRoutes);
+@@ -82 +82 @@
+-const profileRoutes = require('./src/routes/profileRoutes');
++const profileRoutes = require("./src/routes/profileRoutes");
+@@ -83 +83 @@
+-app.use('/api/profile', profileRoutes);
++app.use("/api/profile", profileRoutes);
+@@ -87 +87 @@
+-console.log('AWS Region:', process.env.AWS_REGION );
++console.log("AWS Region:", process.env.AWS_REGION);
+@@ -90 +90 @@
+-app.get('/', (req, res) => {
++app.get("/", (req, res) => {
+@@ -91 +91 @@
+-  res.json({ 
++  res.json({
+@@ -92 +92 @@
+-    success: true, 
++    success: true,
+@@ -93 +93 @@
+-    message: 'AI Learning Platform API is running',
++    message: "AI Learning Platform API is running",
+@@ -102 +102 @@
+-    message: 'Route not found',
++    message: "Route not found",
+@@ -108 +108 @@
+-  console.error('Error:', err);
++  console.error("Error:", err);
+@@ -111 +111 @@
+-    message: err.message || 'Internal server error',
++    message: err.message || "Internal server error",
+@@ -121 +121 @@
+-app.listen(PORT, '0.0.0.0',() => {
++app.listen(PORT, "0.0.0.0", () => {

@@ -1,0 +1,20 @@
+--- backend/src/utils/jwt.js
++++ backend/src/utils/jwt.js
+@@ -1 +1 @@
+-const jwt = require('jsonwebtoken');
++const jwt = require("jsonwebtoken");
+@@ -16 +16 @@
+-    expiresIn: '7d',
++    expiresIn: "7d",
+@@ -27 +27 @@
+-    if (error.name === 'TokenExpiredError') {
++    if (error.name === "TokenExpiredError") {
+@@ -28 +28 @@
+-      throw new Error('Token expired');
++      throw new Error("Token expired");
+@@ -30 +30 @@
+-    throw new Error('Invalid token');
++    throw new Error("Invalid token");
+@@ -38 +38 @@
+-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
++  if (!authHeader || !authHeader.startsWith("Bearer ")) {

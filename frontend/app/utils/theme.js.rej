@@ -1,0 +1,41 @@
+--- frontend/app/utils/theme.js
++++ frontend/app/utils/theme.js
+@@ -7 +7 @@
+-  
++
+@@ -9 +9 @@
+-  text: "#2D5016", // Dark green
++  textLight: "#808080", // Light gray
+@@ -14 +14 @@
+-  primary: "#2D5016", // Dark green
++  
+@@ -18 +18 @@
+-  accent: "#00897B", // Teal for forgot password
++  
+@@ -22 +22 @@
+-  inputBackground: "#F9F9F9",
++  
+@@ -26 +26 @@
+-  error: "#FF4444",
++  
+@@ -30 +30 @@
+-  profileBackground: "#FFB6C1", // Light pink
++
+@@ -40 +40 @@
+-  text: "#E0E0E0", // Light text
++  textLight: "#808080", // Light gray
+@@ -45 +45 @@
+-  primary: "#4CAF50", // Light green (inverted)
++  
+@@ -49 +49 @@
+-  accent: "#26A69A", // Lighter teal
++  
+@@ -53 +53 @@
+-  inputBackground: "#3D3D3D",
++  
+@@ -57 +57 @@
+-  error: "#FF6666",
++  
+@@ -61 +61 @@
+-  profileBackground: "#7B68EE", // Purple for dark mode
++

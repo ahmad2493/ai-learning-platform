@@ -1,0 +1,47 @@
+--- backend/src/config/passport.js
++++ backend/src/config/passport.js
+@@ -1 +1 @@
+-const passport = require('passport');
++const passport = require("passport");
+@@ -2 +2 @@
+-const GoogleStrategy = require('passport-google-oauth20').Strategy;
++const GoogleStrategy = require("passport-google-oauth20").Strategy;
+@@ -3 +3 @@
+-const User = require('../models/User');
++const User = require("../models/User");
+@@ -8 +8 @@
+-  return `USR${String(count + 1).padStart(6, '0')}`;
++  return `USR${String(count + 1).padStart(6, "0")}`;
+@@ -23 +23 @@
+-        const firstName = profile.name.givenName || 'User';
++        const firstName = profile.name.givenName || "User";
+@@ -25 +25 @@
+-        const profilePhoto = profile.photos[0]?.value || 'default-avatar.png';
++        const profilePhoto = profile.photos[0]?.value || "default-avatar.png";
+@@ -46 +46 @@
+-          role_id: 'ROLE001',
++          role_id: "ROLE001",
+@@ -47 +47 @@
+-          role_name: 'Student',
++          role_name: "Student",
+@@ -51 +51 @@
+-          contact_no: '0000000000', // Placeholder
++          contact_no: "0000000000", // Placeholder
+@@ -52 +52 @@
+-          password: 'GOOGLE_AUTH_USER', // Placeholder - Google users don't use password
++          password: "GOOGLE_AUTH_USER", // Placeholder - Google users don't use password
+@@ -53 +53 @@
+-          gender: 'Not Specified',
++          gender: "Not Specified",
+@@ -54 +54 @@
+-          dob: new Date('2000-01-01'),
++          dob: new Date("2000-01-01"),
+@@ -55 +55 @@
+-          address: 'Not Provided',
++          address: "Not Provided",
+@@ -56 +56 @@
+-          status: 'Active',
++          status: "Active",
+@@ -65 +65 @@
+-        console.error('Google OAuth error:', error);
++        console.error("Google OAuth error:", error);

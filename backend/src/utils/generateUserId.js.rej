@@ -1,0 +1,11 @@
+--- backend/src/utils/generateUserId.js
++++ backend/src/utils/generateUserId.js
+@@ -1 +1 @@
+-const Counter = require('../models/Counter');
++const Counter = require("../models/Counter");
+@@ -5 +5 @@
+-    { name: 'user_id' },
++    { name: "user_id" },
+@@ -10 +10 @@
+-  return `USR${String(counter.value).padStart(6, '0')}`;
++  return `USR${String(counter.value).padStart(6, "0")}`;

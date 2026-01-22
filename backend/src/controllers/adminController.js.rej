@@ -1,0 +1,11 @@
+--- backend/src/controllers/adminController.js
++++ backend/src/controllers/adminController.js
+@@ -31 +31 @@
+-    console.error('ð¥ Error fetching students:', error);
++    console.error("ð¥ Error fetching students:", error);
+@@ -69 +69 @@
+-    console.error('ð¥ Error suspending student:', error);
++    console.error("ð¥ Error suspending student:", error);
+@@ -107 +107 @@
+-    console.error('ð¥ Error activating student:', error);
++    console.error("ð¥ Error activating student:", error);

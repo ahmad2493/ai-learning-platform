@@ -1,0 +1,8 @@
+--- frontend/app/screens/AiChatScreen.js
++++ frontend/app/screens/AiChatScreen.js
+@@ -44 +44 @@
+-            text: `Welcome back, ${name}!\nLet\'s start today\'s session.`,
++            text: `Welcome back, ${name}!\nLet's start today\'s session.`,
+@@ -82 +82 @@
+-        text: `Welcome back, ${userName}!\nLet\'s start today\'s session.`,
++        text: `Welcome back, ${userName}!\nLet's start today\'s session.`,

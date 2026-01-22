@@ -1,0 +1,11 @@
+--- backend/src/utils/validateEmail.js
++++ backend/src/utils/validateEmail.js
+@@ -3 +3 @@
+-    return 'Email is required.';
++    return "Email is required.";
+@@ -5 +5 @@
+-  const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
++  const emailRegex = /^[a-zA-Z\d._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+@@ -7 +7 @@
+-    return 'Invalid email address.';
++    return "Invalid email address.";

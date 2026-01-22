@@ -1,0 +1,71 @@
+--- backend/src/models/User.js
++++ backend/src/models/User.js
+@@ -1 +1 @@
+-const mongoose = require('mongoose');
++const mongoose = require("mongoose");
+@@ -4 +4 @@
+-        user_id: {type: String, required: true, unique: true},
++  user_id: { type: String, required: true, unique: true },
+@@ -5 +5 @@
+-        role_id: {type: String, required: true},
++  role_id: { type: String, required: true },
+@@ -6 +6 @@
+-        role_name: {type: String, required: true},
++  role_name: { type: String, required: true },
+@@ -7 +7 @@
+-        name: {type: String, required: true},
++  name: { type: String, required: true },
+@@ -8 +8 @@
+-        cnic: {type: String, required: true, unique: true},
++  cnic: { type: String, required: true, unique: true },
+@@ -9 +9 @@
+-        email: {type: String, required: true, unique: true},
++  email: { type: String, required: true, unique: true },
+@@ -10 +10 @@
+-        contact_no: {type: String, required: true},
++  contact_no: { type: String, required: true },
+@@ -11 +11 @@
+-        password: {type: String, required: true},
++  password: { type: String, required: true },
+@@ -12 +12 @@
+-        gender: {type: String, required: true},
++  gender: { type: String, required: true },
+@@ -13 +13 @@
+-        dob: {type: Date, required: true},
++  dob: { type: Date, required: true },
+@@ -14 +14 @@
+-        address: {type: String, required: true},
++  address: { type: String, required: true },
+@@ -15 +15 @@
+-        status: {type: String, required: true},
++  status: { type: String, required: true },
+@@ -16 +16 @@
+-        profile_photo_url: {type: String, default:null},
++  profile_photo_url: { type: String, default: null },
+@@ -17 +17 @@
+-        // Password reset fields
++  // Password reset fields
+@@ -18 +18 @@
+-        resetPasswordToken: { type: String },
++  resetPasswordToken: { type: String },
+@@ -19 +19 @@
+-        resetPasswordExpires: { type: Date },
++  resetPasswordExpires: { type: Date },
+@@ -20 +20 @@
+-        // Google OAuth
++  // Google OAuth
+@@ -21 +21 @@
+-        googleId: { type: String },
++  googleId: { type: String },
+@@ -22 +22 @@
+-        twoFactorEnabled: { type: Boolean, default: false },
++  twoFactorEnabled: { type: Boolean, default: false },
+@@ -23 +23 @@
+-        created_at: {type: Date, required: true, default: Date.now},
++  created_at: { type: Date, required: true, default: Date.now },
+@@ -26 +26 @@
+-)
++});
+@@ -27 +27 @@
+-module.exports = mongoose.model('User', userSchema);
++module.exports = mongoose.model("User", userSchema);

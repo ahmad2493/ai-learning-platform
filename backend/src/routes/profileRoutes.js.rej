@@ -1,0 +1,14 @@
+--- backend/src/routes/profileRoutes.js
++++ backend/src/routes/profileRoutes.js
+@@ -1 +1 @@
+-const express = require('express');
++const express = require("express");
+@@ -3 +3 @@
+-const upload = require('../middleware/uploadProfile');
++const upload = require("../middleware/uploadProfile");
+@@ -7 +7 @@
+-router.get('/:id', getProfile);
++router.get("/:id", getProfile);
+@@ -10 +10 @@
+-router.patch('/:id', upload.single('profile_picture'), updateProfile);
++router.patch("/:id", upload.single("profile_picture"), updateProfile);

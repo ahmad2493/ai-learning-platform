@@ -1,0 +1,44 @@
+--- backend/src/utils/otpHelper.js
++++ backend/src/utils/otpHelper.js
+@@ -89 +89 @@
+-        console.log('ð¹ [OTP HELPER] Creating OTP...');
++    console.log("ð¹ [OTP HELPER] Creating OTP...");
+@@ -90 +90 @@
+-        console.log('ð¹ [OTP HELPER] userId:', userId);
++    console.log("ð¹ [OTP HELPER] userId:", userId);
+@@ -91 +91 @@
+-        console.log('ð¹ [OTP HELPER] email:', email);
++    console.log("ð¹ [OTP HELPER] email:", email);
+@@ -92 +92 @@
+-        console.log('ð¹ [OTP HELPER] otpType:', otpType);
++    console.log("ð¹ [OTP HELPER] otpType:", otpType);
+@@ -109 +109 @@
+-        console.log('â [OTP HELPER] Generated OTP:', otp);
++    console.log("â [OTP HELPER] Generated OTP:", otp);
+@@ -113 +113 @@
+-        console.log('â° [OTP HELPER] OTP expires at:', expiresAt);
++    console.log("â° [OTP HELPER] OTP expires at:", expiresAt);
+@@ -124 +124 @@
+-        console.log('ð¾ [OTP HELPER] Saving OTP to database...');
++    console.log("ð¾ [OTP HELPER] Saving OTP to database...");
+@@ -126 +126 @@
+-        console.log('â [OTP HELPER] OTP saved successfully to database');
++    console.log("â [OTP HELPER] OTP saved successfully to database");
+@@ -130 +130 @@
+-        console.error('â [OTP HELPER] Error creating OTP:', error);
++    console.error("â [OTP HELPER] Error creating OTP:", error);
+@@ -131 +131 @@
+-        console.error('â [OTP HELPER] Error details:', error.message);
++    console.error("â [OTP HELPER] Error details:", error.message);
+@@ -139 +139 @@
+-        console.log('ð [OTP HELPER] Verifying OTP...');
++    console.log("ð [OTP HELPER] Verifying OTP...");
+@@ -140 +140 @@
+-        console.log('ð [OTP HELPER] email:', email);
++    console.log("ð [OTP HELPER] email:", email);
+@@ -141 +141 @@
+-        console.log('ð [OTP HELPER] otp:', otp);
++    console.log("ð [OTP HELPER] otp:", otp);
+@@ -142 +142 @@
+-        console.log('ð [OTP HELPER] otpType:', otpType);
++    console.log("ð [OTP HELPER] otpType:", otpType);

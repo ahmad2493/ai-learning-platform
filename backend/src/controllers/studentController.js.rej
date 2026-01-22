@@ -1,0 +1,5 @@
+--- backend/src/controllers/studentController.js
++++ backend/src/controllers/studentController.js
+@@ -2 +2 @@
+-const mongoose = require('mongoose'); // â ADDED - Required for ObjectId validation
++const mongoose = require("mongoose"); // â ADDED - Required for ObjectId validation

@@ -1,0 +1,32 @@
+--- backend/src/models/TestQuestionBank.js
++++ backend/src/models/TestQuestionBank.js
+@@ -1 +1 @@
+-const mongoose = require('mongoose');
++const mongoose = require("mongoose");
+@@ -4 +4 @@
+-        question_bank_id : {type: String, required: true, unique: true},
++  question_bank_id: { type: String, required: true, unique: true },
+@@ -7 +7 @@
+-        options: {type: [String], required: true},
++  options: { type: [String], required: true },
+@@ -8 +8 @@
+-        correct_answer : {type: String, required: true},
++  correct_answer: { type: String, required: true },
+@@ -9 +9 @@
+-        student_answer : {type: String, required: true},
++  student_answer: { type: String, required: true },
+@@ -10 +10 @@
+-        is_correct : {type: Boolean, required: true},
++  is_correct: { type: Boolean, required: true },
+@@ -11 +11 @@
+-        explanation : {type: String, required: true},
++  explanation: { type: String, required: true },
+@@ -12 +12 @@
+-        marks : {type: Number, required: true},
++  marks: { type: Number, required: true },
+@@ -13 +13 @@
+-        created_at : {type: Date, required: true, default: Date.now},
++  created_at: { type: Date, required: true, default: Date.now },
+@@ -14 +14 @@
+-        updated_at : {type: Date, required: true, default: Date.now}
++  updated_at: { type: Date, required: true, default: Date.now },

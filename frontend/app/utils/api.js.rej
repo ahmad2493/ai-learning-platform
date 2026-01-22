@@ -1,0 +1,11 @@
+--- frontend/app/utils/api.js
++++ frontend/app/utils/api.js
+@@ -1 +1 @@
+-import { BASE_URL } from './apiConfig';
++import { BASE_URL } from "./apiConfig";
+@@ -9 +9 @@
+-      'Content-Type': 'application/json',
++      "Content-Type": "application/json",
+@@ -10 +10 @@
+-      'ngrok-skip-browser-warning': 'true',
++      "ngrok-skip-browser-warning": "true",
