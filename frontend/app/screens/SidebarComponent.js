@@ -5,6 +5,7 @@ import {
   StyleSheet,
   TouchableOpacity,
   Animated,
+  ScrollView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../utils/ThemeContext';
@@ -72,15 +73,17 @@ export default function Sidebar({ isVisible, onClose, activeScreen }) {
           },
         ]}
       >
-        <View style={styles.sidebarTop}>
-            <SidebarIcon name="grid-outline" screenName="StudentDashboard" label="Dashboard" />
-            <SidebarIcon name="person-circle-outline" screenName="Profile" label="Profile" />
-            <SidebarIcon name="chatbubbles-outline" screenName="AiChat" label="AI Chat" />
-            <SidebarIcon name="document-text-outline" screenName="TestGenerator" label="Test Generator" />
-            <SidebarIcon name="documents-outline" screenName="PastPapers" label="Past Papers" />
-            <SidebarIcon name="bar-chart-outline" screenName="CloPerformance" label="Progress" />
-            <SidebarIcon name="settings-outline" screenName="Settings" label="Settings" />
-        </View>
+        <ScrollView contentContainerStyle={styles.sidebarScroll}>
+            <View style={styles.sidebarTop}>
+                <SidebarIcon name="grid-outline" screenName="StudentDashboard" label="Dashboard" />
+                <SidebarIcon name="person-circle-outline" screenName="Profile" label="Profile" />
+                <SidebarIcon name="chatbubbles-outline" screenName="AiChat" label="AI Chat" />
+                <SidebarIcon name="document-text-outline" screenName="TestGenerator" label="Test Generator" />
+                <SidebarIcon name="documents-outline" screenName="PastPapers" label="Past Papers" />
+                <SidebarIcon name="bar-chart-outline" screenName="CloPerformance" label="Progress" />
+                <SidebarIcon name="settings-outline" screenName="Settings" label="Settings" />
+            </View>
+        </ScrollView>
         <View style={styles.sidebarBottom}>
             <TouchableOpacity style={styles.sidebarIcon} onPress={() => handleNavigation("SignIn")}>
                 <Ionicons name="log-out-outline" size={30} color="#FF6B6B" />
@@ -94,8 +97,9 @@ export default function Sidebar({ isVisible, onClose, activeScreen }) {
 
 const styles = StyleSheet.create({
   overlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0, 0, 0, 0.5)', zIndex: 100 },
-  sidebar: { position: 'absolute', right: 0, top: 0, bottom: 0, alignItems: 'center', justifyContent: 'space-between', paddingVertical: 50, zIndex: 101, borderTopLeftRadius: 25, borderBottomLeftRadius: 25 },
-  sidebarTop: { flex: 1, alignItems: 'center', gap: 30, marginTop: 50 },
+  sidebar: { position: 'absolute', right: 0, top: 0, bottom: 0, justifyContent: 'space-between', paddingVertical: 50, zIndex: 101, borderTopLeftRadius: 25, borderBottomLeftRadius: 25 },
+  sidebarScroll: { alignItems: 'center', flexGrow: 1, justifyContent: 'center' },
+  sidebarTop: { alignItems: 'center', gap: 30, marginTop: 50, paddingBottom: 20 },
   sidebarBottom: { marginBottom: 20 },
   sidebarIcon: { 
       height: 60, 

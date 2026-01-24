@@ -443,16 +443,16 @@ class BookRAG:
             template=r"""
                 Use the context below to answer the question.
                 The context may contain LaTeX, equations, or textbook formatting.
-        
+
                 Interpret the mathematics correctly, but DO NOT copy the formatting.
-        
+
                 STRICT FORMAT RULES (MANDATORY):
                 - Do NOT use LaTeX or math blocks.
                 - Do NOT use markdown (no headings, lists, or bold text).
                 - Write all mathematics inline using Unicode symbols (², √, ×).
                 - Do not number steps or label sections.
                 - Do not imitate textbook solution layouts.
-        
+
                 Required answer structure:
                 Perform mathematical derivations/solution step by step in each line.
                 State given values in sentences.
@@ -461,13 +461,13 @@ class BookRAG:
                 Compute results.
                 State final answers clearly.
                 BUT THE CONTENT SHOULD BE RELATED TO CONTEXT.
-        
+
                 Context:
                 {context}
-        
+
                 Question:
                 {question}
-        
+
                 Answer:
                 """
         )
@@ -502,4 +502,3 @@ class BookRAG:
             self.create_vectorstores(chunks)
 
         self.setup_qa()
-

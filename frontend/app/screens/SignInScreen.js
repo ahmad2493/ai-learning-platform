@@ -6,6 +6,7 @@ import {
   TextInput,
   TouchableOpacity,
   ScrollView,
+  ActivityIndicator,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -29,17 +30,17 @@ export default function SignInScreen({ navigation }) {
     message: "",
     type: "error",
   });
+  const [isLoading, setIsLoading] = useState(false);
 
   const showAlert = (title, message, type = "error") => {
     setAlertConfig({ title, message, type });
     setAlertVisible(true);
 
-    // ✅ AUTO-CLOSE SUCCESS ALERTS AFTER 2 SECONDS
     if (type === "success") {
       setTimeout(() => {
         setAlertVisible(false);
         handleSuccessNavigation();
-      }, 2000); // 2 seconds for success messages
+      }, 2000);
     }
   };
 
@@ -56,7 +57,6 @@ export default function SignInScreen({ navigation }) {
     return Object.keys(newErrors).length === 0;
   };
 
-  // Handle deep link callback from OAuth
   useEffect(() => {
     const handleDeepLink = async (event) => {
       const { path, queryParams } = Linking.parse(event.url);
@@ -69,7 +69,6 @@ export default function SignInScreen({ navigation }) {
             await AsyncStorage.setItem("user_id", queryParams.user_id);
           }
 
-          // Fetch full user data
           const response = await fetch(`${BASE_URL}/auth/me`, {
             method: "GET",
             headers: {
@@ -124,6 +123,8 @@ export default function SignInScreen({ navigation }) {
       return;
     }
 
+    setIsLoading(true);
+
     try {
       console.log('🌐 [SIGNIN] Sending login request...');
 
@@ -150,26 +151,22 @@ export default function SignInScreen({ navigation }) {
         return;
       }
 
-      // ✅ CHECK IF 2FA IS REQUIRED
       if (result.requiresTwoFactor) {
         console.log('🔐 [SIGNIN] 2FA Required - Navigating to OTP screen');
         navigation.navigate('OtpVerification', {
           email: email,
-          password: password, // ✅ Pass password for resend functionality
+          password: password,
           verificationType: 'TWO_FACTOR_LOGIN'
         });
         return;
       }
 
-      // ✅ NORMAL LOGIN (2FA NOT ENABLED)
       console.log('✅ [SIGNIN] Normal login (no 2FA)');
       const { token } = result.data;
       console.log('✅ [SIGNIN] Login successful, token received');
 
-      // Store token
       await AsyncStorage.setItem("authToken", token);
 
-      // Fetch full user data
       console.log('📥 [SIGNIN] Fetching user data...');
       const meResponse = await fetch(`${BASE_URL}/auth/me`, {
         method: "GET",
@@ -200,6 +197,8 @@ export default function SignInScreen({ navigation }) {
     } catch (error) {
       console.error('❌ [SIGNIN] Login error:', error);
       showAlert("Error", "Server error. Try again.");
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -233,10 +232,6 @@ export default function SignInScreen({ navigation }) {
     }
   };
 
-  const handleFacebookSignIn = () => {
-    console.log("Facebook Sign In");
-  };
-
   return (
     <SafeAreaView
       style={[styles.container, { backgroundColor: theme.background }]}
@@ -248,14 +243,12 @@ export default function SignInScreen({ navigation }) {
         type={alertConfig.type}
         onClose={() => {
           setAlertVisible(false);
-          // Only navigate on manual close (button tap)
           if (alertConfig.type === "success") {
             handleSuccessNavigation();
           }
         }}
       />
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        {/* Header Section */}
         <View style={styles.header}>
           <Ionicons name="book" size={50} color={theme.primary} />
           <Text style={[styles.title, { color: theme.text }]}>
@@ -266,9 +259,7 @@ export default function SignInScreen({ navigation }) {
           </Text>
         </View>
 
-        {/* White Card Container */}
         <View style={[styles.card, { backgroundColor: theme.surface }]}>
-          {/* Tabs */}
           <View
             style={[
               styles.tabsContainer,
@@ -294,7 +285,6 @@ export default function SignInScreen({ navigation }) {
             </TouchableOpacity>
           </View>
 
-          {/* Form Fields */}
           <View style={styles.form}>
             <TextInput
               style={[
@@ -336,7 +326,6 @@ export default function SignInScreen({ navigation }) {
               secureTextEntry
             />
 
-            {/* Forgot Password Link */}
             <TouchableOpacity
               onPress={handleForgotPassword}
               style={styles.forgotPasswordContainer}
@@ -348,16 +337,23 @@ export default function SignInScreen({ navigation }) {
               </Text>
             </TouchableOpacity>
 
-            {/* Sign In Button */}
             <TouchableOpacity
-              style={[styles.signInButton, { backgroundColor: theme.primary }]}
+              style={[
+                styles.signInButton,
+                { backgroundColor: theme.primary },
+                isLoading && styles.disabledButton,
+              ]}
               onPress={handleSignIn}
               activeOpacity={0.8}
+              disabled={isLoading}
             >
-              <Text style={styles.signInButtonText}>Sign In</Text>
+              {isLoading ? (
+                <ActivityIndicator color="#FFFFFF" />
+              ) : (
+                <Text style={styles.signInButtonText}>Sign In</Text>
+              )}
             </TouchableOpacity>
 
-            {/* OR Separator */}
             <View style={styles.separator}>
               <View
                 style={[
@@ -378,7 +374,6 @@ export default function SignInScreen({ navigation }) {
               />
             </View>
 
-            {/* Social Login Buttons */}
             <TouchableOpacity
               style={[
                 styles.socialButton,
@@ -393,23 +388,6 @@ export default function SignInScreen({ navigation }) {
               <Ionicons name="logo-google" size={24} color="#4285F4" />
               <Text style={[styles.socialButtonText, { color: theme.text }]}>
                 Continue with Google
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[
-                styles.socialButton,
-                {
-                  backgroundColor: theme.surface,
-                  borderColor: theme.inputBorder,
-                },
-              ]}
-              onPress={handleFacebookSignIn}
-              activeOpacity={0.8}
-            >
-              <Ionicons name="logo-facebook" size={24} color="#1877F2" />
-              <Text style={[styles.socialButtonText, { color: theme.text }]}>
-                Continue with Facebook
               </Text>
             </TouchableOpacity>
           </View>
@@ -525,5 +503,8 @@ const styles = StyleSheet.create({
     marginLeft: 12,
     fontSize: 16,
     fontWeight: "500",
+  },
+  disabledButton: {
+    backgroundColor: "#CCCCCC",
   },
 });

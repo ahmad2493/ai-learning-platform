@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   ScrollView,
   Modal,
+  ActivityIndicator,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -31,6 +32,7 @@ export default function SignUpScreen({ navigation }) {
   const [errors, setErrors] = useState({});
   const [isModalVisible, setModalVisible] = useState(false);
   const [tempUserId, setTempUserId] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
 
   const showAlert = (title, message, type = "error") => {
     setAlertConfig({ title, message, type });
@@ -51,7 +53,7 @@ export default function SignUpScreen({ navigation }) {
     console.log('🚀 [SIGNUP] ========== SIGNUP PROCESS STARTED ==========');
     console.log('🚀 [SIGNUP] BASE_URL:', BASE_URL);
     console.log('🚀 [SIGNUP] Full endpoint:', `${BASE_URL}/auth/register`);
-    
+
     if (!validateFields()) {
       console.log('❌ [SIGNUP] Validation failed - missing fields');
       return;
@@ -69,6 +71,8 @@ export default function SignUpScreen({ navigation }) {
       return;
     }
 
+    setIsLoading(true);
+
     const requestBody = {
       email: email,
       password: password,
@@ -80,7 +84,7 @@ export default function SignUpScreen({ navigation }) {
 
     try {
       console.log('🌐 [SIGNUP] Sending fetch request...');
-      
+
       const response = await fetch(`${BASE_URL}/auth/register`, {
         method: "POST",
         headers: {
@@ -99,18 +103,16 @@ export default function SignUpScreen({ navigation }) {
       if (data.success) {
         console.log('✅ [SIGNUP] OTP sent successfully!');
         console.log('✅ [SIGNUP] TempUserId:', data.data.tempUserId);
-        
-        // Store tempUserId for OTP verification
+
         setTempUserId(data.data.tempUserId);
-        
-        // ✅ NAVIGATE DIRECTLY TO OTP SCREEN WITHOUT SUCCESS ALERT
+
         console.log('🧭 [SIGNUP] Navigating to OTP verification screen');
-        navigation.navigate("OtpVerification", { 
+        navigation.navigate("OtpVerification", {
           email: email,
           name: fullName,
           password: password,
           tempUserId: data.data.tempUserId,
-          verificationType: "REGISTRATION"
+          verificationType: "REGISTRATION",
         });
       } else {
         console.log('❌ [SIGNUP] Registration failed:', data.message);
@@ -120,6 +122,8 @@ export default function SignUpScreen({ navigation }) {
       console.error("❌ [SIGNUP] Fetch error:", error);
       console.error("❌ [SIGNUP] Error message:", error.message);
       showAlert("Error", "An error occurred. Please try again.");
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -131,14 +135,10 @@ export default function SignUpScreen({ navigation }) {
     console.log("Google Sign In");
   };
 
-  const handleFacebookSignIn = () => {
-    console.log("Facebook Sign In");
-  };
-
   const closeModal = () => {
     setModalVisible(false);
   };
-  
+
   const handleAcceptAndClose = () => {
     setAgreeToTerms(true);
     closeModal();
@@ -148,7 +148,6 @@ export default function SignUpScreen({ navigation }) {
     <SafeAreaView
       style={[styles.container, { backgroundColor: theme.background }]}
     >
-      {/* Only show alert for ERRORS, not success */}
       <CustomAlert
         visible={alertVisible}
         title={alertConfig.title}
@@ -157,7 +156,6 @@ export default function SignUpScreen({ navigation }) {
         onClose={() => setAlertVisible(false)}
       />
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        {/* Header Section */}
         <View style={styles.header}>
           <Ionicons name="book" size={50} color={theme.primary} />
           <Text style={[styles.title, { color: theme.text }]}>
@@ -168,9 +166,7 @@ export default function SignUpScreen({ navigation }) {
           </Text>
         </View>
 
-        {/* White Card Container */}
         <View style={[styles.card, { backgroundColor: theme.surface }]}>
-          {/* Tabs */}
           <View
             style={[
               styles.tabsContainer,
@@ -196,7 +192,6 @@ export default function SignUpScreen({ navigation }) {
             </TouchableOpacity>
           </View>
 
-          {/* Form Fields */}
           <View style={styles.form}>
             <TextInput
               style={[
@@ -277,7 +272,6 @@ export default function SignUpScreen({ navigation }) {
               secureTextEntry
             />
 
-            {/* Terms & Conditions */}
             <View style={styles.termsContainer}>
               <TouchableOpacity
                 style={styles.checkbox}
@@ -303,20 +297,25 @@ export default function SignUpScreen({ navigation }) {
               </TouchableOpacity>
             </View>
 
-            {/* Create Account Button */}
             <TouchableOpacity
               style={[
                 styles.createAccountButton,
-                { backgroundColor: agreeToTerms ? theme.primary : "#CCCCCC" },
+                {
+                  backgroundColor: agreeToTerms ? theme.primary : "#CCCCCC",
+                },
+                isLoading && styles.disabledButton,
               ]}
               onPress={handleSignUp}
               activeOpacity={0.8}
-              disabled={!agreeToTerms}
+              disabled={!agreeToTerms || isLoading}
             >
-              <Text style={styles.createAccountButtonText}>Create Account</Text>
+              {isLoading ? (
+                <ActivityIndicator color="#FFFFFF" />
+              ) : (
+                <Text style={styles.createAccountButtonText}>Create Account</Text>
+              )}
             </TouchableOpacity>
 
-            {/* OR Separator */}
             <View style={styles.separator}>
               <View
                 style={[
@@ -337,7 +336,6 @@ export default function SignUpScreen({ navigation }) {
               />
             </View>
 
-            {/* Social Login Buttons */}
             <TouchableOpacity
               style={[
                 styles.socialButton,
@@ -354,23 +352,6 @@ export default function SignUpScreen({ navigation }) {
                 Continue with Google
               </Text>
             </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[
-                styles.socialButton,
-                {
-                  backgroundColor: theme.surface,
-                  borderColor: theme.inputBorder,
-                },
-              ]}
-              onPress={handleFacebookSignIn}
-              activeOpacity={0.8}
-            >
-              <Ionicons name="logo-facebook" size={24} color="#1877F2" />
-              <Text style={[styles.socialButtonText, { color: theme.text }]}>
-                Continue with Facebook
-              </Text>
-            </TouchableOpacity>
           </View>
         </View>
       </ScrollView>
@@ -381,17 +362,33 @@ export default function SignUpScreen({ navigation }) {
         onRequestClose={closeModal}
       >
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalContainer, { backgroundColor: theme.surface }]}>
+          <View
+            style={[styles.modalContainer, { backgroundColor: theme.surface }]}
+          >
             <View style={styles.modalHeader}>
-              <Text style={[styles.modalTitle, { color: theme.text }]}>Terms & Conditions</Text>
+              <Text style={[styles.modalTitle, { color: theme.text }]}>
+                Terms & Conditions
+              </Text>
               <TouchableOpacity onPress={closeModal}>
-                <Ionicons name="close-circle" size={30} color={theme.primary} />
+                <Ionicons
+                  name="close-circle"
+                  size={30}
+                  color={theme.primary}
+                />
               </TouchableOpacity>
             </View>
             <ScrollView style={styles.modalScrollView}>
-              <Text style={[styles.modalText, { color: theme.text }]}>{termsAndConditionsText}</Text>
+              <Text style={[styles.modalText, { color: theme.text }]}>
+                {termsAndConditionsText}
+              </Text>
             </ScrollView>
-            <TouchableOpacity style={[styles.closeButton, { backgroundColor: theme.primary }]} onPress={handleAcceptAndClose}>
+            <TouchableOpacity
+              style={[
+                styles.closeButton,
+                { backgroundColor: theme.primary },
+              ]}
+              onPress={handleAcceptAndClose}
+            >
               <Text style={styles.closeButtonText}>Accept & Close</Text>
             </TouchableOpacity>
           </View>
@@ -517,33 +514,33 @@ const styles = StyleSheet.create({
   },
   modalOverlay: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
   },
   modalContainer: {
-    width: '90%',
-    maxHeight: '80%',
+    width: "90%",
+    maxHeight: "80%",
     borderRadius: 20,
     padding: 20,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
     shadowRadius: 4,
     elevation: 5,
   },
   modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     borderBottomWidth: 1,
-    borderBottomColor: '#E0E0E0',
+    borderBottomColor: "#E0E0E0",
     paddingBottom: 10,
     marginBottom: 10,
   },
   modalTitle: {
     fontSize: 22,
-    fontWeight: 'bold',
+    fontWeight: "bold",
   },
   modalScrollView: {
     marginVertical: 10,
@@ -555,12 +552,15 @@ const styles = StyleSheet.create({
   closeButton: {
     borderRadius: 10,
     padding: 15,
-    alignItems: 'center',
+    alignItems: "center",
     marginTop: 10,
   },
   closeButtonText: {
-    color: 'white',
+    color: "white",
     fontSize: 18,
-    fontWeight: 'bold',
+    fontWeight: "bold",
+  },
+  disabledButton: {
+    backgroundColor: "#CCCCCC",
   },
 });
