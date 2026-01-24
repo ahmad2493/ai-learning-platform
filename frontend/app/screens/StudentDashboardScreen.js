@@ -1,3 +1,15 @@
+/**
+ * Student Dashboard Screen
+ * Author: Momna Butt (BCSF22M021)
+ * 
+ * Functionality:
+ * - Main dashboard interface for students
+ * - Displays course overview and quick access to features
+ * - Shows performance metrics and learning progress
+ * - Navigation hub to other app features (AI Assistant, Tests, etc.)
+ * - Responsive UI with theme support
+ */
+
 import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
@@ -74,12 +86,6 @@ export default function StudentDashboardScreen({ navigation }) {
             <Text style={[styles.mainTitle, { color: theme.text }]}>Student Dashboard</Text>
             <Text style={[styles.subtitle, { color: theme.textSecondary }]}>Welcome back, {userName || 'User'}!</Text>
 
-            <View style={[styles.searchContainer, {backgroundColor: theme.surface}]}>
-                <Ionicons name="search-outline" size={22} color="#888" />
-                <TextInput style={styles.searchText} placeholder="Search for topics, chapters..." placeholderTextColor="#888"/>
-                 <Ionicons name="notifications-outline" size={22} color="red" />
-            </View>
-
             <View style={[styles.mainCard, {backgroundColor: theme.primary}]}>
                 <View style={{flex: 1}}>
                     <Text style={styles.mainCardTitle}>Think Outside the box with AI</Text>
@@ -147,8 +153,6 @@ const styles = StyleSheet.create({
     scrollContent: { padding: 20, paddingBottom: 50 },
     mainTitle: { fontSize: 26, fontWeight: 'bold' },
     subtitle: { fontSize: 16, color: '#666', marginBottom: 20 },
-    searchContainer: { flexDirection: 'row', alignItems: 'center', borderRadius: 10, padding: 15, marginBottom: 20 },
-    searchText: { flex: 1, color: '#888', marginLeft: 10 },
     mainCard: { flexDirection: 'row', alignItems: 'center', borderRadius: 15, padding: 20, marginBottom: 20 },
     mainCardTitle: { fontSize: 18, fontWeight: 'bold', color: 'white', marginBottom: 8 },
     mainCardText: { fontSize: 14, color: 'white' },

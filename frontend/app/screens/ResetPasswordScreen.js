@@ -1,3 +1,14 @@
+/**
+ * Reset Password Screen - Password Reset After OTP Verification
+ * Author: Momna Butt (BCSF22M021)
+ * 
+ * Functionality:
+ * - Allows users to set new password after OTP verification
+ * - Validates password strength and confirmation match
+ * - Resets password via backend API
+ * - Navigates to login after successful reset
+ */
+
 import React, { useState } from "react";
 import {
   View,

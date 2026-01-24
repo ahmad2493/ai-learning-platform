@@ -1,3 +1,14 @@
+/**
+ * Email Service - Email Notification Utility
+ * Author: Muhammad Abubakar (BCSF22M006)
+ * 
+ * Functionality:
+ * - Sends OTP codes via email for password reset
+ * - Configures nodemailer for email delivery
+ * - Formats email templates for different purposes
+ * - Handles email sending errors and logging
+ */
+
 // const nodemailer = require('nodemailer');
 
 // // Configure email transporter (using Gmail as example)

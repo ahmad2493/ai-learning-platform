@@ -1,3 +1,15 @@
+/**
+ * Authentication Middleware
+ * Author: Muhammad Abubakar (BCSF22M006)
+ * 
+ * Functionality:
+ * - Validates JWT tokens from request headers
+ * - Verifies user authentication status
+ * - Attaches user information to request object
+ * - Protects routes requiring authentication
+ * - Handles token expiration and invalid tokens
+ */
+
 const { verifyToken, extractTokenFromHeader } = require('../utils/jwt');
 const User = require('../models/User');
 

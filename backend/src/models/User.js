@@ -1,3 +1,15 @@
+/**
+ * User Model - Base User Schema
+ * Author: Muhammad Abubakar (BCSF22M006)
+ * 
+ * Functionality:
+ * - Defines base user schema for MongoDB
+ * - Stores user authentication and profile information
+ * - Supports password reset tokens and expiration
+ * - Handles Google OAuth user data
+ * - Provides base structure for Student and Admin models
+ */
+
 const mongoose = require('mongoose');
 const userSchema = new mongoose.Schema(
     {

@@ -1,4 +1,13 @@
 # FastAPI Service Dockerfile for Azure Web App
+# Author: Muhammad Ahmad (BCSF22M002) - DevOps, Containerization
+# 
+# Functionality:
+# - Builds Docker container for FastAPI AI service
+# - Installs Python dependencies and system packages
+# - Configures container for Azure Web App deployment
+# - Sets up ChromaDB storage directory
+# - Exposes port 8000 for FastAPI service
+
 FROM python:3.11-slim
 
 WORKDIR /app

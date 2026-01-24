@@ -1,3 +1,15 @@
+/**
+ * Admin Controller - Administrative Operations
+ * Author: Muhammad Abubakar (BCSF22M006)
+ * 
+ * Functionality:
+ * - Manages student accounts and profiles
+ * - Handles course creation and management
+ * - Processes admin-level operations
+ * - Retrieves and updates student information
+ * - Validates admin permissions
+ */
+
 // controllers/AdminController.js
 const Student = require('../models/Student');
 const User = require('../models/User');

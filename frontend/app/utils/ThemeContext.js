@@ -1,3 +1,14 @@
+/**
+ * Theme Context - Theme Management Provider
+ * Author: Momna Butt (BCSF22M021)
+ * 
+ * Functionality:
+ * - Provides theme context to all app components
+ * - Manages light/dark mode based on system preferences
+ * - Supplies theme colors and styles throughout the app
+ * - Enables dynamic theme switching
+ */
+
 import React, { createContext, useContext } from "react";
 import { useColorScheme } from "react-native";
 import { getTheme } from "./theme";

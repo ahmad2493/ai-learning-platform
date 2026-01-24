@@ -1,3 +1,15 @@
+/**
+ * Sidebar Component - Navigation Sidebar
+ * Author: Momna Butt (BCSF22M021)
+ * 
+ * Functionality:
+ * - Provides slide-out navigation menu
+ * - Displays navigation options with icons
+ * - Handles screen navigation and sidebar animations
+ * - Highlights active screen
+ * - Manages sidebar visibility and interactions
+ */
+
 import React, { useEffect } from 'react';
 import {
   View,

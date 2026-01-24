@@ -1,3 +1,16 @@
+/**
+ * Main Express Server - Backend API Entry Point
+ * Author: Muhammad Abubakar (BCSF22M006)
+ * 
+ * Functionality:
+ * - Sets up Express server with middleware (CORS, body parser, sessions)
+ * - Configures MongoDB connection
+ * - Initializes Passport.js for OAuth authentication
+ * - Registers API routes (auth, admin, student, profile)
+ * - Handles error responses and 404 routes
+ * - Starts HTTP server on configured port
+ */
+
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');

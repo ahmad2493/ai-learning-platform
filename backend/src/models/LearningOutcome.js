@@ -1,3 +1,14 @@
+/**
+ * Learning Outcome Model - CLO Tracking Schema
+ * Author: Muhammad Abubakar (BCSF22M006)
+ * 
+ * Functionality:
+ * - Tracks student learning outcomes (CLOs)
+ * - Monitors topic and chapter progress
+ * - Stores student reviews and progress percentages
+ * - Links to student, course, and course content
+ */
+
 const mongoose = require('mongoose');
 const LearningOutcomesSchema = new mongoose.Schema(
     {

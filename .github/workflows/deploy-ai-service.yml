@@ -1,3 +1,12 @@
+# GitHub Actions Workflow - FastAPI AI Service Deployment
+# Author: Muhammad Ahmad (BCSF22M002) - DevOps
+# 
+# Functionality:
+# - Builds Docker image for FastAPI service
+# - Pushes image to container registry (Docker Hub or ACR)
+# - Deploys container to Azure Web App (Darsgah-Rag)
+# - Triggers on changes to ai-service directory
+
 # Deploy FastAPI AI Service to Darsgah-Rag Azure Web App
 name: Build and deploy FastAPI to Azure Web App - Darsgah-Rag
 

@@ -1,3 +1,14 @@
+/**
+ * OTP Model - One-Time Password Schema
+ * Author: Muhammad Abubakar (BCSF22M006)
+ * 
+ * Functionality:
+ * - Stores OTP codes for password reset and verification
+ * - Tracks OTP expiration and usage status
+ * - Links OTPs to users via user_id
+ * - Supports different OTP types (password reset, registration)
+ */
+
 const mongoose = require('mongoose');
 
 const otpSchema = new mongoose.Schema({

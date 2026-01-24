@@ -1,3 +1,13 @@
+/**
+ * Admin Model - Administrator Schema
+ * Author: Muhammad Abubakar (BCSF22M006)
+ * 
+ * Functionality:
+ * - Defines admin user schema
+ * - Links to base User model via user_id reference
+ * - Tracks admin creation timestamps
+ */
+
 const mongoose = require('mongoose');
 const Admin = new mongoose.Schema(
     {

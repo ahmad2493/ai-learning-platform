@@ -1,3 +1,15 @@
+/**
+ * OTP Verification Screen - OTP Code Entry
+ * Author: Momna Butt (BCSF22M021)
+ * 
+ * Functionality:
+ * - Displays 6-digit OTP input interface
+ * - Validates OTP codes for password reset or registration
+ * - Implements countdown timer for OTP expiration
+ * - Handles OTP resend functionality
+ * - Navigates to password reset or registration completion
+ */
+
 import React, { useState, useEffect, useRef } from 'react';
 import {
   View,

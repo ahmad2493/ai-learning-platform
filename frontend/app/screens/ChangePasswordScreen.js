@@ -1,3 +1,15 @@
+/**
+ * Change Password Screen - Password Update Interface
+ * Author: Momna Butt (BCSF22M021)
+ * 
+ * Functionality:
+ * - Allows authenticated users to change their password
+ * - Validates current password before allowing change
+ * - Confirms new password with re-entry field
+ * - Updates password via backend API
+ * - Provides secure password change flow
+ */
+
 import React, { useState } from 'react';
 import {
   View,

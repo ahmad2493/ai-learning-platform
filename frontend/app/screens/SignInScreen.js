@@ -1,3 +1,16 @@
+/**
+ * Sign In Screen - User Authentication
+ * Author: Momna Butt (BCSF22M021)
+ * 
+ * Functionality:
+ * - User login interface with email/password
+ * - Google OAuth sign-in integration
+ * - Form validation and error handling
+ * - Navigation to sign up and forgot password screens
+ * - Token storage for authenticated sessions
+ * - Theme-aware UI components
+ */
+
 import React, { useState, useEffect } from "react";
 import {
   View,

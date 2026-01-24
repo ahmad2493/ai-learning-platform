@@ -1,3 +1,15 @@
+/**
+ * Passport.js Configuration - Google OAuth Setup
+ * Author: Muhammad Abubakar (BCSF22M006)
+ * 
+ * Functionality:
+ * - Configures Google OAuth 2.0 authentication strategy
+ * - Handles Google sign-in callback
+ * - Creates or updates user account from Google profile
+ * - Generates unique user IDs for new users
+ * - Serializes/deserializes user sessions
+ */
+
 const passport = require('passport');
 const GoogleStrategy = require('passport-google-oauth20').Strategy;
 const User = require('../models/User');

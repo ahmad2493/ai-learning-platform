@@ -1,3 +1,14 @@
+/**
+ * Splash Screen - App Launch Screen
+ * Author: Momna Butt (BCSF22M021)
+ * 
+ * Functionality:
+ * - Displays animated splash screen on app launch
+ * - Checks user authentication status
+ * - Navigates to appropriate screen (login or dashboard)
+ * - Provides smooth app initialization experience
+ */
+
 import React, { useEffect, useRef } from "react";
 import {
   View,

@@ -1,3 +1,14 @@
+/**
+ * Settings Screen - App Settings and Preferences
+ * Author: Momna Butt (BCSF22M021)
+ * 
+ * Functionality:
+ * - Displays app settings and configuration options
+ * - Provides navigation to various settings sections
+ * - Handles user preferences and app customization
+ * - Manages logout functionality
+ */
+
 import React, { useState, useEffect } from "react";
 import {
   View,

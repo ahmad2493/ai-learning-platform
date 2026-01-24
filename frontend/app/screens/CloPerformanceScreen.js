@@ -1,3 +1,14 @@
+/**
+ * CLO Performance Screen - Learning Outcomes Tracking
+ * Author: Momna Butt (BCSF22M021)
+ * 
+ * Functionality:
+ * - Displays student learning outcomes (CLOs) performance
+ * - Shows progress for topics and chapters
+ * - Tracks student performance metrics
+ * - Provides visual representation of learning progress
+ */
+
 import React, { useState } from 'react';
 import {
   View,
