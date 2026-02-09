@@ -146,7 +146,7 @@ export default function AiChatScreen({ navigation, route }) {
     setIsTyping(true);
 
     try {
-      const aiServiceUrl = 'http://192.168.131.100:8000/api/ask';
+      const aiServiceUrl = 'https://darsgah-rag-epbjg9dka5hmexaj.uaenorth-01.azurewebsites.net/api/ask';
       const response = await fetch(aiServiceUrl, {
         method: "POST",
         headers: {

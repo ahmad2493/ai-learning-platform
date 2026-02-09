@@ -1,15 +1,3 @@
-/**
- * AI Assistant Screen - Main AI Interface
- * Author: Momna Butt (BCSF22M021)
- * 
- * Functionality:
- * - Main entry point for AI assistant feature
- * - Integrates with FastAPI AI service
- * - Manages AI chat interface and navigation
- * - Handles API communication for question answering
- * - Provides user-friendly AI interaction experience
- */
-
 import React, { useState, useEffect } from "react";
 import {
   View,
