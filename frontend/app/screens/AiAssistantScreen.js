@@ -1,164 +1,128 @@
-import React, { useState, useEffect } from "react";
+/**
+ * AI Assistant Screen - Manages and displays chat history
+ * Author: Momna Butt (BCSF22M021)
+ *
+ * Functionality:
+ * - Fetches and displays a list of saved chat sessions from local storage.
+ * - Refreshes the list automatically when the screen is focused.
+ * - Allows users to start a new chat or open an existing one.
+ */
+
+import React, { useState, useEffect, useCallback } from "react";
 import {
-  View,
-  Text,
-  StyleSheet,
-  TextInput,
-  TouchableOpacity,
-  ScrollView,
-  Platform,
+  View, Text, StyleSheet, TouchableOpacity, ScrollView, FlatList 
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../utils/ThemeContext";
 import Sidebar from "./SidebarComponent";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { BASE_URL } from "../utils/apiConfig";
+import { useIsFocused } from '@react-navigation/native'; // Import the hook
+
+const CHATS_STORAGE_KEY = "darsgah_user_chats";
 
 export default function AiAssistantScreen({ navigation }) {
   const { theme } = useTheme();
   const [sidebarVisible, setSidebarVisible] = useState(false);
-  const [chatHistory, setChatHistory] = useState({});
+  const [chatHistory, setChatHistory] = useState([]);
+  const isFocused = useIsFocused(); // Hook to check if screen is focused
+
+  const fetchChatHistory = useCallback(async () => {
+    try {
+      const chatsJson = await AsyncStorage.getItem(CHATS_STORAGE_KEY);
+      const chats = chatsJson ? JSON.parse(chatsJson) : [];
+      // Sort chats by most recently updated
+      chats.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+      setChatHistory(chats);
+    } catch (error) {
+      console.error("Failed to fetch chat history:", error);
+    }
+  }, []);
 
   useEffect(() => {
-    const fetchChatHistory = async () => {
-      const token = await AsyncStorage.getItem("authToken");
-      if (!token) return;
-
-      try {
-        const response = await fetch(`${BASE_URL}/chats`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
-        const data = await response.json();
-        if (data.success) {
-          // The backend should return data grouped by date
-          setChatHistory(data.data);
-        }
-      } catch (error) {
-        console.error("Failed to fetch chat history:", error);
-      }
-    };
-
-    fetchChatHistory();
-  }, []);
+    // Fetch history every time the screen comes into focus
+    if (isFocused) {
+      fetchChatHistory();
+    }
+  }, [isFocused, fetchChatHistory]);
 
   const toggleSidebar = () => setSidebarVisible(!sidebarVisible);
 
   const handleNewChat = () => {
+    // Navigate to AiChatScreen without a chatId to start a new chat
     navigation.navigate("AiChat");
   };
 
-  const renderChatHistory = () => {
-    if (Object.keys(chatHistory).length === 0) {
-      return <Text style={{color: theme.textSecondary, textAlign: 'center', marginTop: 20}}>No chat history yet.</Text>
-    }
+  const openChat = (chatId) => {
+    // Navigate to AiChatScreen with a specific chatId to load that conversation
+    navigation.navigate("AiChat", { chatId });
+  };
 
-    return Object.keys(chatHistory).map((sectionTitle) => (
-      <View key={sectionTitle} style={styles.historySection}>
-        <Text style={[styles.sectionTitle, { color: theme.textSecondary }]}>
-          {sectionTitle}
-        </Text>
-        {chatHistory[sectionTitle].map((item) => (
-          <TouchableOpacity
-            key={item.id}
-            style={[
-              styles.chatItem,
-              {
-                backgroundColor:
-                  sectionTitle === "Today" ? "#DCE3D5" : theme.surface,
-              },
-            ]}
-            onPress={() => navigation.navigate("AiChat", { chatId: item.id })}
-          >
-            <Ionicons name={item.icon || "chatbubble-ellipses-outline"} size={24} color={theme.text} />
-            <View style={styles.chatTextContainer}>
-              <Text style={[styles.chatTitle, { color: theme.text }]}>
-                {item.title}
-              </Text>
-              <Text
-                style={[styles.chatSubtitle, { color: theme.textSecondary }]}
-              >
-                {item.subtitle}
-              </Text>
-            </View>
-          </TouchableOpacity>
-        ))}
-      </View>
-    ));
+  const renderChatItem = ({ item }) => {
+    const lastMessage = item.messages[item.messages.length - 1];
+    const subtitle = lastMessage ? `${lastMessage.sender === 'user' ? 'You: ' : 'AI: '}${lastMessage.text.substring(0, 40)}...` : 'No messages yet';
+
+    return (
+      <TouchableOpacity
+        key={item.id}
+        style={[styles.chatItem, { backgroundColor: theme.surface }]}
+        onPress={() => openChat(item.id)}
+      >
+        <Ionicons name={"chatbubble-ellipses-outline"} size={24} color={theme.text} />
+        <View style={styles.chatTextContainer}>
+          <Text style={[styles.chatTitle, { color: theme.text }]}>{item.title}</Text>
+          <Text style={[styles.chatSubtitle, { color: theme.textSecondary }]}>{subtitle}</Text>
+        </View>
+      </TouchableOpacity>
+    );
   };
 
   return (
-    <SafeAreaView
-      style={[styles.container, { backgroundColor: theme.background }]}
-    >
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
       <View style={styles.contentWrapper}>
         <View style={[styles.header, { backgroundColor: theme.background }]}>
             <TouchableOpacity onPress={() => navigation.goBack()}>
                 <Ionicons name="arrow-back-outline" size={24} color={theme.text} />
             </TouchableOpacity>
             <Text style={[styles.headerTitle, { color: theme.text }]}>AI Assistant</Text>
-
             <TouchableOpacity onPress={toggleSidebar}>
                 <Ionicons name="menu" size={24} color={theme.primary} />
             </TouchableOpacity>
         </View>
 
-        <ScrollView contentContainerStyle={styles.scrollContent}>
-          <Text style={[styles.mainTitle, { color: theme.text }]}>
-            AI Assistant
-          </Text>
-          <Text style={[styles.subtitle, { color: theme.textSecondary }]}>
-            Ask questions and get AI-powered explanations
-          </Text>
-
-          <View
-            style={[styles.searchContainer, { backgroundColor: theme.surface }]}
+        <View style={styles.chatHistoryHeader}>
+          <Text style={[styles.mainTitle, { color: theme.text }]}>Chat History</Text>
+          <TouchableOpacity
+            style={[styles.newChatButton, { backgroundColor: theme.primary }]}
+            onPress={handleNewChat}
           >
-            <Ionicons
-              name="search-outline"
-              size={22}
-              color="#888"
-              style={styles.searchIcon}
-            />
-            <TextInput
-              placeholder="Search for topics, chapters..."
-              style={[styles.searchInput, { color: theme.text }]}
-              placeholderTextColor="#999"
-            />
-          </View>
+            <Ionicons name="add" size={20} color="white" />
+            <Text style={styles.newChatButtonText}>New Chat</Text>
+          </TouchableOpacity>
+        </View>
 
-          <View style={styles.chatHistoryHeader}>
-            <Text style={[styles.mainTitle, { color: theme.text }]}>
-              Chat History
-            </Text>
-            <TouchableOpacity
-              style={[styles.newChatButton, { backgroundColor: theme.primary }]}
-              onPress={handleNewChat}
-            >
-              <Ionicons name="add" size={20} color="white" />
-              <Text style={styles.newChatButtonText}>New Chat</Text>
-            </TouchableOpacity>
-          </View>
+        <FlatList
+          data={chatHistory}
+          renderItem={renderChatItem}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={styles.scrollContent}
+          ListEmptyComponent={() => (
+            <View style={styles.emptyContainer}>
+              <Ionicons name="chatbubbles-outline" size={60} color={theme.textSecondary} />
+              <Text style={[styles.emptyText, {color: theme.textSecondary}]}>No chat history yet.</Text>
+              <Text style={[styles.emptySubtext, {color: theme.textSecondary}]}>Start a new chat to begin.</Text>
+            </View>
+          )}
+        />
 
-          {renderChatHistory()}
-        </ScrollView>
       </View>
-      <Sidebar
-        isVisible={sidebarVisible}
-        onClose={toggleSidebar}
-        activeScreen="AiAssistant"
-      />
+      <Sidebar isVisible={sidebarVisible} onClose={toggleSidebar} activeScreen="AiAssistant" />
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    paddingTop: Platform.OS === "android" ? 25 : 0,
-  },
+  container: { flex: 1 },
   contentWrapper: { flex: 1 },
   header: {
     flexDirection: "row",
@@ -169,29 +133,16 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: "#E0E0E0",
   },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: "bold",
-    flex: 1,
-    textAlign: 'center',
-  },
+  headerTitle: { fontSize: 24, fontWeight: "bold", flex: 1, textAlign: 'center' },
   scrollContent: { padding: 20, paddingBottom: 50 },
   mainTitle: { fontSize: 26, fontWeight: "bold" },
-  subtitle: { fontSize: 16, color: "#666", marginBottom: 20 },
-  searchContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    borderRadius: 10,
-    padding: 15,
-    marginBottom: 20,
-  },
-  searchIcon: { marginRight: 10 },
-  searchInput: { flex: 1, fontSize: 16 },
   chatHistoryHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     marginBottom: 15,
+    paddingHorizontal: 20,
+    paddingTop: 20,
   },
   newChatButton: {
     flexDirection: "row",
@@ -201,8 +152,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   newChatButtonText: { color: "white", fontWeight: "bold", marginLeft: 5 },
-  historySection: { marginBottom: 15 },
-  sectionTitle: { fontSize: 14, fontWeight: "600", marginBottom: 10 },
   chatItem: {
     flexDirection: "row",
     alignItems: "center",
@@ -212,5 +161,20 @@ const styles = StyleSheet.create({
   },
   chatTextContainer: { marginLeft: 15, flex: 1 },
   chatTitle: { fontSize: 16, fontWeight: "bold" },
-  chatSubtitle: { fontSize: 14, marginTop: 2 },
+  chatSubtitle: { fontSize: 14, marginTop: 4 },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 100,
+  },
+  emptyText: {
+    fontSize: 18,
+    fontWeight: '600',
+    marginTop: 20,
+  },
+  emptySubtext: {
+    fontSize: 14,
+    marginTop: 8,
+  },
 });
