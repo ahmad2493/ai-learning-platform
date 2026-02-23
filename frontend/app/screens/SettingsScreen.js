@@ -1,7 +1,7 @@
 /**
  * Settings Screen - App Settings and Preferences
  * Author: Momna Butt (BCSF22M021)
- * 
+ *
  * Functionality:
  * - Displays app settings and configuration options
  * - Provides navigation to various settings sections
@@ -9,7 +9,7 @@
  * - Manages logout functionality
  */
 
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import {
   View,
   Text,
@@ -24,84 +24,12 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../utils/ThemeContext";
 import Sidebar from "./SidebarComponent";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import { BASE_URL } from "../utils/apiConfig";
+import { useAuth } from "../context/AuthContext";
 
 export default function SettingsScreen({ navigation }) {
   const { theme } = useTheme();
+  const { user, isLoading } = useAuth();
   const [sidebarVisible, setSidebarVisible] = useState(false);
-  const [userName, setUserName] = useState("User");
-  const [userEmail, setUserEmail] = useState("");
-  const [profilePicture, setProfilePicture] = useState(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    loadUserData();
-
-    // Refresh profile data when screen comes into focus
-    const unsubscribe = navigation.addListener('focus', () => {
-      loadUserData();
-    });
-
-    return unsubscribe;
-  }, [navigation]);
-
-  const loadUserData = async () => {
-    try {
-      setLoading(true);
-      
-      // Load from AsyncStorage first
-      const name = await AsyncStorage.getItem("userName");
-      const email = await AsyncStorage.getItem("userEmail");
-      const mongoId = await AsyncStorage.getItem("mongo_user_id");
-      const token = await AsyncStorage.getItem("authToken");
-
-      if (name) setUserName(name);
-      if (email) setUserEmail(email);
-
-      // Fetch profile data from backend to get profile picture
-      if (mongoId) {
-        await fetchProfileData(mongoId, token);
-      }
-    } catch (error) {
-      console.error("❌ [SETTINGS] Error loading user data:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchProfileData = async (userId, token) => {
-    try {
-      const headers = {
-        "Content-Type": "application/json",
-        "ngrok-skip-browser-warning": "true",
-      };
-
-      if (token) {
-        headers["Authorization"] = `Bearer ${token}`;
-      }
-
-      const response = await fetch(`${BASE_URL}/profile/${userId}`, {
-        method: "GET",
-        headers: headers,
-      });
-
-      const result = await response.json();
-
-      if (result.success && result.data) {
-        // Update profile picture
-        setProfilePicture(result.data.profile_photo_url);
-        
-        // Update name if it's different (in case it was updated in profile screen)
-        if (result.data.name) {
-          setUserName(result.data.name);
-          await AsyncStorage.setItem("userName", result.data.name);
-        }
-      }
-    } catch (error) {
-      console.error("❌ [SETTINGS] Error fetching profile data:", error);
-    }
-  };
 
   const getInitials = (name) => {
     if (!name) return "";
@@ -115,6 +43,16 @@ export default function SettingsScreen({ navigation }) {
   const toggleSidebar = () => {
     setSidebarVisible(!sidebarVisible);
   };
+
+  if (isLoading) {
+    return (
+      <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <ActivityIndicator size="large" color={theme.primary} />
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView
@@ -147,26 +85,26 @@ export default function SettingsScreen({ navigation }) {
                   { backgroundColor: theme.primary },
                 ]}
               >
-                {loading ? (
+                {isLoading ? (
                   <ActivityIndicator size="small" color="#FFFFFF" />
-                ) : profilePicture ? (
+                ) : user?.profile_photo_url ? (
                   <Image
-                    source={{ uri: profilePicture }}
+                    source={{ uri: user.profile_photo_url }}
                     style={styles.profileImageFull}
                   />
                 ) : (
                   <Text style={styles.profileInitials}>
-                    {getInitials(userName)}
+                    {getInitials(user?.name)}
                   </Text>
                 )}
               </View>
             </View>
             <View style={styles.profileInfo}>
               <Text style={[styles.profileName, { color: theme.text }]}>
-                {userName}
+                {user?.name || 'User'}
               </Text>
               <Text style={[styles.profileEmail, { color: theme.text }]}>
-                {userEmail}
+                {user?.email}
               </Text>
             </View>
             <Ionicons name="chevron-forward" size={24} color={theme.primary} />

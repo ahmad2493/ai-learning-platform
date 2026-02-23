@@ -1,31 +1,11 @@
-/**
- * Student Dashboard Screen
- * Author: Momna Butt (BCSF22M021)
- * 
- * Functionality:
- * - Main dashboard interface for students
- * - Displays course overview and quick access to features
- * - Shows performance metrics and learning progress
- * - Navigation hub to other app features (AI Assistant, Tests, etc.)
- * - Responsive UI with theme support
- */
-
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  SafeAreaView,
-  ScrollView,
-  Platform,
-  TextInput,
-  Animated,
+  View, Text, StyleSheet, TouchableOpacity, SafeAreaView, ScrollView, Platform, ActivityIndicator
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../utils/ThemeContext';
+import { useAuth } from '../context/AuthContext';
 import Sidebar from './SidebarComponent';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const dashboardData = {
   testsCompleted: 24,
@@ -42,18 +22,8 @@ const dashboardData = {
 
 export default function StudentDashboardScreen({ navigation }) {
   const { theme } = useTheme();
+  const { user, isLoading } = useAuth();
   const [sidebarVisible, setSidebarVisible] = useState(false);
-  const [userName, setUserName] = useState('');
-
-  useEffect(() => {
-    const loadUserName = async () => {
-      const name = await AsyncStorage.getItem('userName');
-      if (name) {
-        setUserName(name);
-      }
-    };
-    loadUserName();
-  }, []);
 
   const toggleSidebar = () => {
     setSidebarVisible(!sidebarVisible);
@@ -68,6 +38,16 @@ export default function StudentDashboardScreen({ navigation }) {
       </View>
     ));
   };
+
+  if (isLoading) {
+    return (
+      <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <ActivityIndicator size="large" color={theme.primary} />
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
@@ -84,7 +64,7 @@ export default function StudentDashboardScreen({ navigation }) {
 
         <ScrollView contentContainerStyle={styles.scrollContent}>
             <Text style={[styles.mainTitle, { color: theme.text }]}>Student Dashboard</Text>
-            <Text style={[styles.subtitle, { color: theme.textSecondary }]}>Welcome back, {userName || 'User'}!</Text>
+            <Text style={[styles.subtitle, { color: theme.textSecondary }]}>Welcome back, {user?.name || 'User'}!</Text>
 
             <View style={[styles.mainCard, {backgroundColor: theme.primary}]}>
                 <View style={{flex: 1}}>

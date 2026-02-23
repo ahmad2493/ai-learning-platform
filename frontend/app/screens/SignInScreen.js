@@ -1,65 +1,30 @@
-/**
- * Sign In Screen - User Authentication
- * Author: Momna Butt (BCSF22M021)
- * 
- * Functionality:
- * - User login interface with email/password
- * - Google OAuth sign-in integration
- * - Form validation and error handling
- * - Navigation to sign up and forgot password screens
- * - Token storage for authenticated sessions
- * - Theme-aware UI components
- */
-
 import React, { useState, useEffect } from "react";
-import {
-  View,
-  Text,
-  StyleSheet,
-  TextInput,
-  TouchableOpacity,
-  ScrollView,
-  ActivityIndicator,
-} from "react-native";
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, ActivityIndicator } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
-import { useTheme } from "../utils/ThemeContext";
-import { BASE_URL } from "../utils/apiConfig";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as WebBrowser from "expo-web-browser";
 import * as Linking from "expo-linking";
+import { useTheme } from "../utils/ThemeContext";
+import { BASE_URL } from "../utils/apiConfig";
 import CustomAlert from "../components/CustomAlert";
+import { useAuth } from '../context/AuthContext';
 
 WebBrowser.maybeCompleteAuthSession();
 
 export default function SignInScreen({ navigation }) {
   const { theme } = useTheme();
+  const { signIn } = useAuth();
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [errors, setErrors] = useState({});
   const [alertVisible, setAlertVisible] = useState(false);
-  const [alertConfig, setAlertConfig] = useState({
-    title: "",
-    message: "",
-    type: "error",
-  });
+  const [alertConfig, setAlertConfig] = useState({ title: "", message: "", type: "error" });
   const [isLoading, setIsLoading] = useState(false);
 
   const showAlert = (title, message, type = "error") => {
     setAlertConfig({ title, message, type });
     setAlertVisible(true);
-
-    if (type === "success") {
-      setTimeout(() => {
-        setAlertVisible(false);
-        handleSuccessNavigation();
-      }, 2000);
-    }
-  };
-
-  const handleSuccessNavigation = () => {
-    console.log('🧭 [SIGNIN] Navigating to StudentDashboard');
-    navigation.navigate("StudentDashboard");
   };
 
   const validateFields = () => {
@@ -73,293 +38,125 @@ export default function SignInScreen({ navigation }) {
   useEffect(() => {
     const handleDeepLink = async (event) => {
       const { path, queryParams } = Linking.parse(event.url);
-
       if (path === "auth/callback" && queryParams?.token) {
+        setIsLoading(true);
         try {
-          await AsyncStorage.setItem("authToken", queryParams.token);
-
-          if (queryParams.user_id) {
-            await AsyncStorage.setItem("user_id", queryParams.user_id);
-          }
-
-          const response = await fetch(`${BASE_URL}/auth/me`, {
-            method: "GET",
-            headers: {
-              Authorization: `Bearer ${queryParams.token}`,
-              "Content-Type": "application/json",
-              "ngrok-skip-browser-warning": "true",
-            },
-          });
-
-          const userData = await response.json();
-
-          if (userData.success && userData.data.user) {
-            const user = userData.data.user;
-            await AsyncStorage.setItem("user_id", user.user_id);
-            await AsyncStorage.setItem("mongo_user_id", user._id);
-            await AsyncStorage.setItem(
-              "userName",
-              user.name ||
-                `${user.first_name || ""} ${user.last_name || ""}`.trim(),
-            );
-            await AsyncStorage.setItem("userEmail", user.email);
-            showAlert("Success", "Login successful!", "success");
-          } else {
-            showAlert("Error", "Failed to fetch user data");
-          }
+          await signIn(queryParams.token);
         } catch (error) {
-          console.error("Error handling OAuth callback:", error);
-          showAlert("Error", "Failed to complete login");
+          showAlert("Error", `Google Sign-In failed: ${error.message}`);
+        } finally {
+          setIsLoading(false);
         }
       }
     };
-
     const subscription = Linking.addEventListener("url", handleDeepLink);
-
-    Linking.getInitialURL().then((url) => {
-      if (url) {
-        handleDeepLink({ url });
-      }
-    });
-
-    return () => {
-      subscription.remove();
-    };
-  }, [navigation]);
+    Linking.getInitialURL().then((url) => { if (url) handleDeepLink({ url }); });
+    return () => subscription.remove();
+  }, [signIn]);
 
   const handleSignIn = async () => {
-    console.log('🔐 [SIGNIN] ========== SIGNIN PROCESS STARTED ==========');
-    console.log('🔐 [SIGNIN] Email:', email);
-
-    if (!validateFields()) {
-      console.log('❌ [SIGNIN] Validation failed');
-      return;
-    }
-
+    if (!validateFields()) return;
     setIsLoading(true);
-
     try {
-      console.log('🌐 [SIGNIN] Sending login request...');
-
       const response = await fetch(`${BASE_URL}/auth/login`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "ngrok-skip-browser-warning": "true",
-        },
-        body: JSON.stringify({
-          email,
-          password,
-        }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
       });
-
-      console.log('📥 [SIGNIN] Response status:', response.status);
-
       const result = await response.json();
-      console.log('📥 [SIGNIN] Response data:', result);
 
       if (!response.ok) {
-        console.log('❌ [SIGNIN] Login failed:', result.message);
-        showAlert("Error", result.message);
+        showAlert("Error", result.message || "Invalid credentials.");
         return;
       }
-
+      
       if (result.requiresTwoFactor) {
-        console.log('🔐 [SIGNIN] 2FA Required - Navigating to OTP screen');
-        navigation.navigate('OtpVerification', {
-          email: email,
-          password: password,
-          verificationType: 'TWO_FACTOR_LOGIN'
-        });
+        navigation.navigate('OtpVerification', { email, password, verificationType: 'TWO_FACTOR_LOGIN' });
         return;
       }
 
-      console.log('✅ [SIGNIN] Normal login (no 2FA)');
       const { token } = result.data;
-      console.log('✅ [SIGNIN] Login successful, token received');
 
-      await AsyncStorage.setItem("authToken", token);
-
-      console.log('📥 [SIGNIN] Fetching user data...');
-      const meResponse = await fetch(`${BASE_URL}/auth/me`, {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-          "ngrok-skip-browser-warning": "true",
-        },
-      });
-
-      const meData = await meResponse.json();
-      console.log('📥 [SIGNIN] User data:', meData);
-
-      if (meData.success && meData.data.user) {
-        const user = meData.data.user;
-        await AsyncStorage.setItem("user_id", user.user_id);
-        await AsyncStorage.setItem("mongo_user_id", user._id);
-        await AsyncStorage.setItem(
-          "userName",
-          user.name ||
-            `${user.first_name || ""} ${user.last_name || ""}`.trim(),
-        );
-        await AsyncStorage.setItem("userEmail", user.email);
-        console.log('✅ [SIGNIN] User data saved to AsyncStorage');
+      if (token) {
+        await signIn(token);
+      } else {
+        showAlert("Error", "Login failed: No token received.");
       }
-
-      showAlert("Success", "Login successful!", "success");
     } catch (error) {
-      console.error('❌ [SIGNIN] Login error:', error);
-      showAlert("Error", "Server error. Try again.");
+      showAlert("Error", `Login failed: ${error.message}`);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleSignUp = () => {
-    navigation.navigate("SignUp");
-  };
-
-  const handleForgotPassword = () => {
-    navigation.navigate("ForgotPassword");
-  };
-
   const handleGoogleSignIn = async () => {
     try {
       const authUrl = `${BASE_URL}/auth/google/signin`;
-
-      console.log("Opening Google OAuth URL:", authUrl);
-
-      const result = await WebBrowser.openAuthSessionAsync(
-        authUrl,
-        "darsgah://auth/callback",
-      );
-
-      console.log("OAuth result:", result);
-
-      if (result.type === "cancel") {
-        showAlert("Cancelled", "Google sign-in was cancelled");
-      }
+      await WebBrowser.openAuthSessionAsync(authUrl, "darsgah://auth/callback");
     } catch (error) {
-      console.error("Google Sign In Error:", error);
-      showAlert("Error", "Failed to sign in with Google");
+      showAlert("Error", "Failed to start Google Sign-In.");
     }
   };
 
+  const handleSignUp = () => navigation.navigate("SignUp");
+  const handleForgotPassword = () => navigation.navigate("ForgotPassword");
+
   return (
-    <SafeAreaView
-      style={[styles.container, { backgroundColor: theme.background }]}
-    >
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
       <CustomAlert
         visible={alertVisible}
         title={alertConfig.title}
         message={alertConfig.message}
         type={alertConfig.type}
-        onClose={() => {
-          setAlertVisible(false);
-          if (alertConfig.type === "success") {
-            handleSuccessNavigation();
-          }
-        }}
+        onClose={() => setAlertVisible(false)}
       />
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <View style={styles.header}>
           <Ionicons name="book" size={50} color={theme.primary} />
-          <Text style={[styles.title, { color: theme.text }]}>
-            Join DarsGah
-          </Text>
-          <Text style={[styles.subtitle, { color: theme.textSecondary }]}>
-            Learn smarter, achieve more.
-          </Text>
+          <Text style={[styles.title, { color: theme.text }]}>Join DarsGah</Text>
+          <Text style={[styles.subtitle, { color: theme.textSecondary }]}>Learn smarter, achieve more.</Text>
         </View>
 
         <View style={[styles.card, { backgroundColor: theme.surface }]}>
-          <View
-            style={[
-              styles.tabsContainer,
-              { backgroundColor: theme.inputBackground },
-            ]}
-          >
-            <TouchableOpacity
-              style={[styles.tab, styles.inactiveTab]}
-              onPress={handleSignUp}
-            >
-              <Text style={[styles.inactiveTabText, { color: theme.primary }]}>
-                Sign Up
-              </Text>
+          <View style={[styles.tabsContainer, { backgroundColor: theme.inputBackground }]}>
+            <TouchableOpacity style={[styles.tab, styles.inactiveTab]} onPress={handleSignUp}>
+              <Text style={[styles.inactiveTabText, { color: theme.primary }]}>Sign Up</Text>
             </TouchableOpacity>
-            <TouchableOpacity
-              style={[
-                styles.tab,
-                styles.activeTab,
-                { backgroundColor: theme.primary },
-              ]}
-            >
+            <TouchableOpacity style={[styles.tab, styles.activeTab, { backgroundColor: theme.primary }]}>
               <Text style={styles.activeTabText}>Sign In</Text>
             </TouchableOpacity>
           </View>
 
           <View style={styles.form}>
             <TextInput
-              style={[
-                styles.input,
-                {
-                  backgroundColor: theme.inputBackground,
-                  borderColor: errors.email ? "red" : theme.inputBorder,
-                  color: theme.text,
-                },
-              ]}
+              style={[ styles.input, { backgroundColor: theme.inputBackground, borderColor: errors.email ? "red" : theme.inputBorder, color: theme.text } ]}
               placeholder="Email Address"
               placeholderTextColor={theme.textSecondary}
               value={email}
               onChangeText={(text) => {
                 setEmail(text);
-                if (errors.email)
-                  setErrors((prev) => ({ ...prev, email: false }));
+                if (errors.email) setErrors((prev) => ({ ...prev, email: false }));
               }}
               keyboardType="email-address"
               autoCapitalize="none"
             />
             <TextInput
-              style={[
-                styles.input,
-                {
-                  backgroundColor: theme.inputBackground,
-                  borderColor: errors.password ? "red" : theme.inputBorder,
-                  color: theme.text,
-                },
-              ]}
+              style={[ styles.input, { backgroundColor: theme.inputBackground, borderColor: errors.password ? "red" : theme.inputBorder, color: theme.text } ]}
               placeholder="Password"
               placeholderTextColor={theme.textSecondary}
               value={password}
               onChangeText={(text) => {
                 setPassword(text);
-                if (errors.password)
-                  setErrors((prev) => ({ ...prev, password: false }));
+                if (errors.password) setErrors((prev) => ({ ...prev, password: false }));
               }}
               secureTextEntry
             />
 
-            <TouchableOpacity
-              onPress={handleForgotPassword}
-              style={styles.forgotPasswordContainer}
-            >
-              <Text
-                style={[styles.forgotPasswordText, { color: theme.primary }]}
-              >
-                Forgot Password?
-              </Text>
+            <TouchableOpacity onPress={handleForgotPassword} style={styles.forgotPasswordContainer}>
+              <Text style={[styles.forgotPasswordText, { color: theme.primary }]}>Forgot Password?</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity
-              style={[
-                styles.signInButton,
-                { backgroundColor: theme.primary },
-                isLoading && styles.disabledButton,
-              ]}
-              onPress={handleSignIn}
-              activeOpacity={0.8}
-              disabled={isLoading}
-            >
+            <TouchableOpacity style={[ styles.signInButton, { backgroundColor: theme.primary }, isLoading && styles.disabledButton, ]} onPress={handleSignIn} activeOpacity={0.8} disabled={isLoading}>
               {isLoading ? (
                 <ActivityIndicator color="#FFFFFF" />
               ) : (
@@ -368,40 +165,14 @@ export default function SignInScreen({ navigation }) {
             </TouchableOpacity>
 
             <View style={styles.separator}>
-              <View
-                style={[
-                  styles.separatorLine,
-                  { backgroundColor: theme.inputBorder },
-                ]}
-              />
-              <Text
-                style={[styles.separatorText, { color: theme.textSecondary }]}
-              >
-                OR
-              </Text>
-              <View
-                style={[
-                  styles.separatorLine,
-                  { backgroundColor: theme.inputBorder },
-                ]}
-              />
+              <View style={[styles.separatorLine, { backgroundColor: theme.inputBorder }]} />
+              <Text style={[styles.separatorText, { color: theme.textSecondary }]}>OR</Text>
+              <View style={[styles.separatorLine, { backgroundColor: theme.inputBorder }]} />
             </View>
 
-            <TouchableOpacity
-              style={[
-                styles.socialButton,
-                {
-                  backgroundColor: theme.surface,
-                  borderColor: theme.inputBorder,
-                },
-              ]}
-              onPress={handleGoogleSignIn}
-              activeOpacity={0.8}
-            >
+            <TouchableOpacity style={[ styles.socialButton, { backgroundColor: theme.surface, borderColor: theme.inputBorder } ]} onPress={handleGoogleSignIn} activeOpacity={0.8}>
               <Ionicons name="logo-google" size={24} color="#4285F4" />
-              <Text style={[styles.socialButtonText, { color: theme.text }]}>
-                Continue with Google
-              </Text>
+              <Text style={[styles.socialButtonText, { color: theme.text }]}>Continue with Google</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -411,113 +182,28 @@ export default function SignInScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  scrollContent: {
-    paddingHorizontal: 20,
-    paddingTop: 20,
-  },
-  header: {
-    alignItems: "center",
-    marginBottom: 30,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: "bold",
-    marginTop: 15,
-    marginBottom: 5,
-  },
-  subtitle: {
-    fontSize: 16,
-  },
-  card: {
-    borderRadius: 20,
-    padding: 20,
-    marginBottom: 20,
-  },
-  tabsContainer: {
-    flexDirection: "row",
-    marginBottom: 25,
-    borderRadius: 10,
-    padding: 4,
-  },
-  tab: {
-    flex: 1,
-    paddingVertical: 12,
-    borderRadius: 8,
-    alignItems: "center",
-  },
+  container: { flex: 1 },
+  scrollContent: { paddingHorizontal: 20, paddingTop: 20 },
+  header: { alignItems: "center", marginBottom: 30 },
+  title: { fontSize: 28, fontWeight: "bold", marginTop: 15, marginBottom: 5 },
+  subtitle: { fontSize: 16 },
+  card: { borderRadius: 20, padding: 20, marginBottom: 20 },
+  tabsContainer: { flexDirection: "row", marginBottom: 25, borderRadius: 10, padding: 4 },
+  tab: { flex: 1, paddingVertical: 12, borderRadius: 8, alignItems: "center" },
   activeTab: {},
-  inactiveTab: {
-    backgroundColor: "transparent",
-  },
-  activeTabText: {
-    color: "#FFFFFF",
-    fontWeight: "bold",
-    fontSize: 16,
-  },
-  inactiveTabText: {
-    fontWeight: "600",
-    fontSize: 16,
-  },
-  form: {
-    width: "100%",
-  },
-  input: {
-    borderRadius: 10,
-    padding: 15,
-    marginBottom: 15,
-    fontSize: 16,
-    borderWidth: 1,
-  },
-  forgotPasswordContainer: {
-    alignSelf: "flex-start",
-    marginBottom: 20,
-  },
-  forgotPasswordText: {
-    fontSize: 14,
-    fontWeight: "600",
-  },
-  signInButton: {
-    borderRadius: 12,
-    paddingVertical: 16,
-    alignItems: "center",
-    marginBottom: 20,
-  },
-  signInButtonText: {
-    color: "#FFFFFF",
-    fontSize: 18,
-    fontWeight: "bold",
-  },
-  separator: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginVertical: 20,
-  },
-  separatorLine: {
-    flex: 1,
-    height: 1,
-  },
-  separatorText: {
-    marginHorizontal: 15,
-    fontSize: 14,
-  },
-  socialButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    borderWidth: 1,
-    borderRadius: 12,
-    paddingVertical: 14,
-    paddingHorizontal: 20,
-    marginBottom: 12,
-  },
-  socialButtonText: {
-    marginLeft: 12,
-    fontSize: 16,
-    fontWeight: "500",
-  },
-  disabledButton: {
-    backgroundColor: "#CCCCCC",
-  },
+  inactiveTab: { backgroundColor: "transparent" },
+  activeTabText: { color: "#FFFFFF", fontWeight: "bold", fontSize: 16 },
+  inactiveTabText: { fontWeight: "600", fontSize: 16 },
+  form: { width: "100%" },
+  input: { borderRadius: 10, padding: 15, marginBottom: 15, fontSize: 16, borderWidth: 1 },
+  forgotPasswordContainer: { alignSelf: "flex-start", marginBottom: 20 },
+  forgotPasswordText: { fontSize: 14, fontWeight: "600" },
+  signInButton: { borderRadius: 12, paddingVertical: 16, alignItems: "center", marginBottom: 20 },
+  signInButtonText: { color: "#FFFFFF", fontSize: 18, fontWeight: "bold" },
+  separator: { flexDirection: "row", alignItems: "center", marginVertical: 20 },
+  separatorLine: { flex: 1, height: 1 },
+  separatorText: { marginHorizontal: 15, fontSize: 14 },
+  socialButton: { flexDirection: "row", alignItems: "center", borderWidth: 1, borderRadius: 12, paddingVertical: 14, paddingHorizontal: 20, marginBottom: 12 },
+  socialButtonText: { marginLeft: 12, fontSize: 16, fontWeight: "500" },
+  disabledButton: { backgroundColor: "#CCCCCC" },
 });

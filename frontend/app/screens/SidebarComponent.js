@@ -1,33 +1,18 @@
-/**
- * Sidebar Component - Navigation Sidebar
- * Author: Momna Butt (BCSF22M021)
- * 
- * Functionality:
- * - Provides slide-out navigation menu
- * - Displays navigation options with icons
- * - Handles screen navigation and sidebar animations
- * - Highlights active screen
- * - Manages sidebar visibility and interactions
- */
-
 import React, { useEffect } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  Animated,
-  ScrollView,
+  View, Text, StyleSheet, TouchableOpacity, Animated, ScrollView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../utils/ThemeContext';
-import { useNavigation, CommonActions } from '@react-navigation/native';
+import { useNavigation } from '@react-navigation/native';
+import { useAuth } from '../context/AuthContext';
 
 export default function Sidebar({ isVisible, onClose, activeScreen }) {
   const { theme } = useTheme();
   const navigation = useNavigation();
+  const { signOut } = useAuth();
   const sidebarAnimation = React.useRef(new Animated.Value(0)).current;
-  const sidebarWidth = 110; // Widened for labels
+  const sidebarWidth = 110;
 
   useEffect(() => {
     Animated.spring(sidebarAnimation, {
@@ -38,20 +23,18 @@ export default function Sidebar({ isVisible, onClose, activeScreen }) {
     }).start();
   }, [isVisible]);
 
+  const handleLogout = async () => {
+    if (isVisible) {
+      onClose();
+      await signOut();
+    }
+  };
+
   const handleNavigation = (screenName) => {
     if (isVisible) {
       onClose();
       if (screenName === activeScreen) return;
-      if (screenName === 'SignIn') {
-        navigation.dispatch(
-          CommonActions.reset({
-            index: 0,
-            routes: [{ name: 'SignIn' }],
-          })
-        );
-      } else {
-        navigation.navigate(screenName);
-      }
+      navigation.navigate(screenName);
     }
   };
 
@@ -97,7 +80,7 @@ export default function Sidebar({ isVisible, onClose, activeScreen }) {
             </View>
         </ScrollView>
         <View style={styles.sidebarBottom}>
-            <TouchableOpacity style={styles.sidebarIcon} onPress={() => handleNavigation("SignIn")}>
+            <TouchableOpacity style={styles.sidebarIcon} onPress={handleLogout}>
                 <Ionicons name="log-out-outline" size={30} color="#FF6B6B" />
                 <Text style={[styles.sidebarLabel, {color: '#FF6B6B'}]}>Logout</Text>
             </TouchableOpacity>

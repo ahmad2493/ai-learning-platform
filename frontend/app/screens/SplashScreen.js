@@ -392,7 +392,8 @@ export default function SplashScreen({ navigation }) {
           </Text>
         </Animated.View>
 
-        {/* Get Started Button with animations */}
+        {/* Get Started Button with animations - COMMENTED OUT */}
+        {/*
         <Animated.View
           style={{
             opacity: buttonOpacity,
@@ -427,6 +428,7 @@ export default function SplashScreen({ navigation }) {
             </LinearGradient>
           </TouchableOpacity>
         </Animated.View>
+        */}
       </View>
     </SafeAreaView>
   );

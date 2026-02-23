@@ -1,7 +1,7 @@
 /**
  * Profile Screen - User Profile Management
  * Author: Momna Butt (BCSF22M021)
- * 
+ *
  * Functionality:
  * - Displays and edits user profile information
  * - Handles profile picture upload and display
@@ -27,17 +27,17 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../utils/ThemeContext';
 import Sidebar from './SidebarComponent';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
 import { BASE_URL } from '../utils/apiConfig';
 import CustomAlert from '../components/CustomAlert';
+import { useAuth } from '../context/AuthContext';
 
 export default function ProfileScreen({ navigation }) {
   const { theme } = useTheme();
+  const { user, isLoading, refreshUser, authToken } = useAuth();
   const [sidebarVisible, setSidebarVisible] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [initialLoading, setInitialLoading] = useState(true);
   const [alertVisible, setAlertVisible] = useState(false);
   const [alertConfig, setAlertConfig] = useState({ title: '', message: '', type: 'error' });
 
@@ -48,89 +48,20 @@ export default function ProfileScreen({ navigation }) {
     profilePicture: null,
   });
 
-  const [userId, setUserId] = useState(null);
-  const [authToken, setAuthToken] = useState(null);
+  useEffect(() => {
+    if (user) {
+      setUserData({
+        name: user.name || 'User',
+        email: user.email || '',
+        bio: user.bio || '',
+        profilePicture: user.profile_photo_url || null,
+      });
+    }
+  }, [user]);
 
   const showAlert = (title, message, type = 'error') => {
     setAlertConfig({ title, message, type });
     setAlertVisible(true);
-  };
-
-  useEffect(() => {
-    const loadUserData = async () => {
-      try {
-        console.log('📥 [PROFILE] Loading user data...');
-        
-        const mongoId = await AsyncStorage.getItem('mongo_user_id');
-        const token = await AsyncStorage.getItem('authToken');
-        const name = await AsyncStorage.getItem('userName');
-        const email = await AsyncStorage.getItem('userEmail');
-
-        console.log('📥 [PROFILE] Retrieved data:', { mongoId, hasToken: !!token, name, email });
-
-        if (!mongoId) {
-          showAlert('Error', 'No user found. Please log in again.');
-          navigation.navigate('SignIn');
-          return;
-        }
-
-        setUserId(mongoId);
-        setAuthToken(token);
-        setUserData(prev => ({
-          ...prev,
-          name: name || prev.name,
-          email: email || prev.email,
-        }));
-
-        await fetchUserProfile(mongoId, token);
-
-      } catch (error) {
-        console.error('❌ [PROFILE] Failed to load user data:', error);
-        showAlert('Error', 'Failed to load profile data.');
-      } finally {
-        setInitialLoading(false);
-      }
-    };
-
-    loadUserData();
-  }, []);
-
-  const fetchUserProfile = async (id, token) => {
-    try {
-      console.log('🌐 [PROFILE] Fetching profile from backend...');
-      
-      const headers = {
-        'Content-Type': 'application/json',
-        'ngrok-skip-browser-warning': 'true',
-      };
-
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
-      }
-
-      const response = await fetch(`${BASE_URL}/profile/${id}`, {
-        method: 'GET',
-        headers: headers,
-      });
-
-      console.log('📥 [PROFILE] Response status:', response.status);
-      const result = await response.json();
-      console.log('📥 [PROFILE] Response data:', result);
-
-      if (result.success) {
-        setUserData(prev => ({
-          ...prev,
-          bio: result.data.bio || '',
-          profilePicture: result.data.profile_photo_url || null,
-          name: result.data.name || prev.name,
-        }));
-        console.log('✅ [PROFILE] Profile loaded successfully');
-      } else {
-        console.log('⚠️ [PROFILE] Failed to fetch profile:', result.message);
-      }
-    } catch (error) {
-      console.error('❌ [PROFILE] Error fetching profile:', error);
-    }
   };
 
   const handleInputChange = (field, value) => {
@@ -154,11 +85,9 @@ export default function ProfileScreen({ navigation }) {
 
       if (!result.canceled) {
         const uri = result.assets[0].uri;
-        console.log('📸 [PROFILE] Image selected:', uri);
         setUserData(prev => ({ ...prev, profilePicture: uri }));
       }
     } catch (error) {
-      console.error('❌ [PROFILE] ImagePicker error:', error);
       showAlert('Error', 'Failed to pick image.');
     }
   };
@@ -181,16 +110,14 @@ export default function ProfileScreen({ navigation }) {
   };
 
   const handleSaveChanges = async () => {
-    if (!userId) {
-      showAlert('Error', 'User ID not found. Please log in again.');
+    if (!authToken) {
+      showAlert('Error', 'User is not authenticated. Please log in again.');
       return;
     }
 
     setLoading(true);
 
     try {
-      console.log('💾 [PROFILE] Saving changes...');
-      
       const formData = new FormData();
       formData.append('name', userData.name.trim());
       formData.append('bio', userData.bio);
@@ -200,56 +127,42 @@ export default function ProfileScreen({ navigation }) {
         const match = /\.(\w+)$/.exec(filename);
         const type = match ? `image/${match[1]}` : 'image/jpeg';
 
-        formData.append('profile_picture', {
+        formData.append('profile_photo', {
           uri: Platform.OS === 'ios' ? userData.profilePicture.replace('file://', '') : userData.profilePicture,
           name: filename,
           type,
         });
-        
-        console.log('📸 [PROFILE] Uploading new profile picture');
       }
 
       const headers = {
+        'Content-Type': 'multipart/form-data',
         'ngrok-skip-browser-warning': 'true',
+        'Authorization': `Bearer ${authToken}`,
       };
 
-      if (authToken) {
-        headers['Authorization'] = `Bearer ${authToken}`;
-      }
-
-      console.log('🌐 [PROFILE] Sending update request...');
-      const response = await fetch(`${BASE_URL}/profile/${userId}`, {
-        method: 'PATCH',
+      const response = await fetch(`${BASE_URL}/profile/me`, {
+        method: 'PUT',
         body: formData,
         headers: headers,
       });
 
-      console.log('📥 [PROFILE] Response status:', response.status);
       const result = await response.json();
-      console.log('📥 [PROFILE] Response data:', result);
 
       if (result.success) {
-        await AsyncStorage.setItem('userName', userData.name.trim());
-        
         showAlert('Success', 'Profile updated successfully!', 'success');
         setIsEditing(false);
-        
-        await fetchUserProfile(userId, authToken);
-        
-        console.log('✅ [PROFILE] Profile updated successfully');
+        await refreshUser();
       } else {
-        console.log('❌ [PROFILE] Update failed:', result);
         showAlert('Error', result.message || 'Failed to update profile.');
       }
     } catch (error) {
-      console.error('❌ [PROFILE] Error updating profile:', error);
       showAlert('Error', 'An error occurred while updating profile. Please try again.');
     } finally {
       setLoading(false);
     }
   };
 
-  if (initialLoading) {
+  if (isLoading && !user) {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
         <View style={styles.loadingContainer}>
@@ -286,9 +199,9 @@ export default function ProfileScreen({ navigation }) {
 
           <ScrollView contentContainerStyle={styles.scrollContent}>
             <View style={[styles.profileHeader, { backgroundColor: theme.surface }]}>
-              <TouchableOpacity 
-                style={styles.avatarContainer} 
-                disabled={!isEditing} 
+              <TouchableOpacity
+                style={styles.avatarContainer}
+                disabled={!isEditing}
                 onPress={handlePickImage}
                 activeOpacity={isEditing ? 0.7 : 1}
               >
@@ -324,11 +237,14 @@ export default function ProfileScreen({ navigation }) {
               {isEditing ? (
                 <TextInput
                   multiline
-                  style={[styles.bioInput, { 
-                    color: theme.text, 
-                    borderColor: theme.inputBorder,
-                    backgroundColor: theme.inputBackground 
-                  }]}
+                  style={[
+                    styles.bioInput,
+                    {
+                      color: theme.text,
+                      borderColor: theme.inputBorder,
+                      backgroundColor: theme.inputBackground
+                    },
+                  ]}
                   value={userData.bio}
                   onChangeText={text => handleInputChange('bio', text)}
                   placeholder="Tell us about yourself..."

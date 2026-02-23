@@ -1,20 +1,9 @@
-/**
- * App Navigator - Navigation Configuration
- * Author: Momna Butt (BCSF22M021)
- * 
- * Functionality:
- * - Configures React Navigation for the mobile app
- * - Defines screen routes and navigation structure
- * - Manages navigation stack and screen transitions
- * - Handles authentication-based navigation flow
- * - Provides navigation context to all screens
- */
+import React, { useState, useEffect } from 'react';
+import { View, ActivityIndicator } from 'react-native';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { useAuth } from '../context/AuthContext';
 
-import React from "react";
-import { NavigationContainer } from "@react-navigation/native";
-import { createNativeStackNavigator } from "@react-navigation/native-stack";
-
-import SplashScreen from "../screens/SplashScreen";
+// --- Import All Screens ---
 import SignInScreen from "../screens/SignInScreen";
 import SignUpScreen from "../screens/SignUpScreen";
 import ForgotPasswordScreen from "../screens/ForgotPasswordScreen";
@@ -33,133 +22,65 @@ import CloPerformanceScreen from "../screens/CloPerformanceScreen";
 import ChangePasswordScreen from "../screens/ChangePasswordScreen";
 import OtpVerificationScreen from "../screens/OtpVerificationScreen";
 import ResetPasswordScreen from "../screens/ResetPasswordScreen";
+import SplashScreen from '../screens/SplashScreen'; // make sure this exists
 
 const Stack = createNativeStackNavigator();
 
-export default function AppNavigator() {
-  return (
-    <NavigationContainer>
-      <Stack.Navigator initialRouteName="Splash">
-        <Stack.Screen
-          name="Splash"
-          component={SplashScreen}
-          options={{ headerShown: false }}
-        />
-        <Stack.Screen
-          name="SignIn"
-          component={SignInScreen}
-          options={{ headerShown: false }}
-        />
-        <Stack.Screen
-          name="SignUp"
-          component={SignUpScreen}
-          options={{ headerShown: false }}
-        />
-        <Stack.Screen
-          name="AuthCallback"
-          component={AuthCallbackScreen}
-          options={{ headerShown: false }}
-        />
-        <Stack.Screen
-          name="ForgotPassword"
-          component={ForgotPasswordScreen}
-          options={{ headerShown: false }}
-        />
-        <Stack.Screen
-          name="Settings"
-          component={SettingsScreen}
-          options={{
-            headerShown: false,
-          }}
-        />
-        <Stack.Screen
-          name="Notifications"
-          component={NotificationsScreen}
-          options={{
-            headerShown: false,
-          }}
-        />
-        <Stack.Screen
-          name="Security"
-          component={SecurityScreen}
-          options={{
-            headerShown: false,
-          }}
-        />
-        <Stack.Screen
-          name="AboutApp"
-          component={AboutAppScreen}
-          options={{
-            headerShown: false,
-          }}
-        />
-        <Stack.Screen
-          name="StudentDashboard"
-          component={StudentDashboardScreen}
-          options={{
-            headerShown: false,
-          }}
-        />
-        <Stack.Screen
-          name="Profile"
-          component={ProfileScreen}
-          options={{
-            headerShown: false,
-          }}
-        />
-        <Stack.Screen
-          name="AiAssistant"
-          component={AiAssistantScreen}
-          options={{
-            headerShown: false,
-          }}
-        />
-        <Stack.Screen
-          name="AiChat"
-          component={AiChatScreen}
-          options={{
-            headerShown: false,
-          }}
-        />
-        <Stack.Screen
-          name="TestGenerator"
-          component={TestGeneratorScreen}
-          options={{
-            headerShown: false,
-          }}
-        />
-        <Stack.Screen
-          name="PastPapers"
-          component={PastPapersScreen}
-          options={{
-            headerShown: false,
-          }}
-        />
-        <Stack.Screen
-          name="CloPerformance"
-          component={CloPerformanceScreen}
-          options={{
-            headerShown: false,
-          }}
-        />
-        <Stack.Screen
-          name="ChangePassword"
-          component={ChangePasswordScreen}
-          options={{
-            headerShown: false,
-          }}
-        />
-        <Stack.Screen
-          name="OtpVerification"
-          component={OtpVerificationScreen}
-          options={{ headerShown: false }}
-        />
-        <Stack.Screen
-          name="ResetPassword"
-          component={ResetPasswordScreen}
-          options={{ headerShown: false }}
-        />
-      </Stack.Navigator>
-    </NavigationContainer>
-  );
-}
+// --- Main App Navigator ---
+const AppStack = () => (
+  <Stack.Navigator initialRouteName="StudentDashboard">
+    <Stack.Screen name="StudentDashboard" component={StudentDashboardScreen} options={{ headerShown: false }} />
+    <Stack.Screen name="Profile" component={ProfileScreen} options={{ headerShown: false }} />
+    <Stack.Screen name="AiAssistant" component={AiAssistantScreen} options={{ headerShown: false }} />
+    <Stack.Screen name="AiChat" component={AiChatScreen} options={{ headerShown: false }} />
+    <Stack.Screen name="TestGenerator" component={TestGeneratorScreen} options={{ headerShown: false }} />
+    <Stack.Screen name="PastPapers" component={PastPapersScreen} options={{ headerShown: false }} />
+    <Stack.Screen name="CloPerformance" component={CloPerformanceScreen} options={{ headerShown: false }} />
+    <Stack.Screen name="Settings" component={SettingsScreen} options={{ headerShown: false }} />
+    <Stack.Screen name="Notifications" component={NotificationsScreen} options={{ headerShown: false }} />
+    <Stack.Screen name="Security" component={SecurityScreen} options={{ headerShown: false }} />
+    <Stack.Screen name="AboutApp" component={AboutAppScreen} options={{ headerShown: false }} />
+    <Stack.Screen name="ChangePassword" component={ChangePasswordScreen} options={{ headerShown: false }} />
+  </Stack.Navigator>
+);
+
+// --- Auth Flow Navigator ---
+const AuthStack = () => (
+  <Stack.Navigator initialRouteName="SignIn">
+    <Stack.Screen name="SignIn" component={SignInScreen} options={{ headerShown: false }} />
+    <Stack.Screen name="SignUp" component={SignUpScreen} options={{ headerShown: false }} />
+    <Stack.Screen name="AuthCallback" component={AuthCallbackScreen} options={{ headerShown: false }} />
+    <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} options={{ headerShown: false }} />
+    <Stack.Screen name="OtpVerification" component={OtpVerificationScreen} options={{ headerShown: false }} />
+    <Stack.Screen name="ResetPassword" component={ResetPasswordScreen} options={{ headerShown: false }} />
+  </Stack.Navigator>
+);
+
+const RootNavigator = () => {
+  const { userToken, isLoading } = useAuth() || {};
+  const [showSplash, setShowSplash] = useState(true);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setShowSplash(false);
+    }, 2500); // 2.5 sec splash
+
+    return () => clearTimeout(timer);
+  }, []);
+
+  if (showSplash) {
+    return <SplashScreen />;
+  }
+
+  if (isLoading) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <ActivityIndicator size="large" />
+      </View>
+    );
+  }
+
+  return userToken ? <AppStack /> : <AuthStack />;
+};
+
+export default RootNavigator;

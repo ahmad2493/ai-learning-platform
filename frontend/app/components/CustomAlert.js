@@ -20,7 +20,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
-const CustomAlert = ({ visible, title, message, type, onClose }) => {
+const CustomAlert = ({ visible, title, message, type, onClose, onConfirm }) => {
   const scaleAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -31,6 +31,7 @@ const CustomAlert = ({ visible, title, message, type, onClose }) => {
         useNativeDriver: true,
       }).start();
 
+      // Auto-close only for success type
       if (type === 'success') {
         const timer = setTimeout(() => {
           onClose();
@@ -38,15 +39,42 @@ const CustomAlert = ({ visible, title, message, type, onClose }) => {
         return () => clearTimeout(timer);
       }
     } else {
-      scaleAnim.setValue(0);
+      // Reset animation when closing
+      Animated.timing(scaleAnim, {
+        toValue: 0,
+        duration: 200,
+        useNativeDriver: true,
+      }).start();
     }
   }, [visible, type, onClose, scaleAnim]);
 
   if (!visible) return null;
 
-  const isSuccess = type === 'success';
-  const iconName = isSuccess ? 'checkmark-done-circle' : 'alert-circle-outline';
-  const iconColor = isSuccess ? '#4CAF50' : '#F44336';
+  // Configuration for different alert types
+  const alertConfig = {
+    success: {
+      icon: 'checkmark-done-circle',
+      color: '#4CAF50',
+      size: 50,
+    },
+    error: {
+      icon: 'alert-circle-outline',
+      color: '#F44336',
+      size: 40,
+    },
+    confirm: {
+      icon: 'help-circle-outline',
+      color: '#FF9800', // Orange for confirmation
+      size: 40,
+    },
+    info: {
+      icon: 'information-circle-outline',
+      color: '#2196F3',
+      size: 40,
+    },
+  };
+
+  const config = alertConfig[type] || alertConfig.error;
 
   return (
     <Modal
@@ -57,16 +85,28 @@ const CustomAlert = ({ visible, title, message, type, onClose }) => {
     >
       <View style={styles.overlay}>
         <Animated.View style={[styles.alertBox, { transform: [{ scale: scaleAnim }] }]}>
-          <Ionicons name={iconName} size={isSuccess ? 50 : 40} color={iconColor} style={{ marginBottom: 15 }} />
+          <Ionicons name={config.icon} size={config.size} color={config.color} style={{ marginBottom: 15 }} />
           <Text style={styles.title}>{title}</Text>
-          {!isSuccess ? (
-            <>
-              <Text style={styles.message}>{message}</Text>
-              <TouchableOpacity style={[styles.button, { backgroundColor: iconColor }]} onPress={onClose}>
-                <Text style={styles.buttonText}>OK</Text>
-              </TouchableOpacity>
-            </>
+          
+          {message && <Text style={styles.message}>{message}</Text>}
+
+          {type === 'error' || type === 'info' ? (
+            <TouchableOpacity style={[styles.button, { backgroundColor: config.color }]} onPress={onClose}>
+              <Text style={styles.buttonText}>OK</Text>
+            </TouchableOpacity>
           ) : null}
+
+          {type === 'confirm' ? (
+            <View style={styles.buttonContainer}>
+              <TouchableOpacity style={[styles.button, styles.cancelButton]} onPress={onClose}>
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.button, { backgroundColor: config.color }]} onPress={onConfirm}>
+                <Text style={styles.buttonText}>Confirm</Text>
+              </TouchableOpacity>
+            </View>
+          ) : null}
+
         </Animated.View>
       </View>
     </Modal>
@@ -79,10 +119,11 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.6)',
     justifyContent: 'center',
     alignItems: 'center',
+    padding: 20,
   },
   alertBox: {
-    width: '85%',
-    maxWidth: 300,
+    width: '100%',
+    maxWidth: 320,
     backgroundColor: 'white',
     borderRadius: 20,
     padding: 25,
@@ -97,21 +138,38 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: 'bold',
     textAlign: 'center',
+    color: '#333',
   },
   message: {
     fontSize: 16,
     textAlign: 'center',
     marginVertical: 10,
-    color: '#333',
+    color: '#666',
+    lineHeight: 22,
+  },
+  buttonContainer: {
+    flexDirection: 'row',
+    marginTop: 20,
+    justifyContent: 'space-between',
+    width: '100%',
   },
   button: {
     borderRadius: 12,
     paddingVertical: 12,
-    paddingHorizontal: 40,
-    marginTop: 15,
+    flex: 1,
+    marginHorizontal: 5,
+    alignItems: 'center',
+  },
+  cancelButton: {
+    backgroundColor: '#E0E0E0',
   },
   buttonText: {
     color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  cancelButtonText: {
+    color: '#333',
     fontSize: 16,
     fontWeight: 'bold',
   },

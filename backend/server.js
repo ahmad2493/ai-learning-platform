@@ -6,7 +6,7 @@
  * - Sets up Express server with middleware (CORS, body parser, sessions)
  * - Configures MongoDB connection
  * - Initializes Passport.js for OAuth authentication
- * - Registers API routes (auth, admin, student, profile)
+ * - Registers API routes (auth, admin, student, profile, chat)
  * - Handles error responses and 404 routes
  * - Starts HTTP server on configured port
  */
@@ -94,6 +94,9 @@ app.use('/api/students', studentRoutes);
 
 const profileRoutes = require('./src/routes/profileRoutes');
 app.use('/api/profile', profileRoutes);
+
+const chatRoutes = require('./src/routes/chatRoutes');
+app.use('/api/chat', chatRoutes);
 
 console.log('AWS Access Key:', process.env.AWS_ACCESS_KEY_ID ? 'Loaded' : 'Missing');
 console.log('AWS Secret Key:', process.env.AWS_SECRET_ACCESS_KEY ? 'Loaded' : 'Missing');
