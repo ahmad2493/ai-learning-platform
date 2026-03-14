@@ -1,4 +1,4 @@
-i h"""
+"""
 Past Papers Retrieval + Cleanup Pipeline
 
 Usage (example, from ai-service folder):
