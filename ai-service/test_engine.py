@@ -26,10 +26,10 @@ load_dotenv()
 # ─────────────────────────────────────────────
 # Paths & constants
 # ─────────────────────────────────────────────
-BASE_DIR = BASE_DIR = r"C:\mnt\chroma"
+BASE_DIR = "/mnt/chroma"
 BOOK_JSON_PATH = os.path.join(BASE_DIR, "Book_Final.json")
 CHUNK_RANGES_PATH = os.path.join(BASE_DIR, "chunk_ranges.json")
-DEFAULT_CHROMA_DIR = r"C:\mnt\chroma\chromadb_Book"
+DEFAULT_CHROMA_DIR = os.path.join(BASE_DIR, "chromadb_Book")
 
 MAX_CHUNK_CHARS = 800
 CHUNKS_PER_SLOT_IN_BATCH = 2
