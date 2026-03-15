@@ -1,7 +1,6 @@
 /**
  * chat controller - Chat Operations
  * Author: Momina (BCSF22M021)
-
  */
 const axios = require('axios');
 const mongoose = require('mongoose');
@@ -16,19 +15,7 @@ exports.sendMessage = async (req, res) => {
   }
 
   try {
-    const aiServiceUrl = process.env.AI_SERVICE_URL || 'https://darsgah-rag-epbjg9dka5hmexaj.uaenorth-01.azurewebsites.net/api/ask';
-    let aiAnswer;
-
-    try {
-      const aiResponse = await axios.post(aiServiceUrl, { question: message });
-      aiAnswer = aiResponse.data.answer;
-      if (!aiAnswer) {
-        throw new Error('AI service did not return a valid answer.');
-      }
-    } catch (aiError) {
-      return res.status(502).json({ success: false, message: 'The AI service is currently unavailable. Please try again later.' });
-    }
-
+    // 1. Get or Create Chat Session
     let chatSession;
     if (chatId && mongoose.Types.ObjectId.isValid(chatId)) {
       chatSession = await Chat.findById(chatId);
@@ -40,21 +27,74 @@ exports.sendMessage = async (req, res) => {
         title: message.length > 40 ? message.substring(0, 37) + '...' : message,
         messages: [],
       });
+      await chatSession.save();
     }
 
+    // 2. Define AI Service URL 
+    // If you are running locally, use 'http://127.0.0.1:8000/api/ask'
+    // If testing the deployed version, use the Azure URL
+    const aiServiceUrl = process.env.AI_SERVICE_URL || 'http://localhost:8000/api/ask';
+    
+    let aiTextAnswer = "";
+    let aiFigures = [];
+
+    console.log(`[AI-DEBUG] Sending request to: ${aiServiceUrl}`);
+
+    try {
+      const aiResponse = await axios.post(aiServiceUrl, { 
+        question: message,
+        session_id: chatSession._id.toString() 
+      }, {
+        timeout: 60000 
+      });
+
+      // Response format: { "question": "...", "answer": { "answer": "...", "figures": [...] } }
+      const data = aiResponse.data;
+      
+      if (data.answer && data.answer.answer) {
+        aiTextAnswer = data.answer.answer;
+        aiFigures = data.answer.figures || [];
+      } else if (data.error) {
+        console.error("[AI-DEBUG] Service returned error:", data.error);
+        throw new Error(data.error);
+      } else {
+        console.error("[AI-DEBUG] Unexpected structure:", JSON.stringify(data));
+        throw new Error("Invalid response format from AI service.");
+      }
+    } catch (aiError) {
+      console.error("--- AI CONNECTION ERROR ---");
+      if (aiError.code === 'ECONNREFUSED') {
+        console.error(`Error: Backend could not connect to Python AI at ${aiServiceUrl}. Ensure uvicorn is running.`);
+      } else {
+        console.error("Message:", aiError.message);
+      }
+      
+      return res.status(502).json({ 
+        success: false, 
+        message: 'The AI service is currently unavailable. Please check your AI backend server.' 
+      });
+    }
+
+    // 3. Save and Respond
     chatSession.messages.push({ sender: 'user', text: message });
-    chatSession.messages.push({ sender: 'ai', text: aiAnswer });
+    chatSession.messages.push({ 
+      sender: 'ai', 
+      text: aiTextAnswer,
+      figures: aiFigures
+    });
     
     await chatSession.save();
 
     res.status(200).json({
       success: true,
-      answer: aiAnswer,
+      answer: aiTextAnswer,
+      figures: aiFigures,
       chatId: chatSession._id,
     });
 
   } catch (error) {
-    res.status(500).json({ success: false, message: 'Your request could not be saved.' });
+    console.error("ChatController Error:", error);
+    res.status(500).json({ success: false, message: 'Internal server error.' });
   }
 };
 

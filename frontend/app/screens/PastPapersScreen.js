@@ -143,7 +143,7 @@ const BOARDS = Object.keys(BOARD_MAPPING).map(b => ({ label: b, value: b }));
 export default function PastPapersScreen({ navigation }) {
   const { theme } = useTheme();
   const [sidebarVisible, setSidebarVisible] = useState(false);
-  
+
   // Filter states
   const [subject, setSubject] = useState('Physics');
   const [chapter, setChapter] = useState(null);
@@ -163,7 +163,7 @@ export default function PastPapersScreen({ navigation }) {
   // 1. Core LaTeX Formatter (returns clean string)
   const formatLatex = (text) => {
     if (!text) return "";
-    
+
     const superscripts = {
       '0':'⁰','1':'¹','2':'²','3':'³','4':'⁴','5':'⁵','6':'⁶','7':'⁷','8':'⁸','9':'⁹',
       '-':'⁻','+':'⁺','n':'ⁿ','x':'ˣ','i':'ⁱ'
@@ -172,26 +172,26 @@ export default function PastPapersScreen({ navigation }) {
     return text
       // Robust fraction handling: \frac{num}{den} -> (num / den)
       .replace(/\\frac\s*\{([^\}]+)\}\s*\{([^\}]+)\}/g, '($1 / $2)')
-      
-      // Strip math bold/text styling commands
-      .replace(/\\math(bf|bb|it|cal|frak|rm|sf)\{([^\}]+)\}/g, '$2')
-      .replace(/\\text(bf|it|sl|sc|sf|rm)\{([^\}]+)\}/g, '$2')
+
+      // Strip math bold/text styling commands (handles optional double slashes)
+      .replace(/\\+math(bf|bb|it|cal|frak|rm|sf)\{([^\}]+)\}/g, '$2')
+      .replace(/\\+text(bf|it|sl|sc|sf|rm)\{([^\}]+)\}/g, '$2')
 
       // Strip symbols/math tags
       .replace(/\$([^\$]+)\$/g, '$1')
       .replace(/\\\(|\\\)|\\\[|\\\]/g, '')
-      .replace(/\\\s*\(/g, '(').replace(/\\\s*\)/g, ')') // Handle escaped parens like \ (
+      .replace(/\\+\s*\(/g, '(').replace(/\\+\s*\)/g, ')')
 
       // Superscripts
       .replace(/\^\{([^\}]+)\}/g, (m, p) => p.split('').map(c => superscripts[c] || c).join(''))
       .replace(/\^([\d\-+nxi])/g, (m, p) => superscripts[p] || p)
 
       // Scientific constants and symbols
-      .replace(/\\mathrm\{([^\}]+)\}/g, '$1')
-      .replace(/\\times/g, '×')
-      .replace(/\\cdot/g, '·')
-      .replace(/\\mu/g, 'µ')
-      .replace(/\\ell/g, 'ℓ')
+      .replace(/\\+mathrm\{([^\}]+)\}/g, '$1')
+      .replace(/\\+times/g, '×')
+      .replace(/\\+cdot/g, '·')
+      .replace(/\\+mu/g, 'µ')
+      .replace(/\\+ell/g, 'ℓ')
       .replace(/~/g, ' ')
       .replace(/\\(?!https?|[\w\d])/g, '') // Clean stray slashes
       .trim();
@@ -201,8 +201,9 @@ export default function PastPapersScreen({ navigation }) {
   const renderContentWithImages = (text, textStyle) => {
     if (!text) return null;
 
-    // Split logic for: Images ![](), Bold LaTeX \mathbf{}, and bold markdown **
-    const parts = text.split(/(!\[\]\(.*?\)|\\mathbf\{.*?\}|\*\*.*?\*\*)/g);
+    // Split logic for: Images, Bold LaTeX, and bold markdown
+    // Updated regex to be more resilient to slashes and whitespace
+    const parts = text.split(/(!\[\]\(.*?\)|\\+math[a-z]+\{.*?\}|\*\*.*?\*\*)/g);
 
     return parts.map((part, i) => {
       // 1. Handle Images
@@ -218,8 +219,8 @@ export default function PastPapersScreen({ navigation }) {
         );
       }
 
-      // 2. Handle Bold LaTeX: \mathbf{...}
-      const boldLatexMatch = part.match(/\\math(bf|bb|it|cal|frak|rm|sf)\{(.*?)\}/);
+      // 2. Handle Bold LaTeX: \mathbf{...} or \\mathbf{...}
+      const boldLatexMatch = part.match(/\\+math(bf|bb|it|cal|frak|rm|sf)\{(.*?)\}/);
       if (boldLatexMatch) {
         return (
           <Text key={i} style={[textStyle, { fontWeight: 'bold' }]}>
@@ -240,7 +241,7 @@ export default function PastPapersScreen({ navigation }) {
 
       // 4. Regular segments
       const cleaned = formatLatex(part);
-      if (!cleaned || cleaned === "!") return null;
+      if (!cleaned || cleaned === "!" || cleaned === "...") return null;
 
       return (
         <Text key={i} style={textStyle}>
@@ -257,7 +258,7 @@ export default function PastPapersScreen({ navigation }) {
     if (isQuestion) {
       clean = text.split(/Ans\.|Answer:|Sol\./i)[0].trim();
     } else {
-      const parts = text.split(/Answer:|Ans\./i);
+      const parts = text.split(/Answer:|Ans\.|Sol\./i);
       clean = parts.length > 1 ? parts[parts.length - 1].trim() : text.trim();
     }
     return clean;
@@ -420,6 +421,13 @@ export default function PastPapersScreen({ navigation }) {
                     const options = (item.options || item.choices || []);
                     const sectionName = item.section || item.type || 'Question';
 
+                    // Check if answer is meaningful before showing box
+                    const hasMeaningfulAnswer = rawAnswer &&
+                                               rawAnswer.trim() !== "" &&
+                                               rawAnswer.trim() !== "..." &&
+                                               rawAnswer.trim() !== "." &&
+                                               rawAnswer.length > 0;
+
                     return (
                       <View key={index} style={{ borderBottomColor: theme.background, borderBottomWidth: index === results.length - 1 ? 0 : 2, paddingBottom: 20, marginBottom: 20 }}>
 
@@ -453,7 +461,7 @@ export default function PastPapersScreen({ navigation }) {
                            </View>
                          )}
 
-                         {rawAnswer ? (
+                         {hasMeaningfulAnswer ? (
                            <View style={{ marginTop: 12, backgroundColor: theme.background, padding: 12, borderRadius: 10, borderLeftWidth: 4, borderLeftColor: theme.primary }}>
                               <Text style={[styles.resultsText, {color: theme.primary, fontWeight: 'bold', fontSize: 14, marginBottom: 6}]}>EXPLANATION / ANSWER:</Text>
                               <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>

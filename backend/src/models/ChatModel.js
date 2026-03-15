@@ -4,6 +4,13 @@
  */
 const mongoose = require('mongoose');
 
+// Schema for figures/images returned by the AI
+const figureSchema = new mongoose.Schema({
+  figure_number: String,
+  caption: String,
+  urls: [String]
+});
+
 // A schema for a single message within a chat
 const messageSchema = new mongoose.Schema({
   sender: {
@@ -15,6 +22,7 @@ const messageSchema = new mongoose.Schema({
     type: String,
     required: true,
   },
+  figures: [figureSchema], // ADDED: to store images from AI
   timestamp: {
     type: Date,
     default: Date.now,

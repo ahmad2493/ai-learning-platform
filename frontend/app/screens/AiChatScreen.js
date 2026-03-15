@@ -1,8 +1,10 @@
 import React, { useState, useRef, useEffect } from "react";
 import {
   View, Text, StyleSheet, TextInput, TouchableOpacity, FlatList, 
-  KeyboardAvoidingView, Platform, ActivityIndicator, Animated
+  KeyboardAvoidingView, Platform, ActivityIndicator, Animated,
+  ScrollView
 } from "react-native";
+import { Image } from 'expo-image';
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../utils/ThemeContext";
@@ -23,7 +25,7 @@ export default function AiChatScreen({ navigation, route }) {
   const [messages, setMessages] = useState([]);
   const [inputText, setInputText] = useState("");
   const [isTyping, setIsTyping] = useState(false);
-  const [isLoadingHistory, setIsLoadingHistory] = useState(true); // New state for loading history
+  const [isLoadingHistory, setIsLoadingHistory] = useState(true);
   const [sidebarVisible, setSidebarVisible] = useState(false);
   const [currentChatId, setCurrentChatId] = useState(route.params?.chatId || null);
 
@@ -34,7 +36,6 @@ export default function AiChatScreen({ navigation, route }) {
     const initializeChat = async () => {
       const chatIdFromParams = route.params?.chatId;
       if (chatIdFromParams) {
-        // --- THIS IS THE NEW LOGIC TO LOAD AN EXISTING CHAT ---
         setIsLoadingHistory(true);
         try {
           const response = await fetch(`${BASE_URL}/chat/${chatIdFromParams}`,
@@ -47,7 +48,6 @@ export default function AiChatScreen({ navigation, route }) {
             setMessages(data.data.messages);
             setCurrentChatId(data.data._id);
           } else {
-            // Handle case where chat is not found or user is not authorized
             setMessages([{ id: "error-1", text: "Could not load this chat session.", sender: "ai" }]);
           }
         } catch (e) {
@@ -56,7 +56,6 @@ export default function AiChatScreen({ navigation, route }) {
           setIsLoadingHistory(false);
         }
       } else {
-        // This is a new chat
         setMessages([
           { id: "welcome-1", text: "Let\'s start a new session.", sender: "ai" }
         ]);
@@ -84,19 +83,21 @@ export default function AiChatScreen({ navigation, route }) {
         },
         body: JSON.stringify({
           message: text,
-          chatId: currentChatId // This will be null for new chats, or a valid ID for existing ones
+          chatId: currentChatId
         }),
       });
 
       const data = await response.json();
 
       if (response.ok && data.success) {
-        const aiMessage = { id: (Date.now() + 1).toString(), text: data.answer, sender: "ai" };
+        const aiMessage = { 
+          id: (Date.now() + 1).toString(), 
+          text: data.answer, 
+          sender: "ai",
+          figures: data.figures || [] // Store figures in the local state
+        };
         setMessages(prev => [...prev, aiMessage]);
 
-        // --- THIS IS THE FIX ---
-        // If this was a new chat, the backend sends back the new official ID.
-        // We must update our state to use this ID for all future messages in this session.
         if (!currentChatId && data.chatId) {
           setCurrentChatId(data.chatId);
         }
@@ -129,27 +130,54 @@ export default function AiChatScreen({ navigation, route }) {
     }).start();
   };
 
-   const renderMessage = ({ item }) => {
-       const isUser = item.sender === "user";
-       return (
-         <View
-           style={[
-             styles.messageBubble,
-             isUser ? styles.userBubble : styles.aiBubble,
-             { backgroundColor: isUser ? theme.primary : theme.surface },
-           ]}
-         >
-           {!isUser && (
-             <View style={[styles.aiIconContainer, { backgroundColor: theme.iconBackground }]}>
-               <Ionicons name="hardware-chip-outline" size={16} color={theme.primary} />
-             </View>
-           )}
-           <Text style={[styles.messageText, { color: isUser ? "#FFFFFF" : theme.text }]}>
-                      {item.text}
-           </Text>
-         </View>
-       );
-   };
+  const renderMessage = ({ item }) => {
+    const isUser = item.sender === "user";
+    return (
+      <View
+        style={[
+          styles.messageBubble,
+          isUser ? styles.userBubble : styles.aiBubble,
+          { backgroundColor: isUser ? theme.primary : theme.surface },
+        ]}
+      >
+        {!isUser && (
+          <View style={[styles.aiIconContainer, { backgroundColor: theme.iconBackground }]}>
+            <Ionicons name="hardware-chip-outline" size={16} color={theme.primary} />
+          </View>
+        )}
+        <View style={styles.textAndImageContainer}>
+          <Text style={[styles.messageText, { color: isUser ? "#FFFFFF" : theme.text }]}>
+            {item.text}
+          </Text>
+
+          {/* Render Figures/Images if they exist */}
+          {!isUser && item.figures && item.figures.length > 0 && (
+            <View style={styles.figuresContainer}>
+              {item.figures.map((fig, idx) => (
+                <View key={idx} style={styles.figureWrapper}>
+                  {fig.urls && fig.urls.map((url, uIdx) => (
+                    <View key={uIdx}>
+                       <Image
+                        source={{ uri: url }}
+                        style={styles.figureImage}
+                        contentFit="contain"
+                      />
+                      {fig.caption ? (
+                        <Text style={[styles.captionText, { color: theme.textSecondary }]}>
+                          {fig.figure_number ? `Fig ${fig.figure_number}: ` : ""}{fig.caption}
+                        </Text>
+                      ) : null}
+                    </View>
+                  ))}
+                </View>
+              ))}
+            </View>
+          )}
+        </View>
+      </View>
+    );
+  };
+
   if (isLoadingHistory) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: theme.background }}>
@@ -227,7 +255,6 @@ export default function AiChatScreen({ navigation, route }) {
   );
 }
 
-// ... Your full styles object from before ...
 const styles = StyleSheet.create({
   container: { flex: 1 },
   flexContainer: { flex: 1 },
@@ -249,7 +276,12 @@ const styles = StyleSheet.create({
   aiBubble: { alignSelf: "flex-start", borderBottomLeftRadius: 5 },
   userBubble: { alignSelf: "flex-end", borderBottomRightRadius: 5 },
   aiIconContainer: { width: 28, height: 28, borderRadius: 14, backgroundColor: "rgba(255,255,255,0.25)", justifyContent: "center", alignItems: "center", marginRight: 8 },
-  messageText: { fontSize: 16, lineHeight: 22, flex: 1 },
+  textAndImageContainer: { flex: 1 },
+  messageText: { fontSize: 16, lineHeight: 22 },
+  figuresContainer: { marginTop: 10 },
+  figureWrapper: { marginBottom: 10 },
+  figureImage: { width: '100%', height: 200, borderRadius: 10, backgroundColor: '#f0f0f0' },
+  captionText: { fontSize: 12, fontStyle: 'italic', marginTop: 5, textAlign: 'center' },
   inputSection: { paddingTop: 10, paddingHorizontal: 15, borderTopWidth: 1, borderTopColor: '#E0E0E0', paddingBottom: Platform.OS === "android" ? 15 : 30 },
   textInputContainer: { flexDirection: "row", alignItems: "center", borderRadius: 25, paddingHorizontal: 15, minHeight: 50 },
   textInput: { flex: 1, fontSize: 16, lineHeight: 22, maxHeight: 100, paddingVertical: 10 },
