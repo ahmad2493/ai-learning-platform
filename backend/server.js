@@ -98,6 +98,12 @@ app.use('/api/profile', profileRoutes);
 const chatRoutes = require('./src/routes/chatRoutes');
 app.use('/api/chat', chatRoutes);
 
+const testRoutes = require('./src/routes/test_routes');
+app.use('/api/tests', testRoutes);
+
+const progressRoutes = require('./src/routes/progress_routes');
+app.use('/api/progress', progressRoutes);
+
 console.log('AWS Access Key:', process.env.AWS_ACCESS_KEY_ID ? 'Loaded' : 'Missing');
 console.log('AWS Secret Key:', process.env.AWS_SECRET_ACCESS_KEY ? 'Loaded' : 'Missing');
 console.log('AWS Region:', process.env.AWS_REGION );
