@@ -15,7 +15,7 @@ from dataclasses import asdict
 from fastapi import FastAPI
 from pydantic import BaseModel
 from typing import List, Optional
-from BookRag import BookRAG
+from BookRAG import BookRAG
 from PastPapersRag import (
     retrieve_past_paper_questions,
     filter_and_correct_chunks_with_llm,

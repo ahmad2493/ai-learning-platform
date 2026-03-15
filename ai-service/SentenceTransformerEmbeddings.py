@@ -1,5 +1,5 @@
 from sentence_transformers import SentenceTransformer
-from langchain.embeddings.base import Embeddings
+from langchain_core.embeddings import Embeddings
 from typing import List
 class SentenceTransformerEmbeddings(Embeddings):
     def __init__(self):
