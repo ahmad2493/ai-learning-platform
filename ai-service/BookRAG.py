@@ -13,6 +13,7 @@ from langchain_core.messages import HumanMessage, AIMessage, BaseMessage, System
 
 from mathbert_embeddings import MathBERTEmbeddings
 from SentenceTransformerEmbeddings import SentenceTransformerEmbeddings
+from session_storage import MongoSessionStore
 
 load_dotenv()
 
@@ -527,14 +528,18 @@ def doc_header(doc: Document) -> str:
 # ===================
 
 class BookRAG:
-    def __init__(self, persist_dir: str = "/mnt/chroma/chromadb_physicsBook9"):
+    def __init__(self,
+                 persist_dir: str = "/mnt/chroma/chromadb_physicsBook9",
+                 MONGODB_URI : str = os.getenv("MONGODB_URI"),
+                 DB_NAME: str = os.getenv("DB_NAME"),
+                 ):
         self.persist_dir = persist_dir
         self.math_vectorstore = None
         self.text_vectorstore = None
         self.retriever = None
         self._llm = None
         self._figure_lookup: Dict[tuple, list] = {}
-        self._history: List[Dict] = []
+        self.store = MongoSessionStore(MONGODB_URI, DB_NAME)
 
     # ------------------------------------------------------------------
     # Setup
@@ -601,13 +606,29 @@ class BookRAG:
     # ask()
     # ------------------------------------------------------------------
 
-    def ask(self, question: str) -> Dict[str, List[str]]:
-        if self._history:
+    def ask(self, question: str, session_id: str) -> Dict[str, List[str]]:
+        state = self.store.get(session_id)
+        history = state["history"]
+        retrieval = state["retrieval"]
+
+        # Rebuild last_docs from stored content + metadata
+        last_docs = []
+        if retrieval.get("last_docs_content"):
+            last_docs = [
+                Document(page_content=c, metadata=m)
+                for c, m in zip(
+                    retrieval["last_docs_content"],
+                    retrieval.get("last_docs_metadata", [])
+                )
+            ]
+
+        # Condense
+        if history:
             history_text = "\n".join(
                 f"User: {t['question']}\nAssistant: {t['answer'][:300]}…"
                 if len(t['answer']) > 300 else
                 f"User: {t['question']}\nAssistant: {t['answer']}"
-                for t in self._history[-3:]
+                for t in history[-3:]
             )
             condense_prompt = CONDENSE_PROMPT.format(
                 history=history_text,
@@ -617,7 +638,8 @@ class BookRAG:
                 raw = self._llm.invoke([HumanMessage(content=condense_prompt)]).content.strip()
                 if raw.upper().startswith("CHAT:"):
                     answer = raw[len("CHAT:"):].strip()
-                    self._history.append({"question": question, "answer": answer})
+                    history.append({"question": question, "answer": answer})
+                    self.store.save(session_id, history, retrieval)
                     return {"answer": answer, "figures": []}
                 elif raw.upper().startswith("FOLLOWUP:"):
                     is_followup = True
@@ -636,37 +658,52 @@ class BookRAG:
             is_followup = False
             condensed = question
 
-        # For followups: reuse the exact same docs from the previous turn.
-        if is_followup and self.retriever._last_docs:
-            docs = self.retriever._last_docs
+        # Retrieve
+        if is_followup and last_docs:
+            docs = last_docs
         else:
             docs = self.retriever.retrieve(condensed, k=7)
 
+        # Build context & call LLM
         context = "\n\n---\n\n".join(
             ((doc_header(d) + "\n\n") if doc_header(d) else "") + d.page_content
             for d in docs
         )
-
-        messages : List[BaseMessage] = [SystemMessage(content=SYSTEM_PROMPT)]
-        for turn in self._history[-3:]:
+        messages: List[BaseMessage] = [SystemMessage(content=SYSTEM_PROMPT)]
+        for turn in history[-3:]:
             messages.append(HumanMessage(content=turn["question"]))
             messages.append(AIMessage(content=turn["answer"]))
         messages.append(HumanMessage(content=(
             f"[Retrieved context]\n{context}\n\n"
-            f"[Current question]\n{question}"  # original question for natural answer tone
+            f"[Current question]\n{question}"
         )))
 
-        response = self._llm.invoke(messages)
-        answer = response.content
+        answer = self._llm.invoke(messages).content
 
-        self._history.append({"question": question, "answer": answer})
+        # Persist updated session back to MongoDB
+        history.append({"question": question, "answer": answer})
+
+        # Only keep last 10 turns to avoid unbounded growth
+        history = history[-10:]
+
+        updated_retrieval = {
+            "last_docs_content": [d.page_content for d in docs],
+            "last_docs_metadata": [d.metadata for d in docs],
+            "last_chapter": docs[0].metadata.get("chapter_number") if docs else None,
+            "last_topic": docs[0].metadata.get("topic_number") if docs else None,
+            "last_example": docs[0].metadata.get("example_number") if docs else None,
+            "last_exercise": docs[0].metadata.get("exercise_question_number") if docs else None,
+            "last_section_kind": docs[0].metadata.get("section_kind") if docs else None,
+        }
+        self.store.save(session_id, history, updated_retrieval)
 
         figures = self.print_figures(docs)
+        return {"answer": answer, "figures": figures}
 
-        return {
-            "answer": answer,
-            "figures": figures,
-        }
+    def clear_history(self, session_id: str):
+        self.store.delete(session_id)
+        print(f"[History cleared for session {session_id}]")
+
 
     # ------------------------------------------------------------------
     # Helpers
@@ -746,25 +783,5 @@ class BookRAG:
                     figures.append({"figure_number": None, "caption": "", "urls": [url]})
 
         if not figures: return []
-        print("\n" + "=" * 80)
-        print(f"FIGURES ({len(figures)}):")
-        print("=" * 80)
-        for fig in figures:
-            n = fig.get("figure_number")
-            cap = fig.get("caption", "")
-            lbl = (f"Fig. {n}" if n else "Figure") + (f" — {cap}" if cap else "")
-            print(f"\n  {lbl}")
-            for url in fig.get("urls", []):
-                print(f"  {url}")
         return figures
-
-    def clear_history(self):
-        self._history.clear()
-        self.retriever._last_chapter = None
-        self.retriever._last_topic = None
-        self.retriever._last_example = None
-        self.retriever._last_exercise = None
-        self.retriever._last_section_kind = None
-        self.retriever._last_docs = []
-        print("[History cleared]")
 

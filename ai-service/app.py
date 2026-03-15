@@ -27,6 +27,7 @@ app = FastAPI(title="RAG API")
 # Input schema
 class QuestionRequest(BaseModel):
     question: str
+    session_id: str
 
 # Initialize BookRAG
 rag = BookRAG()
@@ -39,7 +40,7 @@ def root():
 @app.post("/api/ask")
 async def ask_question(req: QuestionRequest):
     try:
-        answer = rag.ask(req.question)
+        answer = rag.ask(req.question, req.session_id)
         return {"question": req.question, "answer": answer}
     except Exception as e:
         return {"error": str(e)}
