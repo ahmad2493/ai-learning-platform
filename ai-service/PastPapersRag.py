@@ -572,6 +572,7 @@ def retrieve_past_paper_questions(
     year_range: Optional[Tuple[int, int]] = None,
     natural_query: Optional[str] = None,
     n_questions: int = 10,
+    use_llm: bool = False,
     base_dir: str = ".",
 ) -> List[PastPaperQuestion]:
     """
@@ -644,7 +645,6 @@ def retrieve_past_paper_questions(
         filtered_chunks = filtered_chunks[:n_questions]
 
         # Optional batched LLM normalization using the JSON fields.
-        use_llm = bool(os.getenv("OPENAI_API_KEY"))
 
         mcq_indices: List[int] = []
         mcq_payload: List[Tuple[str, Sequence[str]]] = []
@@ -816,8 +816,6 @@ def retrieve_past_paper_questions(
                 "answer_text": None,
             }
         )
-
-    use_llm = bool(os.getenv("OPENAI_API_KEY"))
 
     # Batch LLM normalization for MCQs
     if use_llm:
