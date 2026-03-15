@@ -1,41 +1,86 @@
 """
 FastAPI Application - AI Service Entry Point
-Authors: 
+Authors:
   - Sajeela Safdar (BCSF22M001) - AI Development
 
-Functionality:
-  - FastAPI web server for AI question answering service
-  - Initializes RAG system with physics textbook and past papers
-  - Provides REST API endpoints for question answering
-  - Handles question requests and returns AI-generated answers
+Endpoints:
+  GET  /                        — health check
+  POST /api/ask                 — question from physics textbook
+  POST /api/ask-pastpaper       — question from past papers
+  POST /api/past-papers/query   — structured past paper retrieval
+  POST /api/generate-test       — generate physics test + save to MongoDB
 """
 
 import re
 from dataclasses import asdict
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, HTTPException
 from pydantic import BaseModel
 from typing import List, Optional
+
 from BookRAG import BookRAG
 from PastPapersRag import (
     retrieve_past_paper_questions,
     filter_and_correct_chunks_with_llm,
     detect_board_and_year_from_query,
 )
+from test_engine import TestGenerationEngine
+from auth import extract_user_id
+from backend_client import save_test
 
-app = FastAPI(title="RAG API")
+app = FastAPI(title="AI Service")
 
-# Input schema
+# ── Request schemas ───────────────────────────────────────────────────────────
+
 class QuestionRequest(BaseModel):
     question: str
     session_id: str
 
-# Initialize BookRAG
+class TopicSelectionRequest(BaseModel):
+    chapter: int
+    topic_number: str
+    topic_name: Optional[str] = None
+    chapter_name: Optional[str] = None
+
+class GenerateTestRequest(BaseModel):
+    mode: str
+    mcq_count: Optional[int] = 0
+    short_count: Optional[int] = 0
+    long_count: Optional[int] = 0
+    full_chapters: Optional[List[int]] = []
+    topic_selections: Optional[List[TopicSelectionRequest]] = []
+
+class PastPaperQueryRequest(BaseModel):
+    chapter_no: int
+    topic_numbers: Optional[List[str]] = None
+    boards: Optional[List[str]] = None
+    years: Optional[List[int]] = None
+    after_year: Optional[int] = None
+    before_year: Optional[int] = None
+    year_range: Optional[List[int]] = None  # [start_year, end_year]
+    natural_query: Optional[str] = None
+    n_questions: int = 10
+
+# ── Startup ───────────────────────────────────────────────────────────────────
+
 rag = BookRAG()
 rag.prepare_rag()
 
+engine = TestGenerationEngine()
+
+# ── Routes ────────────────────────────────────────────────────────────────────
+
 @app.get("/")
 def root():
-    return {"message": "BookRAG API is running. Use POST /api/ask to query questions."}
+    return {
+        "message": "AI Service is running.",
+        "endpoints": {
+            "book_questions":     "POST /api/ask",
+            "pastpaper_questions": "POST /api/ask-pastpaper",
+            "pastpaper_query":    "POST /api/past-papers/query",
+            "generate_test":      "POST /api/generate-test",
+        }
+    }
+
 
 @app.post("/api/ask")
 async def ask_question(req: QuestionRequest):
@@ -44,6 +89,7 @@ async def ask_question(req: QuestionRequest):
         return {"question": req.question, "answer": answer}
     except Exception as e:
         return {"error": str(e)}
+
 
 @app.post("/api/ask-pastpaper")
 async def ask_pastpaper_question(req: QuestionRequest):
@@ -84,18 +130,6 @@ async def ask_pastpaper_question(req: QuestionRequest):
         }
     except Exception as e:
         return {"error": str(e)}
-
-
-class PastPaperQueryRequest(BaseModel):
-    chapter_no: int
-    topic_numbers: Optional[List[str]] = None
-    boards: Optional[List[str]] = None
-    years: Optional[List[int]] = None
-    after_year: Optional[int] = None
-    before_year: Optional[int] = None
-    year_range: Optional[List[int]] = None  # [start_year, end_year]
-    natural_query: Optional[str] = None
-    n_questions: int = 10
 
 
 @app.post("/api/past-papers/query")
@@ -155,5 +189,34 @@ async def query_past_papers(req: PastPaperQueryRequest):
             "total": len(result),
             "questions": result,
         }
+    except Exception as e:
+        return {"error": str(e)}
+
+
+@app.post("/api/generate-test")
+async def generate_test(req: GenerateTestRequest, request: Request):
+    try:
+        # 1. Extract user_id from JWT token in Authorization header
+        user_id = extract_user_id(request)
+
+        # 2. Generate the test
+        result = engine.generate(req.dict())
+
+        # 3. Save to MongoDB via backend server (server-to-server).
+        #    Backend returns { test_id, expires_at }.
+        #    We inject test_id into result so frontend has it.
+        try:
+            saved = await save_test(user_id, result)
+            result["test_id"] = saved.get("test_id")
+        except Exception as save_error:
+            # Save failed — log and continue.
+            # Frontend gets the test but cannot submit (no test_id).
+            print(f"[WARN] Failed to save test to backend: {save_error}")
+            result["test_id"] = None
+
+        return result
+
+    except HTTPException:
+        raise
     except Exception as e:
         return {"error": str(e)}
