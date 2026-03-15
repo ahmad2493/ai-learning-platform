@@ -18,32 +18,126 @@ import {
   ActivityIndicator,
   Alert,
 } from 'react-native';
+import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../utils/ThemeContext';
 import Sidebar from './SidebarComponent';
 import Dropdown from '../components/Dropdown';
+import { AI_BASE_URL } from '../utils/apiConfig';
 
 // --- Data for Dropdowns ---
 const CHAPTERS_DATA = {
   'Physics': [
-    { label: 'Chapter 1: Physical Quantities and Measurements', value: '1' },
+    { label: 'Chapter 1: Physical Quantities and Measurement', value: '1' },
     { label: 'Chapter 2: Kinematics', value: '2' },
     { label: 'Chapter 3: Dynamics', value: '3' },
+    { label: 'Chapter 4: Turning Effect of Forces', value: '4' },
+    { label: 'Chapter 5: Gravitation', value: '5' },
+    { label: 'Chapter 6: Work and Energy', value: '6' },
+    { label: 'Chapter 7: Properties of Matter', value: '7' },
+    { label: 'Chapter 8: Thermal Properties of Matter', value: '8' },
+    { label: 'Chapter 9: Transfer of Heat', value: '9' },
   ],
 };
 
 const TOPICS_DATA = {
-  '1': [{ label: 'Topic 1.1: Introduction to Physics', value: '1.1' }, { label: 'Topic 1.2: Physical Quantities', value: '1.2' }],
-  '2': [{ label: 'Topic 2.1: Rectilinear Motion', value: '2.1' }, { label: 'Topic 2.2: Projectile Motion', value: '2.2' }],
-  '3': [{ label: 'Topic 3.1: Newton’s Laws', value: '3.1' }, { label: 'Topic 3.2: Friction', value: '3.2' }],
+  '1': [
+    { label: '1.1 Introduction to Physics', value: '1.1' },
+    { label: '1.2 Physical Quantities', value: '1.2' },
+    { label: '1.3 International System of Units', value: '1.3' },
+    { label: '1.4 Prefixes', value: '1.4' },
+    { label: '1.5 Scientific Notation', value: '1.5' },
+    { label: '1.6 Measuring Instruments', value: '1.6' },
+    { label: '1.7 Significant Figures', value: '1.7' },
+  ],
+  '2': [
+    { label: '2.1 Rest and Motion', value: '2.1' },
+    { label: '2.2 Types of Motion', value: '2.2' },
+    { label: '2.3 Scalars and Vectors', value: '2.3' },
+    { label: '2.4 Terms Associated with Motion', value: '2.4' },
+    { label: '2.5 Graphical Analysis of Motion', value: '2.5' },
+    { label: '2.6 Equations of Motion', value: '2.6' },
+    { label: '2.7 Motion of Freely Falling Bodies', value: '2.7' },
+  ],
+  '3': [
+    { label: '3.1 Force, Inertia and Momentum', value: '3.1' },
+    { label: '3.2 Newtons Laws of Motion', value: '3.2' },
+    { label: '3.3 Friction', value: '3.3' },
+    { label: '3.4 Uniform Circular Motion', value: '3.4' },
+  ],
+  '4': [
+    { label: '4.1 Parallel Forces', value: '4.1' },
+    { label: '4.2 Addition of Forces', value: '4.2' },
+    { label: '4.3 Resolution of Forces', value: '4.3' },
+    { label: '4.4 Torque or Moment of a Force', value: '4.4' },
+    { label: '4.5 Principle of Moments', value: '4.5' },
+    { label: '4.6 Centre of Mass', value: '4.6' },
+    { label: '4.7 Centre of Gravity', value: '4.7' },
+    { label: '4.8 Couple', value: '4.8' },
+    { label: '4.9 Equilibrium', value: '4.9' },
+  ],
+  '5': [
+    { label: '5.1 The Law of Gravitation', value: '5.1' },
+    { label: '5.2 Mass of the Earth', value: '5.2' },
+    { label: '5.3 Variation of g with Altitude', value: '5.3' },
+    { label: '5.4 Artificial Satellites', value: '5.4' },
+  ],
+  '6': [
+    { label: '6.1 Work', value: '6.1' },
+    { label: '6.2 Energy', value: '6.2' },
+    { label: '6.3 Kinetic Energy', value: '6.3' },
+    { label: '6.4 Potential Energy', value: '6.4' },
+    { label: '6.5 Forms of Energy', value: '6.5' },
+    { label: '6.6 Interconversion of Energy', value: '6.6' },
+    { label: '6.7 Major Sources of Energy', value: '6.7' },
+    { label: '6.8 Efficiency', value: '6.8' },
+    { label: '6.9 Power', value: '6.9' },
+  ],
+  '7': [
+    { label: '7.1 Kinetic Molecular Model', value: '7.1' },
+    { label: '7.2 Density', value: '7.2' },
+    { label: '7.3 Pressure', value: '7.3' },
+    { label: '7.4 Atmospheric Pressure', value: '7.4' },
+    { label: '7.5 Pressure in Liquids', value: '7.5' },
+    { label: '7.6 Archimedes Principle', value: '7.6' },
+    { label: '7.7 Principle of Floatation', value: '7.7' },
+    { label: '7.8 Elasticity', value: '7.8' },
+    { label: '7.9 Hookes Law', value: '7.9' },
+  ],
+  '8': [
+    { label: '8.1 Temperature and Heat', value: '8.1' },
+    { label: '8.2 Thermometer', value: '8.2' },
+    { label: '8.3 Specific Heat Capacity', value: '8.3' },
+    { label: '8.4 Latent Heat of Fusion', value: '8.4' },
+    { label: '8.5 Latent Heat of Vaporization', value: '8.5' },
+    { label: '8.6 Evaporation', value: '8.6' },
+    { label: '8.7 Thermal Expansion', value: '8.7' },
+  ],
+  '9': [
+    { label: '9.1 Transfer of Heat', value: '9.1' },
+    { label: '9.2 Conduction', value: '9.2' },
+    { label: '9.3 Convection', value: '9.3' },
+    { label: '9.4 Radiation', value: '9.4' },
+    { label: '9.5 Consequences of Radiation', value: '9.5' },
+  ],
 };
 
-const YEARS = Array.from({ length: 10 }, (_, i) => ({ label: (2023 - i).toString(), value: (2023 - i).toString() }));
-const BOARDS = [
-  'Lahore', 'Multan', 'Rawalpindi', 'Sahiwal', 'Sargodha', 
-  'Dera Ghazi Khan', 'Bahawalpur', 'Gujranwala', 'Faisalabad'
-].map(b => ({ label: b, value: b }));
+const YEARS = Array.from({ length: 11 }, (_, i) => ({ label: (2024 - i).toString(), value: (2024 - i).toString() }));
+
+const BOARD_MAPPING = {
+  'Lahore': 'LHR',
+  'Multan': 'MLN',
+  'Rawalpindi': 'RWP',
+  'Sahiwal': 'SWL',
+  'Sargodha': 'SGD',
+  'Dera Ghazi Khan': 'DGK',
+  'Bahawalpur': 'BWP',
+  'Gujranwala': 'GRW',
+  'Faisalabad': 'FSD'
+};
+
+const BOARDS = Object.keys(BOARD_MAPPING).map(b => ({ label: b, value: b }));
 
 
 export default function PastPapersScreen({ navigation }) {
@@ -64,7 +158,111 @@ export default function PastPapersScreen({ navigation }) {
 
   const toggleSidebar = () => setSidebarVisible(!sidebarVisible);
 
-  // Memoized options for performance
+  // --- Helper Functions ---
+
+  // 1. Core LaTeX Formatter (returns clean string)
+  const formatLatex = (text) => {
+    if (!text) return "";
+    
+    const superscripts = {
+      '0':'⁰','1':'¹','2':'²','3':'³','4':'⁴','5':'⁵','6':'⁶','7':'⁷','8':'⁸','9':'⁹',
+      '-':'⁻','+':'⁺','n':'ⁿ','x':'ˣ','i':'ⁱ'
+    };
+
+    return text
+      // Robust fraction handling: \frac{num}{den} -> (num / den)
+      .replace(/\\frac\s*\{([^\}]+)\}\s*\{([^\}]+)\}/g, '($1 / $2)')
+      
+      // Strip math bold/text styling commands
+      .replace(/\\math(bf|bb|it|cal|frak|rm|sf)\{([^\}]+)\}/g, '$2')
+      .replace(/\\text(bf|it|sl|sc|sf|rm)\{([^\}]+)\}/g, '$2')
+
+      // Strip symbols/math tags
+      .replace(/\$([^\$]+)\$/g, '$1')
+      .replace(/\\\(|\\\)|\\\[|\\\]/g, '')
+      .replace(/\\\s*\(/g, '(').replace(/\\\s*\)/g, ')') // Handle escaped parens like \ (
+
+      // Superscripts
+      .replace(/\^\{([^\}]+)\}/g, (m, p) => p.split('').map(c => superscripts[c] || c).join(''))
+      .replace(/\^([\d\-+nxi])/g, (m, p) => superscripts[p] || p)
+
+      // Scientific constants and symbols
+      .replace(/\\mathrm\{([^\}]+)\}/g, '$1')
+      .replace(/\\times/g, '×')
+      .replace(/\\cdot/g, '·')
+      .replace(/\\mu/g, 'µ')
+      .replace(/\\ell/g, 'ℓ')
+      .replace(/~/g, ' ')
+      .replace(/\\(?!https?|[\w\d])/g, '') // Clean stray slashes
+      .trim();
+  };
+
+  // 2. Component helper to render segments, bold text, and images
+  const renderContentWithImages = (text, textStyle) => {
+    if (!text) return null;
+
+    // Split logic for: Images ![](), Bold LaTeX \mathbf{}, and bold markdown **
+    const parts = text.split(/(!\[\]\(.*?\)|\\mathbf\{.*?\}|\*\*.*?\*\*)/g);
+
+    return parts.map((part, i) => {
+      // 1. Handle Images
+      const imageMatch = part.match(/!\[\]\((.*?)\)/);
+      if (imageMatch) {
+        return (
+          <Image
+            key={i}
+            source={{ uri: imageMatch[1] }}
+            style={{ width: '100%', height: 250, borderRadius: 10, marginVertical: 12 }}
+            contentFit="contain"
+          />
+        );
+      }
+
+      // 2. Handle Bold LaTeX: \mathbf{...}
+      const boldLatexMatch = part.match(/\\math(bf|bb|it|cal|frak|rm|sf)\{(.*?)\}/);
+      if (boldLatexMatch) {
+        return (
+          <Text key={i} style={[textStyle, { fontWeight: 'bold' }]}>
+            {formatLatex(boldLatexMatch[2])}
+          </Text>
+        );
+      }
+
+      // 3. Handle Regular Markdown Bold: **...**
+      const boldMdMatch = part.match(/\*\*(.*?)\*\*/);
+      if (boldMdMatch) {
+        return (
+          <Text key={i} style={[textStyle, { fontWeight: 'bold' }]}>
+            {formatLatex(boldMdMatch[1])}
+          </Text>
+        );
+      }
+
+      // 4. Regular segments
+      const cleaned = formatLatex(part);
+      if (!cleaned || cleaned === "!") return null;
+
+      return (
+        <Text key={i} style={textStyle}>
+          {cleaned}
+        </Text>
+      );
+    });
+  };
+
+  // 3. Clean raw inputs (splitter)
+  const getCleanedInput = (text, isQuestion = false) => {
+    if (!text) return "";
+    let clean = text;
+    if (isQuestion) {
+      clean = text.split(/Ans\.|Answer:|Sol\./i)[0].trim();
+    } else {
+      const parts = text.split(/Answer:|Ans\./i);
+      clean = parts.length > 1 ? parts[parts.length - 1].trim() : text.trim();
+    }
+    return clean;
+  };
+
   const chapterOptions = useMemo(() => CHAPTERS_DATA[subject] || [], [subject]);
   const topicOptions = useMemo(() => chapter ? (TOPICS_DATA[chapter] || []) : [], [chapter]);
 
@@ -78,8 +276,8 @@ export default function PastPapersScreen({ navigation }) {
   };
 
   const handleSearch = async () => {
-    if (!chapter && !topic && !year && !board) {
-      Alert.alert("No Filters Selected", "Please select at least one filter to start a search.");
+    if (!chapter) {
+      Alert.alert("Chapter Required", "Please select a chapter to find specific past paper questions.");
       return;
     }
 
@@ -87,36 +285,28 @@ export default function PastPapersScreen({ navigation }) {
     setResults(null);
     setError(null);
 
-    // Construct the query string
-    let queryParts = ["Give me past paper questions"];
-    if (chapter) {
-      const chapterLabel = chapterOptions.find(c => c.value === chapter)?.label;
-      queryParts.push(`from ${chapterLabel}`);
-    }
-    if (topic) {
-      const topicLabel = topicOptions.find(t => t.value === topic)?.label;
-      queryParts.push(`on the topic of ${topicLabel}`);
-    }
-    if (year) {
-      queryParts.push(`that came in the year ${year}`);
-    }
-    if (board) {
-      queryParts.push(`in the ${board} board`);
-    }
-    const finalQuery = queryParts.join(', ') + '.';
-
     try {
-      const aiServiceUrl = 'https://darsgah-rag-epbjg9dka5hmexaj.uaenorth-01.azurewebsites.net/api/ask-pastpaper';
+      const aiServiceUrl = `${AI_BASE_URL}/past-papers/query`;
+
+      const payload = {
+        chapter_no: parseInt(chapter),
+        n_questions: 100
+      };
+
+      if (topic) payload.topic_numbers = [topic];
+      if (board) payload.boards = [BOARD_MAPPING[board] || board];
+      if (year) payload.years = [parseInt(year)];
+
       const response = await fetch(aiServiceUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ question: finalQuery }),
+        body: JSON.stringify(payload),
       });
 
       const data = await response.json();
 
-      if (response.ok && data.answer) {
-        setResults(data.answer);
+      if (response.ok && data.questions) {
+        setResults(data.questions);
       } else {
         setError(data.error || 'Failed to get a valid response from the server.');
       }
@@ -149,55 +339,55 @@ export default function PastPapersScreen({ navigation }) {
 
             <View style={[styles.filterContainer, {backgroundColor: theme.surface}]}>
                 <Text style={[styles.filterTitle, {color: theme.text}]}>Filter Past Papers</Text>
-                
+
                 <Text style={styles.label}>Subject</Text>
                 <Dropdown options={['Physics']} selectedValue={subject} onValueChange={() => {}} placeholder="Select a subject" theme={theme} disabled={true} />
-                
+
                 <Text style={styles.label}>Chapter</Text>
-                <Dropdown 
-                    options={chapterOptions.map(c => c.label)} 
+                <Dropdown
+                    options={chapterOptions.map(c => c.label)}
                     selectedValue={findLabel(chapterOptions, chapter)}
                     onValueChange={(label) => {
                       const selectedValue = chapterOptions.find(c => c.label === label)?.value;
                       setChapter(selectedValue);
-                      setTopic(null); // Reset topic when chapter changes
+                      setTopic(null);
                     }}
-                    placeholder="Select a chapter" theme={theme} 
+                    placeholder="Select a chapter" theme={theme}
                 />
-                
+
                 <Text style={styles.label}>Topic</Text>
-                <Dropdown 
-                    options={topicOptions.map(t => t.label)} 
+                <Dropdown
+                    options={topicOptions.map(t => t.label)}
                     selectedValue={findLabel(topicOptions, topic)}
                     onValueChange={(label) => {
                       const selectedValue = topicOptions.find(t => t.label === label)?.value;
                       setTopic(selectedValue);
                     }}
-                    placeholder="Select a topic" theme={theme} disabled={!chapter} 
+                    placeholder="Select a topic" theme={theme} disabled={!chapter}
                 />
 
                 <Text style={styles.label}>Year</Text>
-                <Dropdown 
-                    options={YEARS.map(y => y.label)} 
+                <Dropdown
+                    options={YEARS.map(y => y.label)}
                     selectedValue={findLabel(YEARS, year)}
                     onValueChange={(label) => {
                       const selectedValue = YEARS.find(y => y.label === label)?.value;
                       setYear(selectedValue);
                     }}
-                    placeholder="Select a year" 
-                    theme={theme} 
+                    placeholder="Select a year"
+                    theme={theme}
                 />
 
                 <Text style={styles.label}>Board</Text>
-                <Dropdown 
-                    options={BOARDS.map(b => b.label)} 
+                <Dropdown
+                    options={BOARDS.map(b => b.label)}
                     selectedValue={findLabel(BOARDS, board)}
                     onValueChange={(label) => {
                       const selectedValue = BOARDS.find(b => b.label === label)?.value;
                       setBoard(selectedValue);
                     }}
-                    placeholder="Select a board" 
-                    theme={theme} 
+                    placeholder="Select a board"
+                    theme={theme}
                 />
             </View>
 
@@ -221,12 +411,70 @@ export default function PastPapersScreen({ navigation }) {
                   <Text style={[styles.errorTitle, {color: theme.danger}]}>An Error Occurred</Text>
                   <Text style={[styles.errorSubtitle, {color: theme.textSecondary}]}>{error}</Text>
                 </View>
-              ) : results ? (
-                <ScrollView><Text style={[styles.resultsText, {color: theme.text}]}>{results}</Text></ScrollView>
+              ) : results && Array.isArray(results) && results.length > 0 ? (
+                <View>
+                  {results.map((item, index) => {
+                    const rawQuestion = getCleanedInput(item.question_text || item.question || item.text || "", true);
+                    const rawAnswer = getCleanedInput(item.answer_text || item.answer || item.explanation || "", false);
+
+                    const options = (item.options || item.choices || []);
+                    const sectionName = item.section || item.type || 'Question';
+
+                    return (
+                      <View key={index} style={{ borderBottomColor: theme.background, borderBottomWidth: index === results.length - 1 ? 0 : 2, paddingBottom: 20, marginBottom: 20 }}>
+
+                         <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginBottom: 8, alignItems: 'center' }}>
+                            <View style={{ backgroundColor: theme.primary + '20', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 4, marginRight: 8 }}>
+                              <Text style={{ fontSize: 10, color: theme.primary, fontWeight: 'bold', textTransform: 'uppercase' }}>
+                                {sectionName.replace('_', ' ')}
+                              </Text>
+                            </View>
+                            {item.appearances && item.appearances.length > 0 && (
+                              <Text style={{ fontSize: 11, color: theme.textSecondary }}>
+                                {item.appearances.map(a => `${a.board} ${a.year}`).join(', ')}
+                              </Text>
+                            )}
+                         </View>
+
+                         <View style={{ marginBottom: 10, flexDirection: 'row', flexWrap: 'wrap' }}>
+                            <Text style={[styles.resultsText, {color: theme.text, fontWeight: 'bold', fontSize: 17}]}>
+                                Q{index + 1}:{" "}
+                            </Text>
+                            {renderContentWithImages(rawQuestion, [styles.resultsText, {color: theme.text, fontWeight: 'bold', fontSize: 17}])}
+                         </View>
+
+                         {options && options.length > 0 && (
+                           <View style={{ marginTop: 10, marginLeft: 10 }}>
+                             {options.map((opt, i) => (
+                               <View key={i} style={{ marginBottom: 6, flexDirection: 'row', flexWrap: 'wrap' }}>
+                                 {renderContentWithImages(opt, [styles.resultsText, {color: theme.text, fontSize: 15}])}
+                               </View>
+                             ))}
+                           </View>
+                         )}
+
+                         {rawAnswer ? (
+                           <View style={{ marginTop: 12, backgroundColor: theme.background, padding: 12, borderRadius: 10, borderLeftWidth: 4, borderLeftColor: theme.primary }}>
+                              <Text style={[styles.resultsText, {color: theme.primary, fontWeight: 'bold', fontSize: 14, marginBottom: 6}]}>EXPLANATION / ANSWER:</Text>
+                              <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
+                                {renderContentWithImages(rawAnswer, [styles.resultsText, {color: theme.text, lineHeight: 22}])}
+                              </View>
+                           </View>
+                         ) : null}
+                      </View>
+                    );
+                  })}
+                </View>
+              ) : results && Array.isArray(results) && results.length === 0 ? (
+                <View style={styles.centered}>
+                  <Ionicons name="search-outline" size={60} color={theme.textSecondary} />
+                  <Text style={[styles.noResultsTitle, {color: theme.text}]}>No Questions Found</Text>
+                  <Text style={[styles.noResultsSubtitle, {color: theme.textSecondary}]}>Try adjusting your filters (Topic, Year, Board).</Text>
+                </View>
               ) : (
                 <View style={styles.centered}>
                   <Ionicons name="folder-open-outline" size={60} color={theme.textSecondary} />
-                  <Text style={[styles.noResultsTitle, {color: theme.text}]}>No Papers Found</Text>
+                  <Text style={[styles.noResultsTitle, {color: theme.text}]}>Search Past Papers</Text>
                   <Text style={[styles.noResultsSubtitle, {color: theme.textSecondary}]}>Use the filters above to find past paper questions</Text>
                 </View>
               )}
@@ -306,7 +554,7 @@ const styles = StyleSheet.create({
     resultsContainer: {
         borderRadius: 15,
         padding: 20,
-        minHeight: 200, // Increased height for results
+        minHeight: 200, 
         justifyContent: 'center',
     },
     centered: {
