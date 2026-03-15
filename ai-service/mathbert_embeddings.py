@@ -10,7 +10,7 @@ Functionality:
   - Handles tokenization, model inference, and embedding generation
 """
 
-from langchain.embeddings.base import Embeddings
+from langchain_core.embeddings import Embeddings
 from transformers import AutoTokenizer, AutoModel
 import torch
 import numpy as np
