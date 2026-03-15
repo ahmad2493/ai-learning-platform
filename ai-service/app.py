@@ -27,6 +27,7 @@ app = FastAPI(title="RAG API")
 # Input schema
 class QuestionRequest(BaseModel):
     question: str
+    session_id: str
 
 # Initialize BookRAG
 rag = BookRAG()
@@ -39,7 +40,7 @@ def root():
 @app.post("/api/ask")
 async def ask_question(req: QuestionRequest):
     try:
-        answer = rag.ask(req.question)
+        answer = rag.ask(req.question, req.session_id)
         return {"question": req.question, "answer": answer}
     except Exception as e:
         return {"error": str(e)}
@@ -100,13 +101,9 @@ class PastPaperQueryRequest(BaseModel):
 @app.post("/api/past-papers/query")
 async def query_past_papers(req: PastPaperQueryRequest):
     """
-    Retrieve 9th grade Physics past paper questions by chapter/topic/board/year,
-    then filter and correct them using GPT-4o-mini.
-
-    GPT-4o-mini will:
-    - Keep only chunks that are valid past paper questions.
-    - Return the exact text if already correct.
-    - Fix incorrect wording or incomplete statements while preserving meaning.
+    Retrieve 9th grade Physics past paper questions by chapter/topic/board/year.
+    Returns question text, options, answer, boards and years directly from the
+    JSON index — no LLM call needed for structured queries.
     """
     try:
         # Parse board/year hints from natural_query if not explicitly provided.
@@ -142,12 +139,21 @@ async def query_past_papers(req: PastPaperQueryRequest):
             base_dir="/mnt/chroma",
         )
 
-        questions = filter_and_correct_chunks_with_llm(questions)
+        result = []
+        for q in questions:
+            appearances = sorted({f'{a["board"]} {a["year"]}' for a in q.appearances}) if q.appearances else []
+            entry = {
+                "question": q.question_text,
+                "options": q.options or [],
+                "answer": q.answer_text,
+                "boards_years": appearances,
+            }
+            result.append(entry)
 
         return {
             "chapter_no": req.chapter_no,
-            "total": len(questions),
-            "questions": [asdict(q) for q in questions],
+            "total": len(result),
+            "questions": result,
         }
     except Exception as e:
         return {"error": str(e)}
