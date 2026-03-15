@@ -1,16 +1,9 @@
 /**
- * Test Generator Screen - Test Creation Interface
+ * Test Generator Screen - Refactored Multi-step Flow with Custom Alerts
  * Author: Momna Butt (BCSF22M021)
- * 
- * Functionality:
- * - Interface for generating practice tests
- * - Allows selection of test type (structured/prompt-based)
- * - Configures question types (MCQ, Short, Long)
- * - Submits test generation requests to backend
- * - Displays test generation results
  */
 
-import React, { useState } from 'react';
+import React, { useState, useReducer, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -18,301 +11,645 @@ import {
   TouchableOpacity,
   ScrollView,
   TextInput,
+  FlatList,
+  Modal,
+  ActivityIndicator,
+  Animated,
+  Dimensions,
+  Platform,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../utils/ThemeContext';
+import { AI_BASE_URL } from '../utils/apiConfig';
 import Sidebar from './SidebarComponent';
-import Dropdown from '../components/Dropdown';
+import CustomAlert from '../components/CustomAlert';
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const CARD_WIDTH = SCREEN_WIDTH * 0.9;
+
+// Mock Data
+const SUBJECTS = [
+  { id: '1', name: 'Physics', icon: 'flash' },
+  { id: '2', name: 'Chemistry', icon: 'flask' },
+  { id: '3', name: 'Mathematics', icon: 'calculator' },
+  { id: '4', name: 'Biology', icon: 'leaf' },
+];
+
+const CONTENT_DATA = {
+  '1': [
+      {
+        id: 'c1',
+        title: 'Chapter 1: Physical Quantities and Measurements',
+        topics: [
+          { id: 't1.1', title: '1.1 Physical and Non-Physical Quantities' },
+          { id: 't1.2', title: '1.2 Base and Derived Physical Quantities' },
+          { id: 't1.3', title: '1.3 International System of Units' },
+          { id: 't1.4', title: '1.4 Scientific Notation' },
+          { id: 't1.5', title: '1.5 Length Measuring Instruments' },
+          { id: 't1.6', title: '1.6 Mass Measuring Instruments' },
+          { id: 't1.7', title: '1.7 Time Measuring Instruments' },
+          { id: 't1.8', title: '1.8 Volume Measuring Instruments' },
+          { id: 't1.9', title: '1.9 Errors in Measurements' },
+          { id: 't1.10', title: '1.10 Uncertainty in Measurement' },
+          { id: 't1.11', title: '1.11 Significant Figures' },
+          { id: 't1.12', title: '1.12 Precision and Accuracy' },
+          { id: 't1.13', title: '1.13 Rounding off the digits' },
+        ]
+      },
+      {
+        id: 'c2',
+        title: 'Chapter 2: Kinematics',
+        topics: [
+          { id: 't2.1', title: '2.1 Scalars and Vectors' },
+          { id: 't2.2', title: '2.2 Rest and Motion' },
+          { id: 't2.3', title: '2.3 Types of Motion' },
+          { id: 't2.4', title: '2.4 Distance and Displacement' },
+          { id: 't2.5', title: '2.5 Speed and Velocity' },
+          { id: 't2.6', title: '2.6 Acceleration' },
+          { id: 't2.7', title: '2.7 Graphical Analysis of Motion' },
+          { id: 't2.8', title: '2.8 Gradient of Distance-Time Graph' },
+          { id: 't2.9', title: '2.9 Speed-Time Graph' },
+          { id: 't2.10', title: '2.10 Gradient of Speed-Time Graph' },
+          { id: 't2.11', title: '2.11 Area under Speed-Time Graph' },
+          { id: 't2.12', title: '2.12 Solving Problems for Motion Under Gravity' },
+          { id: 't2.13', title: '2.13 Free Fall Acceleration' },
+        ]
+      },
+      {
+        id: 'c3',
+        title: 'Chapter 3: Dynamics',
+        topics: [
+          { id: 't3.1', title: '3.1 Concept of Force' },
+          { id: 't3.2', title: '3.2 Fundamental Forces' },
+          { id: 't3.3', title: '3.3 Forces in a Free-Body Diagram' },
+          { id: 't3.4', title: '3.4 Newton’s Law of Motion' },
+          { id: 't3.5', title: '3.5 Limitations of Newton’s Law of Motion' },
+          { id: 't3.6', title: '3.6 Mass and Weight' },
+          { id: 't3.7', title: '3.7 Mechanical and Electronic Balances' },
+          { id: 't3.8', title: '3.8 Friction' },
+          { id: 't3.9', title: '3.9 Momentum and Impulse' },
+          { id: 't3.10', title: '3.10 Principle of Conservation of Momentum' },
+        ]
+      },
+      {
+        id: 'c4',
+        title: 'Chapter 4: Turning Effect of Force',
+        topics: [
+          { id: 't4.1', title: '4.1 Like and Unlike Parallel Forces' },
+          { id: 't4.2', title: '4.2 Addition of Forces' },
+          { id: 't4.3', title: '4.3 Turning Effect of Force' },
+          { id: 't4.4', title: '4.4 Resolution of Vectors' },
+          { id: 't4.5', title: '4.5 Determination of a Force from its Perpendicular components' },
+          { id: 't4.6', title: '4.6 Principle of Moments' },
+          { id: 't4.7', title: '4.7 Centre of Gravity and Centre of Mass' },
+          { id: 't4.8', title: '4.8 Equilibrium' },
+          { id: 't4.9', title: '4.9 Conditions of Equilibrium' },
+          { id: 't4.10', title: '4.10 States of Equilibrium' },
+          { id: 't4.11', title: '4.11 Improvement of Stability' },
+          { id: 't4.12', title: '4.12 Application of Stability in Real Life' },
+          { id: 't4.13', title: '4.13 Centripetal Force' },
+        ]
+      },
+      {
+        id: 'c5',
+        title: 'Chapter 5: Work, Energy and Power',
+        topics: [
+          { id: 't5.1', title: '5.1 Work' },
+          { id: 't5.2', title: '5.2 Energy' },
+          { id: 't5.3', title: '5.3 Conservation of Energy' },
+          { id: 't5.4', title: '5.4 Sources of Energy' },
+          { id: 't5.5', title: '5.5 Renewable and Non-Renewable Sources' },
+          { id: 't5.6', title: '5.6 The Advantages and Disadvantages of Methods of Energy Production' },
+          { id: 't5.7', title: '5.7 Power' },
+          { id: 't5.8', title: '5.8 Efficiency' },
+        ]
+      },
+      {
+        id: 'c6',
+        title: 'Chapter 6: Mechanical Properties of Matter',
+        topics: [
+          { id: 't6.1', title: '6.1 Deformation of Solids' },
+          { id: 't6.2', title: '6.2 Hooke’s Law' },
+          { id: 't6.3', title: '6.3 Density' },
+          { id: 't6.4', title: '6.4 Pressure' },
+          { id: 't6.5', title: '6.5 Pressure in Liquids' },
+          { id: 't6.6', title: '6.6 Atmospheric Pressure' },
+          { id: 't6.7', title: '6.7 Measurement of Atmospheric Pressure' },
+          { id: 't6.8', title: '6.8 Measurement of Pressure by Manometer' },
+          { id: 't6.9', title: '6.9 Pascal’s Law' },
+        ]
+      },
+      {
+        id: 'c7',
+        title: 'Chapter 7: Thermal Properties of Matter',
+        topics: [
+          { id: 't7.1', title: '7.1 Kinetic Molecular Theory of Matter' },
+          { id: 't7.2', title: '7.2 Temperature and Heat' },
+          { id: 't7.3', title: '7.3 Thermometers' },
+          { id: 't7.4', title: '7.4 Sensitivity, Range and Linearity of Thermometers' },
+          { id: 't7.5', title: '7.5 Structure of Liquid in Glass Thermometer' },
+        ]
+      },
+      {
+        id: 'c8',
+        title: 'Chapter 8: Magnetism',
+        topics: [
+          { id: 't8.1', title: '8.1 Magnetic Materials' },
+          { id: 't8.2', title: '8.2 Properties of Magnets' },
+          { id: 't8.3', title: '8.3 Induced Magnetism' },
+          { id: 't8.4', title: '8.4 Temporary and Permanent Magnets' },
+          { id: 't8.5', title: '8.5 Magnetic Fields' },
+          { id: 't8.6', title: '8.6 Uses of Permanent Magnets' },
+          { id: 't8.7', title: '8.7 Electromagnets' },
+          { id: 't8.8', title: '8.8 Domain Theory of Magnetism' },
+          { id: 't8.9', title: '8.9 Magnetisation and Demagnetisation' },
+          { id: 't8.10', title: '8.10 Applications of Magnets in Recording Technology' },
+          { id: 't8.11', title: '8.11 Soft Iron as Magnetic Shield' },
+        ]
+      },
+      {
+        id: 'c9',
+        title: 'Chapter 9: Nature of Science',
+        topics: [
+          { id: 't9.1', title: '9.1 Scope of Physics' },
+          { id: 't9.2', title: '9.2 Branches of Physics' },
+          { id: 't9.3', title: '9.3 Interdisciplinary Nature of Physics' },
+          { id: 't9.4', title: '9.4 Interdisciplinary Research' },
+          { id: 't9.5', title: '9.5 Scientific Method' },
+          { id: 't9.6', title: '9.6 Scientific Base of Technologies and Engineering' },
+        ]
+      }
+  ],
+};
+
+const RECENT_TESTS = [
+  { id: 'r1', title: 'Physics: Newton\'s Law', details: '15 MCQS | Medium', time: '2 hours ago' },
+  { id: 'r2', title: 'Chemistry: Periodic table', details: '10 MCQS, 5 SQs | Hard', time: 'Yesterday' },
+];
+
+const initialState = {
+  step: 0,
+  selectedSubject: null,
+  selectedContent: {},
+  pattern: null,
+  customConfig: {
+    mcqs: { selected: false, quantity: 10 },
+    short: { selected: false, quantity: 5 },
+    long: { selected: false, quantity: 2 },
+  },
+  loading: false,
+};
+
+function reducer(state, action) {
+  switch (action.type) {
+    case 'SET_STEP':
+      return { ...state, step: action.payload };
+    case 'SELECT_SUBJECT':
+      return { ...state, selectedSubject: action.payload, step: 1 };
+    case 'TOGGLE_TOPIC': {
+      const { chapterId, topicId } = action.payload;
+      const currentTopics = state.selectedContent[chapterId] || [];
+      const newTopics = currentTopics.includes(topicId)
+        ? currentTopics.filter(id => id !== topicId)
+        : [...currentTopics, topicId];
+      return {
+        ...state,
+        selectedContent: { ...state.selectedContent, [chapterId]: newTopics }
+      };
+    }
+    case 'TOGGLE_CHAPTER': {
+      const { chapterId, allTopicIds } = action.payload;
+      const isSelected = state.selectedContent[chapterId]?.length === allTopicIds.length;
+      return {
+        ...state,
+        selectedContent: {
+          ...state.selectedContent,
+          [chapterId]: isSelected ? [] : [...allTopicIds]
+        }
+      };
+    }
+    case 'SET_PATTERN':
+      return { ...state, pattern: action.payload };
+    case 'UPDATE_CUSTOM_CONFIG': {
+      let qty = action.payload.quantity;
+      let isSelected = action.payload.selected;
+      
+      const currentConfig = state.customConfig[action.key];
+      const nextSelected = isSelected !== undefined ? isSelected : currentConfig.selected;
+      let nextQty = qty !== undefined ? qty : currentConfig.quantity;
+
+      if (isSelected === true && nextQty === 0) nextQty = 1;
+
+      if (action.key === 'mcqs' || action.key === 'short') {
+        nextQty = Math.max(0, Math.min(20, nextQty));
+      } else if (action.key === 'long') {
+        nextQty = Math.max(0, Math.min(4, nextQty));
+      }
+
+      return {
+        ...state,
+        customConfig: {
+          ...state.customConfig,
+          [action.key]: { ...currentConfig, selected: nextSelected, quantity: nextQty }
+        }
+      };
+    }
+    case 'SET_LOADING':
+      return { ...state, loading: action.payload };
+    case 'RESET':
+      return initialState;
+    default:
+      return state;
+  }
+}
+
+const Checkbox = ({ selected, onPress, label, theme }) => (
+  <TouchableOpacity style={styles.checkboxRow} onPress={onPress}>
+    <Ionicons
+      name={selected ? "checkbox" : "square-outline"}
+      size={22}
+      color={theme.primary}
+    />
+    {label && <Text style={[styles.checkboxLabel, { color: theme.text }]}>{label}</Text>}
+  </TouchableOpacity>
+);
+
+const ChapterItem = ({ chapter, state, dispatch, theme }) => {
+  const [expanded, setExpanded] = useState(false);
+  const selectedTopics = state.selectedContent[chapter.id] || [];
+  const isAllSelected = selectedTopics.length === chapter.topics.length;
+
+  return (
+    <View style={styles.chapterContainer}>
+      <View style={styles.chapterHeader}>
+        <Checkbox
+          selected={isAllSelected}
+          onPress={() => dispatch({ type: 'TOGGLE_CHAPTER', payload: { chapterId: chapter.id, allTopicIds: chapter.topics.map(t => t.id) } })}
+          theme={theme}
+        />
+        <TouchableOpacity style={{ flex: 1, marginLeft: 10 }} onPress={() => setExpanded(!expanded)}>
+          <Text style={[styles.chapterTitle, { color: theme.text }]}>{chapter.title}</Text>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={() => setExpanded(!expanded)}>
+          <Ionicons name={expanded ? "chevron-up" : "chevron-down"} size={20} color={theme.textSecondary} />
+        </TouchableOpacity>
+      </View>
+      {expanded && (
+        <View style={styles.topicsList}>
+          {chapter.topics.map(topic => (
+            <View key={topic.id} style={styles.topicRow}>
+              <Checkbox
+                selected={selectedTopics.includes(topic.id)}
+                onPress={() => dispatch({ type: 'TOGGLE_TOPIC', payload: { chapterId: chapter.id, topicId: topic.id } })}
+                label={topic.title}
+                theme={theme}
+              />
+            </View>
+          ))}
+        </View>
+      )}
+    </View>
+  );
+};
 
 export default function TestGeneratorScreen({ navigation }) {
   const { theme } = useTheme();
   const [sidebarVisible, setSidebarVisible] = useState(false);
-  const [testType, setTestType] = useState('structured'); // 'structured' or 'prompt'
-  const [questionTypes, setQuestionTypes] = useState({ mcqs: true, short: false, long: false });
-  const [difficulty, setDifficulty] = useState('medium');
+  const [state, dispatch] = useReducer(reducer, initialState);
+  const slideAnim = useRef(new Animated.Value(0)).current;
+  const pulseAnim = useRef(new Animated.Value(1)).current;
 
-  const [subject, setSubject] = useState(null);
-  const [chapter, setChapter] = useState(null);
-  const [topic, setTopic] = useState(null);
-  const [numQuestions, setNumQuestions] = useState(null);
+  // Custom Alert State
+  const [alertConfig, setAlertConfig] = useState({ visible: false, title: '', message: '', type: 'error' });
+
+  useEffect(() => {
+    if (state.loading) {
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(pulseAnim, { toValue: 1.2, duration: 800, useNativeDriver: true }),
+          Animated.timing(pulseAnim, { toValue: 1, duration: 800, useNativeDriver: true }),
+        ])
+      ).start();
+    } else {
+      pulseAnim.setValue(1);
+    }
+  }, [state.loading]);
 
   const toggleSidebar = () => setSidebarVisible(!sidebarVisible);
 
-  const renderRecentTests = () => {
-    const recentTests = [
-      { id: 1, title: 'Physics: Newtons Law', details: '15 MCQS | Medium', time: '2 hours ago' },
-      { id: 2, title: 'Chemistry: Periodic table', details: '10 MCQS, 5SQs | Hard', time: 'yesterday' },
-      { id: 3, title: 'Mathematics: Algebra', details: '20 MCQS | Easy', time: '3 days ago' },
-    ];
+  const showAlert = (title, message, type = 'error', onConfirm = null) => {
+    setAlertConfig({ visible: true, title, message, type, onConfirm });
+  };
 
-    return recentTests.map(test => (
-        <View key={test.id} style={[styles.recentTestCard, {backgroundColor: theme.surface}]}>
-            <View style={{flex: 1}}>
-                <Text style={[styles.recentTestTitle, {color: theme.text}]}>{test.title}</Text>
-                <Text style={[styles.recentTestDetails, {color: theme.textSecondary}]}>{test.details}</Text>
-                <Text style={[styles.recentTestTime, {color: theme.textSecondary}]}>Generated {test.time}</Text>
-            </View>
-            <View style={styles.recentTestActions}>
-                <TouchableOpacity><Ionicons name="eye-outline" size={24} color={theme.primary} /></TouchableOpacity>
-                <TouchableOpacity><Ionicons name="download-outline" size={24} color={theme.primary} /></TouchableOpacity>
-                <TouchableOpacity><Ionicons name="refresh-outline" size={24} color={theme.primary} /></TouchableOpacity>
-            </View>
-        </View>
-    ));
-  }
+  const closeAlert = () => setAlertConfig({ ...alertConfig, visible: false });
 
-  const Checkbox = ({ label, value, onValueChange }) => (
-    <TouchableOpacity style={styles.checkboxContainer} onPress={onValueChange}>
-        <Ionicons name={value ? 'checkbox' : 'square-outline'} size={24} color={theme.primary} />
-        <Text style={[styles.checkboxLabel, {color: theme.text}]}>{label}</Text>
-    </TouchableOpacity>
-  );
+  const goToStep2 = () => {
+    Animated.timing(slideAnim, { toValue: -CARD_WIDTH, duration: 300, useNativeDriver: true }).start(() => dispatch({ type: 'SET_STEP', payload: 2 }));
+  };
 
-  const RadioButton = ({ label, value, selected, onSelect }) => (
-    <TouchableOpacity style={styles.radioButtonContainer} onPress={onSelect}>
-        <Ionicons name={value === selected ? 'radio-button-on' : 'radio-button-off'} size={24} color={theme.primary} />
-        <Text style={[styles.radioLabel, {color: theme.text}]}>{label}</Text>
-    </TouchableOpacity>
-  );
+  const goBackToStep1 = () => {
+    Animated.timing(slideAnim, { toValue: 0, duration: 300, useNativeDriver: true }).start(() => dispatch({ type: 'SET_STEP', payload: 1 }));
+  };
+
+  const handleCancel = () => {
+    slideAnim.setValue(0);
+    dispatch({ type: 'SET_STEP', payload: 0 });
+  };
+
+  const navigateWithDemo = () => {
+    closeAlert();
+    const demoData = {
+      test_details: {
+        mode: "custom",
+        duration_minutes: 30,
+        expires_at: new Date(Date.now() + 30 * 60000).toISOString(),
+      },
+      mcqs: [
+        { question_number: 1, question: "Which is a base quantity?", options: { a: "Velocity", b: "Length", c: "Force", d: "Area" }, correct_option: "b" },
+        { question_number: 2, question: "The study of motion without considering its cause is:", options: { a: "Dynamics", b: "Kinematics", c: "Statics", d: "Mechanics" }, correct_option: "b" },
+      ],
+      short_questions: [{ question_number: 3, question: "Define scientific notation with an example." }],
+      long_questions: [{ question_number: 4, part_a: { marks: 4, question: "Describe characteristics of gravitational force." }, part_b: { marks: 5, question: "A body weighs 20N. Find its mass." } }]
+    };
+    navigation.navigate('TestViewScreen', { generatedTest: demoData });
+    dispatch({ type: 'SET_STEP', payload: 0 });
+  };
+
+  const handleGenerateTest = async () => {
+    if (state.loading) return;
+    dispatch({ type: 'SET_LOADING', payload: true });
+
+    try {
+      const full_chapters = [];
+      const topic_selections = [];
+
+      Object.keys(state.selectedContent).forEach(chId => {
+        const selectedTopicIds = state.selectedContent[chId];
+        const chapterData = CONTENT_DATA['1']?.find(c => c.id === chId);
+        if (chapterData) {
+          if (selectedTopicIds.length === chapterData.topics.length) {
+            full_chapters.push(parseInt(chId.replace('c', '')));
+          } else {
+            selectedTopicIds.forEach(tId => {
+              const topicData = chapterData.topics.find(t => t.id === tId);
+              if (topicData) {
+                topic_selections.push({
+                  chapter: parseInt(chId.replace('c', '')),
+                  topic_number: topicData.title.split(' ')[0],
+                  topic_name: topicData.title.split(' ').slice(1).join(' '),
+                  chapter_name: chapterData.title.split(': ')[1]
+                });
+              }
+            });
+          }
+        }
+      });
+
+      const payload = {
+        mode: state.pattern,
+        mcq_count: state.pattern === 'board' ? 12 : (state.customConfig.mcqs.selected ? state.customConfig.mcqs.quantity : 0),
+        short_count: state.pattern === 'board' ? 15 : (state.customConfig.short.selected ? state.customConfig.short.quantity : 0),
+        long_count: state.pattern === 'board' ? 3 : (state.customConfig.long.selected ? state.customConfig.long.quantity : 0),
+        full_chapters: full_chapters,
+        topic_selections: topic_selections
+      };
+
+      const response = await fetch(`${AI_BASE_URL}/generate-test`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      const result = await response.json();
+
+      if (response.ok) {
+        navigation.navigate('TestViewScreen', { generatedTest: result });
+        dispatch({ type: 'RESET' });
+        slideAnim.setValue(0);
+      } else {
+        showAlert("Generation Failed", "The AI service is currently unavailable. Would you like to try demo mode?", "confirm", navigateWithDemo);
+      }
+    } catch (error) {
+      showAlert("Connection Error", "Cannot reach server. Use sample data instead?", "confirm", navigateWithDemo);
+    } finally {
+      dispatch({ type: 'SET_LOADING', payload: false });
+    }
+  };
+
+  const isContentSelected = Object.values(state.selectedContent).some(topics => topics.length > 0);
+  const isAtLeastOneTypeSelected = (state.customConfig.mcqs.selected && state.customConfig.mcqs.quantity > 0) || 
+                                   (state.customConfig.short.selected && state.customConfig.short.quantity > 0) || 
+                                   (state.customConfig.long.selected && state.customConfig.long.quantity > 0);
+  
+  const isGenerateEnabled = state.pattern === 'board' || (state.pattern === 'custom' && isAtLeastOneTypeSelected);
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
       <View style={styles.contentWrapper}>
         <View style={[styles.header, {backgroundColor: theme.background}]}>
-            <View style={styles.headerLeft}>
-                <Ionicons name="book" size={30} color={theme.primary} style={styles.logo} />
-                <Text style={[styles.headerTitle, { color: theme.text }]}>DarsGah</Text>
-            </View>
-            <TouchableOpacity onPress={toggleSidebar}>
-                <Ionicons name="menu" size={24} color={theme.primary} />
-            </TouchableOpacity>
+          <View style={styles.headerLeft}>
+            <Ionicons name="book" size={30} color={theme.primary} style={styles.logo} />
+            <Text style={[styles.headerTitle, { color: theme.text }]}>DarsGah</Text>
+          </View>
+          <TouchableOpacity onPress={toggleSidebar}><Ionicons name="menu" size={24} color={theme.primary} /></TouchableOpacity>
         </View>
 
         <ScrollView contentContainerStyle={styles.scrollContent}>
-            <Text style={[styles.mainTitle, { color: theme.text }]}>Test Generator</Text>
-            <Text style={[styles.subtitle, { color: theme.textSecondary }]}>Create customized tests for any subject and topic</Text>
+          <Text style={[styles.mainTitle, { color: theme.text }]}>Test Generator</Text>
+          <Text style={[styles.subtitle, { color: theme.textSecondary }]}>Create customized tests for any subject and topic</Text>
 
-             <View style={[styles.searchContainer, {backgroundColor: theme.surface}]}>
-                <Ionicons name="search-outline" size={22} color="#888" />
-                <TextInput style={{flex:1, marginLeft: 10, color: theme.text}} placeholder="Search for topics, chapters..." placeholderTextColor="#888"/>
-                 <Ionicons name="notifications-outline" size={22} color="red" />
+          <View style={[styles.mainCard, {backgroundColor: theme.primary}]}>
+            <View style={{flex: 1}}>
+              <Text style={styles.mainCardTitle}>Generate custom tests in seconds</Text>
+              <Text style={styles.mainCardText}>AI-powered generation for any subject or topic.</Text>
             </View>
+            <Ionicons name="document-text-outline" size={40} color="#FFFFFF" style={{marginLeft: 10}}/>
+          </View>
 
-            <View style={[styles.mainCard, {backgroundColor: theme.primary}]}>
-                <View style={{flex: 1}}>
-                    <Text style={styles.mainCardTitle}>Generate custom tests in seconds</Text>
-                    <Text style={styles.mainCardText}>Create personalized tests for any subject, chapter, or topic with AI-powered question generation.</Text>
-                </View>
-                <Ionicons name="document-text-outline" size={40} color="#FFFFFF"/>
-            </View>
-
-            <View style={styles.toggleContainer}>
-                <TouchableOpacity 
-                    style={[styles.toggleButton, testType === 'structured' && styles.activeButton, {backgroundColor: testType === 'structured' ? theme.primary : theme.surface}] } 
-                    onPress={() => setTestType('structured')}>
-                    <Text style={[styles.toggleText, testType === 'structured' && styles.activeText, {color: testType === 'structured' ? 'white': theme.text}]}>Structured</Text>
-                </TouchableOpacity>
-                <TouchableOpacity 
-                    style={[styles.toggleButton, testType === 'prompt' && styles.activeButton, {backgroundColor: testType === 'prompt' ? theme.primary : theme.surface}]} 
-                    onPress={() => setTestType('prompt')}>
-                    <Text style={[styles.toggleText, testType === 'prompt' && styles.activeText, {color: testType === 'prompt' ? 'white': theme.text}]}>Prompt-Based</Text>
-                </TouchableOpacity>
-            </View>
-
-            {testType === 'structured' ? (
-                <View style={[styles.generatorContainer, {backgroundColor: theme.surface}]}>
-                    <Text style={[styles.generatorTitle, {color: theme.text}]}>Structured Test Generator</Text>
-                    <Text style={styles.label}>Subject</Text>
-                    <Dropdown options={["Mathematics", "Physics", "Chemistry"]} selectedValue={subject} onValueChange={setSubject} placeholder="Select a subject" theme={theme} />
-                    <Text style={styles.label}>Chapter</Text>
-                    <Dropdown options={["Chapter 1", "Chapter 2", "Chapter 3"]} selectedValue={chapter} onValueChange={setChapter} placeholder="Select a chapter" theme={theme} />
-                    <Text style={styles.label}>Topic</Text>
-                    <Dropdown options={["Topic 1", "Topic 2", "Topic 3"]} selectedValue={topic} onValueChange={setTopic} placeholder="Select a topic" theme={theme} />
-                    <Text style={styles.label}>Sub Topic (optional)</Text>
-                    <TextInput style={styles.textInput} placeholder="e.g. Applications, formulas, examples..." placeholderTextColor="#888"/>
-                    <Text style={styles.label}>Question Types</Text>
-                    <Checkbox label="Multiple Choice (MCQs)" value={questionTypes.mcqs} onValueChange={() => setQuestionTypes({...questionTypes, mcqs: !questionTypes.mcqs})} />
-                    <Checkbox label="Short Questions" value={questionTypes.short} onValueChange={() => setQuestionTypes({...questionTypes, short: !questionTypes.short})} />
-                    <Checkbox label="Long Questions" value={questionTypes.long} onValueChange={() => setQuestionTypes({...questionTypes, long: !questionTypes.long})} />
-                    <Text style={styles.label}>No of Questions</Text>
-                    <Dropdown options={["5", "10", "15", "20"]} selectedValue={numQuestions} onValueChange={setNumQuestions} placeholder="Select number of questions" theme={theme} />
-                    <Text style={styles.label}>Difficulty Level</Text>
-                    <RadioButton label="Low" value="low" selected={difficulty} onSelect={() => setDifficulty('low')} />
-                    <RadioButton label="Medium" value="medium" selected={difficulty} onSelect={() => setDifficulty('medium')} />
-                    <RadioButton label="Hard" value="hard" selected={difficulty} onSelect={() => setDifficulty('hard')} />
-                </View>
-            ) : (
-                <View style={[styles.generatorContainer, {backgroundColor: theme.surface}]}>
-                    <Text style={[styles.generatorTitle, {color: theme.text}]}>Prompt-Based Generator</Text>
-                    <Text style={[styles.promptLabel, {color: theme.textSecondary}]}>Describe Your Test</Text>
-                    <TextInput
-                        style={[styles.promptInput, {borderColor: theme.hairline, color: theme.text}]}
-                        placeholder="e.g., Mathematics calculus integration with 20 MCQs at easy difficulty level"
-                        placeholderTextColor="#888"
-                        multiline
-                    />
-                </View>
+          <FlatList
+            data={SUBJECTS}
+            renderItem={({item}) => (
+              <TouchableOpacity style={[styles.subjectCard, { backgroundColor: theme.surface }]} onPress={() => dispatch({ type: 'SELECT_SUBJECT', payload: item })}>
+                <Ionicons name={item.icon} size={32} color={theme.primary} />
+                <Text style={[styles.subjectName, { color: theme.text }]}>{item.name}</Text>
+                <View style={[styles.generateBtn, { backgroundColor: theme.primary }]}><Text style={styles.generateBtnText}>Generate Test</Text></View>
+              </TouchableOpacity>
             )}
+            keyExtractor={item => item.id}
+            numColumns={2}
+            scrollEnabled={false}
+            columnWrapperStyle={styles.row}
+            style={styles.subjectGrid}
+          />
 
-            <TouchableOpacity style={[styles.generateButton, {backgroundColor: theme.primary}]}>
-                <Ionicons name="flash-outline" size={24} color="white" />
-                <Text style={styles.generateButtonText}>Generate Test</Text>
-            </TouchableOpacity>
-
-
-            <Text style={[styles.sectionTitle, { color: theme.text, marginTop: 30 }]}>Recent Tests</Text>
-            {renderRecentTests()}
-
+          <Text style={[styles.sectionTitle, { color: theme.text }]}>Recent Tests</Text>
+          {RECENT_TESTS.map(test => (
+            <View key={test.id} style={[styles.recentCard, { backgroundColor: theme.surface }]}>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.recentTitle, { color: theme.text }]}>{test.title}</Text>
+                <Text style={[styles.recentDetails, { color: theme.textSecondary }]}>{test.details}</Text>
+              </View>
+              <View style={styles.recentActions}>
+                <Ionicons name="eye-outline" size={20} color={theme.primary} />
+                <Ionicons name="download-outline" size={20} color={theme.primary} />
+                <Ionicons name="refresh-outline" size={20} color={theme.primary} />
+              </View>
+            </View>
+          ))}
         </ScrollView>
       </View>
+
+      <Modal visible={state.step > 0} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={[styles.stepCard, { backgroundColor: theme.surface }]}>
+            <Animated.View style={[styles.animatedContainer, { transform: [{ translateX: slideAnim }] }]}>
+              <View style={styles.stepPage}>
+                <Text style={[styles.stepHeader, { color: theme.text }]}>Select Content</Text>
+                <Text style={[styles.stepSubHeader, { color: theme.textSecondary }]}>{state.selectedSubject?.name}</Text>
+                <ScrollView style={styles.contentScroll}>
+                  {CONTENT_DATA[state.selectedSubject?.id]?.map(chapter => (
+                    <ChapterItem key={chapter.id} chapter={chapter} state={state} dispatch={dispatch} theme={theme} />
+                  ))}
+                </ScrollView>
+                <View style={styles.stepFooter}>
+                  <TouchableOpacity style={[styles.backBtn, { borderColor: theme.primary }]} onPress={handleCancel}><Text style={{ color: theme.primary }}>Cancel</Text></TouchableOpacity>
+                  <TouchableOpacity 
+                    disabled={!isContentSelected}
+                    style={[styles.nextBtn, { backgroundColor: isContentSelected ? theme.primary : theme.textSecondary }]} 
+                    onPress={goToStep2}
+                  >
+                    <Text style={styles.btnText}>Next</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              <View style={styles.stepPage}>
+                <Text style={[styles.stepHeader, { color: theme.text }]}>Test Pattern</Text>
+                <ScrollView style={styles.contentScroll}>
+                  <TouchableOpacity style={styles.radioRow} onPress={() => dispatch({ type: 'SET_PATTERN', payload: 'board' })}>
+                    <Ionicons name={state.pattern === 'board' ? "radio-button-on" : "radio-button-off"} size={22} color={theme.primary} />
+                    <Text style={[styles.radioLabel, { color: theme.text }]}>Board Pattern</Text>
+                  </TouchableOpacity>
+                  {state.pattern === 'board' && (
+                    <View style={[styles.patternInfo, { backgroundColor: theme.background }]}>
+                      <Text style={[styles.patternTitle, { color: theme.primary }]}>Punjab Board 9th Physics Pattern:</Text>
+                      <Text style={{ color: theme.text }}>Total Marks: 60 | Time: 2 Hours</Text>
+                      <Text style={{ color: theme.text }}>Section A: 12 MCQs | Section B: 15 Short Qs | Section C: 2 Long Qs</Text>
+                    </View>
+                  )}
+                  <TouchableOpacity style={styles.radioRow} onPress={() => dispatch({ type: 'SET_PATTERN', payload: 'custom' })}>
+                    <Ionicons name={state.pattern === 'custom' ? "radio-button-on" : "radio-button-off"} size={22} color={theme.primary} />
+                    <Text style={[styles.radioLabel, { color: theme.text }]}>Customized</Text>
+                  </TouchableOpacity>
+                  {state.pattern === 'custom' && (
+                    <View style={styles.customOptions}>
+                      {['mcqs', 'short', 'long'].map(type => (
+                        <View key={type} style={styles.customRow}>
+                          <Checkbox selected={state.customConfig[type].selected} onPress={() => dispatch({ type: 'UPDATE_CUSTOM_CONFIG', key: type, payload: { selected: !state.customConfig[type].selected } })} label={type.toUpperCase()} theme={theme} />
+                          {state.customConfig[type].selected && (
+                            <View style={{alignItems: 'center'}}>
+                                <TextInput style={[styles.qtyInput, { color: theme.text, borderColor: theme.primary }]} keyboardType="numeric" value={state.customConfig[type].quantity.toString()} onChangeText={(val) => dispatch({ type: 'UPDATE_CUSTOM_CONFIG', key: type, payload: { quantity: parseInt(val) || 0 } })} />
+                                <Text style={{fontSize: 10, color: theme.textSecondary}}>Limit: {type === 'long' ? '4' : '20'}</Text>
+                            </View>
+                          )}
+                        </View>
+                      ))}
+                    </View>
+                  )}
+                </ScrollView>
+                <View style={styles.stepFooter}>
+                  <TouchableOpacity style={[styles.backBtn, { borderColor: theme.primary }]} onPress={goBackToStep1} disabled={state.loading}><Text style={{ color: theme.primary }}>Back</Text></TouchableOpacity>
+                  <TouchableOpacity 
+                    style={[styles.nextBtn, { backgroundColor: isGenerateEnabled && !state.loading ? theme.primary : theme.textSecondary }]} 
+                    disabled={!isGenerateEnabled || state.loading} 
+                    onPress={handleGenerateTest}
+                  >
+                    {state.loading ? <ActivityIndicator size="small" color="white" /> : <Text style={styles.btnText}>Generate Test</Text>}
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </Animated.View>
+          </View>
+        </View>
+      </Modal>
+
+      <CustomAlert 
+        visible={alertConfig.visible} 
+        title={alertConfig.title} 
+        message={alertConfig.message} 
+        type={alertConfig.type} 
+        onClose={closeAlert} 
+        onConfirm={alertConfig.onConfirm} 
+      />
+
+      {state.loading && (
+        <View style={styles.loadingOverlay}>
+          <Animated.View style={{ transform: [{ scale: pulseAnim }], alignItems: 'center' }}>
+            <View style={[styles.loaderIconBg, { backgroundColor: theme.primary }]}>
+              <Ionicons name="sparkles" size={40} color="white" />
+            </View>
+          </Animated.View>
+          <Text style={[styles.loadingText, { color: 'white' }]}>DarsGah AI is crafting your test...</Text>
+          <ActivityIndicator size="small" color="white" style={{ marginTop: 20 }} />
+        </View>
+      )}
       <Sidebar isVisible={sidebarVisible} onClose={toggleSidebar} activeScreen="TestGenerator" />
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-    container: { 
-        flex: 1,
-    },
-    contentWrapper: { flex: 1 },
-    header: {
-        flexDirection: "row",
-        justifyContent: "space-between",
-        alignItems: "center",
-        paddingVertical: 10,
-        paddingHorizontal: 20,
-        borderBottomWidth: 1,
-        borderBottomColor: '#E0E0E0'
-    },
-    headerLeft: {
-        flexDirection: 'row',
-        alignItems: 'center',
-    },
-    logo: {
-        marginRight: 10,
-    },
-    headerTitle: {
-        fontSize: 24,
-        fontWeight: 'bold',
-    },
-    scrollContent: { padding: 20, paddingBottom: 50 },
-    mainTitle: { fontSize: 26, fontWeight: 'bold' },
-    subtitle: { fontSize: 16, color: '#666', marginBottom: 20 },
-    searchContainer: { flexDirection: 'row', alignItems: 'center', borderRadius: 10, padding: 15, marginBottom: 20 },
-    mainCard: { flexDirection: 'row', alignItems: 'center', borderRadius: 15, padding: 20, marginBottom: 20 },
-    mainCardTitle: { fontSize: 18, fontWeight: 'bold', color: 'white', marginBottom: 8 },
-    mainCardText: { fontSize: 14, color: 'white' },
-    toggleContainer: {
-        flexDirection: 'row',
-        borderRadius: 10,
-        overflow: 'hidden',
-        marginBottom: 20,
-    },
-    toggleButton: {
-        flex: 1,
-        padding: 15,
-        alignItems: 'center',
-    },
-    activeButton: {},
-    toggleText: {
-        fontWeight: 'bold',
-        fontSize: 16
-    },
-    activeText: {
-        color: 'white'
-    },
-    generatorContainer: {
-        borderRadius: 15,
-        padding: 20,
-        marginBottom: 20,
-    },
-    generatorTitle: {
-        fontSize: 18,
-        fontWeight: 'bold',
-        marginBottom: 15
-    },
-    promptLabel: {
-        fontSize: 14,
-        marginBottom: 5
-    },
-    promptInput: {
-        borderWidth: 1,
-        borderRadius: 10,
-        padding: 15,
-        textAlignVertical: 'top',
-        minHeight: 100,
-        fontSize: 16,
-    },
-    generateButton: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        borderRadius: 10,
-        padding: 15,
-    },
-    generateButtonText: {
-        color: 'white',
-        fontWeight: 'bold',
-        fontSize: 18,
-        marginLeft: 10
-    },
-    sectionTitle: {
-        fontSize: 20,
-        fontWeight: 'bold',
-        marginBottom: 15,
-    },
-    recentTestCard: {
-        borderRadius: 15,
-        padding: 15,
-        marginBottom: 15,
-        flexDirection: 'row',
-        alignItems: 'center'
-    },
-    recentTestTitle: {
-        fontSize: 16,
-        fontWeight: 'bold'
-    },
-    recentTestDetails: {
-        fontSize: 14,
-        marginTop: 4
-    },
-    recentTestTime: {
-        fontSize: 12,
-        marginTop: 8
-    },
-    recentTestActions: {
-        flexDirection: 'row',
-        gap: 15,
-    },
-    label: {
-        fontSize: 16,
-        fontWeight: 'bold',
-        marginBottom: 10,
-    },
-    textInput: {
-        borderWidth: 1,
-        borderColor: '#ccc',
-        borderRadius: 5,
-        padding: 15,
-        marginBottom: 15,
-    },
-    checkboxContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginBottom: 15,
-    },
-    checkboxLabel: {
-        marginLeft: 10,
-        fontSize: 16,
-    },
-    radioButtonContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginBottom: 15,
-    },
-    radioLabel: {
-        marginLeft: 10,
-        fontSize: 16,
-    }
+  container: { flex: 1 },
+  contentWrapper: { flex: 1 },
+  header: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingVertical: 10, paddingHorizontal: 20, borderBottomWidth: 1, borderBottomColor: '#E0E0E0' },
+  headerLeft: { flexDirection: 'row', alignItems: 'center' },
+  logo: { marginRight: 10 },
+  headerTitle: { fontSize: 24, fontWeight: 'bold' },
+  scrollContent: { padding: 20, paddingBottom: 50 },
+  mainTitle: { fontSize: 26, fontWeight: 'bold' },
+  subtitle: { fontSize: 16, marginBottom: 20 },
+  mainCard: { flexDirection: 'row', alignItems: 'center', borderRadius: 15, padding: 20, marginBottom: 20 },
+  mainCardTitle: { fontSize: 18, fontWeight: 'bold', color: 'white', marginBottom: 8 },
+  mainCardText: { fontSize: 14, color: 'white' },
+  subjectGrid: { marginBottom: 20 },
+  row: { justifyContent: 'space-between' },
+  subjectCard: { width: '48%', borderRadius: 15, padding: 20, alignItems: 'center', marginBottom: 15, elevation: 3 },
+  subjectName: { fontSize: 16, fontWeight: 'bold', marginTop: 10, marginBottom: 15 },
+  generateBtn: { paddingVertical: 8, paddingHorizontal: 12, borderRadius: 8 },
+  generateBtnText: { color: 'white', fontSize: 12, fontWeight: 'bold' },
+  sectionTitle: { fontSize: 18, fontWeight: 'bold', marginVertical: 15 },
+  recentCard: { flexDirection: 'row', padding: 15, borderRadius: 12, marginBottom: 10, alignItems: 'center' },
+  recentTitle: { fontSize: 16, fontWeight: '600' },
+  recentDetails: { fontSize: 13, marginTop: 4 },
+  recentActions: { flexDirection: 'row', gap: 12 },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
+  stepCard: { width: CARD_WIDTH, height: '75%', borderRadius: 20, overflow: 'hidden' },
+  animatedContainer: { flexDirection: 'row', width: CARD_WIDTH * 2, height: '100%' },
+  stepPage: { width: CARD_WIDTH, height: '100%', padding: 20 },
+  stepHeader: { fontSize: 20, fontWeight: 'bold', textAlign: 'center' },
+  stepSubHeader: { fontSize: 16, textAlign: 'center', marginBottom: 20 },
+  contentScroll: { flex: 1 },
+  chapterContainer: { marginBottom: 15 },
+  chapterHeader: { flexDirection: 'row', alignItems: 'center' },
+  chapterTitle: { fontSize: 16, fontWeight: '600' },
+  topicsList: { marginLeft: 30, marginTop: 5 },
+  topicRow: { marginVertical: 5 },
+  checkboxRow: { flexDirection: 'row', alignItems: 'center' },
+  checkboxLabel: { marginLeft: 10, fontSize: 14 },
+  stepFooter: { flexDirection: 'row', justifyContent: 'space-between', paddingTop: 20, borderTopWidth: 1, borderTopColor: '#EEE' },
+  backBtn: { paddingVertical: 12, paddingHorizontal: 25, borderRadius: 10, borderWidth: 1 },
+  nextBtn: { paddingVertical: 12, paddingHorizontal: 25, borderRadius: 10, minWidth: 140, justifyContent: 'center', alignItems: 'center' },
+  btnText: { color: 'white', fontWeight: 'bold' },
+  radioRow: { flexDirection: 'row', alignItems: 'center', marginVertical: 15 },
+  radioLabel: { fontSize: 16, fontWeight: '600', marginLeft: 10 },
+  patternInfo: { padding: 15, borderRadius: 10, marginVertical: 10 },
+  patternTitle: { fontWeight: 'bold', marginBottom: 5 },
+  customOptions: { paddingLeft: 30 },
+  customRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginVertical: 10 },
+  qtyInput: { borderWidth: 1, borderRadius: 5, padding: 5, width: 60, textAlign: 'center' },
+  loadingOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.85)', justifyContent: 'center', alignItems: 'center', zIndex: 2000 },
+  loaderIconBg: { width: 80, height: 80, borderRadius: 40, justifyContent: 'center', alignItems: 'center', marginBottom: 20, elevation: 10 },
+  loadingText: { marginTop: 10, fontSize: 18, fontWeight: 'bold', textAlign: 'center' },
 });

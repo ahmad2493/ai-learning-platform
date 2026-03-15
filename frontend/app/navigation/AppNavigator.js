@@ -17,12 +17,13 @@ import ProfileScreen from "../screens/ProfileScreen";
 import AiAssistantScreen from "../screens/AiAssistantScreen";
 import AiChatScreen from "../screens/AiChatScreen";
 import TestGeneratorScreen from "../screens/TestGeneratorScreen";
+import TestViewScreen from "../screens/TestViewScreen";
 import PastPapersScreen from "../screens/PastPapersScreen";
 import CloPerformanceScreen from "../screens/CloPerformanceScreen";
 import ChangePasswordScreen from "../screens/ChangePasswordScreen";
 import OtpVerificationScreen from "../screens/OtpVerificationScreen";
 import ResetPasswordScreen from "../screens/ResetPasswordScreen";
-import SplashScreen from '../screens/SplashScreen'; // make sure this exists
+import SplashScreen from '../screens/SplashScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -34,6 +35,7 @@ const AppStack = () => (
     <Stack.Screen name="AiAssistant" component={AiAssistantScreen} options={{ headerShown: false }} />
     <Stack.Screen name="AiChat" component={AiChatScreen} options={{ headerShown: false }} />
     <Stack.Screen name="TestGenerator" component={TestGeneratorScreen} options={{ headerShown: false }} />
+    <Stack.Screen name="TestViewScreen" component={TestViewScreen} options={{ headerShown: false }} />
     <Stack.Screen name="PastPapers" component={PastPapersScreen} options={{ headerShown: false }} />
     <Stack.Screen name="CloPerformance" component={CloPerformanceScreen} options={{ headerShown: false }} />
     <Stack.Screen name="Settings" component={SettingsScreen} options={{ headerShown: false }} />
