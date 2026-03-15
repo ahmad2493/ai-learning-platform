@@ -124,7 +124,7 @@ class QueryParser:
 
     def classify_query(self, q: str, parsed: ParsedQuery) -> QueryType:
         if parsed.example_number or parsed.exercise_number or \
-                parsed.table_number or parsed.figure_number:
+                parsed.table_number or parsed.figure_number or parsed.topic_number:
             return QueryType.SPECIFIC_REFERENCE
         inds = ['give me', 'show me', 'find', 'list', 'practice', 'what is explained in']
         exts = ['mcq', 'question', 'exercise', 'problem', 'numerical', 'short', 'comprehensive question']
@@ -184,6 +184,7 @@ class JSONBookIndex:
         self._table_index: Dict[tuple, List[Document]] = {}
         self._figure_index: Dict[tuple, List[Document]] = {}
         self._activity_index: Dict[tuple, List[Document]] = {}
+        self._topic_index: Dict[tuple, List[Document]] = {}
         self._loaded = False
 
     def build(self) -> bool:
@@ -202,6 +203,7 @@ class JSONBookIndex:
             tbl = self._n(meta.get("table_number"))
             fig = self._n(meta.get("figure_number"))
             act = self._n(meta.get("activity_number"))
+            top = self._n(meta.get("topic_number"))
             sk = self._n(meta.get("section_kind"))
             if ex:  self._example_index.setdefault((ch, ex), []).append(doc)
             if exq:
@@ -210,6 +212,7 @@ class JSONBookIndex:
             if tbl: self._table_index.setdefault((ch, tbl), []).append(doc)
             if fig: self._figure_index.setdefault((ch, fig), []).append(doc)
             if act: self._activity_index.setdefault((ch, act), []).append(doc)
+            if top: self._topic_index.setdefault((ch, top), []).append(doc)
         self._loaded = True
         return True
 
@@ -239,6 +242,16 @@ class JSONBookIndex:
             if docs: return self.by_page(docs)
         if parsed.activity_number:
             docs = self._activity_index.get((ch, self._n(parsed.activity_number)), [])
+            if docs: return self.by_page(docs)
+        if parsed.topic_number:
+            top = self._n(parsed.topic_number)
+            # Infer chapter from topic prefix if not given (e.g. "3.3" -> "3")
+            effective_ch = ch
+            if effective_ch is None and top and '.' in top:
+                effective_ch = top.split('.')[0]
+            docs = self._topic_index.get((effective_ch, top), [])
+            if not docs:
+                docs = [d for k, v in self._topic_index.items() if k[1] == top for d in v]
             if docs: return self.by_page(docs)
         return []
 
@@ -474,9 +487,12 @@ CONDENSE_PROMPT = """You are a query rewriter for a physics textbook chatbot.
                     Given the conversation history and the new question, classify and rewrite it.  
                     CLASSIFICATION RULES, apply in this exact order:
 
-                    1. SPECIFIC REFERENCE, if the message contains a textbook reference like
-                       "example 3.2", "numerical 5.3", "SQ 1.2", "table 4.1":
+                    1. SPECIFIC REFERENCE, if the message contains ANY textbook reference like
+                       "example 3.2", "numerical 5.3", "SQ 1.2", "table 4.1",
+                       "topic 3.6", "topic 1.4", "chapter 3", "section 2.1",
+                       "activity 2.3", "figure 4.1" — i.e. any keyword followed by a number:
                        → Label NEW: and return the reference EXACTLY as written.
+                       NOTE: A different topic/chapter number is ALWAYS a new reference, NEVER a follow-up.
 
                     2. CHAT, if the message is a pure social pleasantry with NO learning intent:
                        greetings, thanks, bye, acknowledgements like "ok", "great", "acha", "theek hai",
@@ -501,6 +517,9 @@ CONDENSE_PROMPT = """You are a query rewriter for a physics textbook chatbot.
                       FOLLOWUP: Explain in more detail how T2 produces zero torque in Example 4.5.
                       NEW: What is Hooke's law?
                       NEW: numerical 5.3
+                      NEW: topic 3.6
+                      NEW: explain topic 3.6
+                      NEW: chapter 2
                       CHAT: You're welcome! Feel free to ask if you have more questions.
 
                     Conversation history:
@@ -520,6 +539,9 @@ def doc_header(doc: Document) -> str:
         return f"[{kind} Question {m['exercise_question_number']}]"
     if m.get('table_number'):
         return f"[Table {m['table_number']}]"
+    if m.get('topic_number'):
+        name = m.get('topic_name', '')
+        return f"[Topic {m['topic_number']}" + (f" — {name}]" if name else "]")
     return ""
 
 
@@ -784,4 +806,3 @@ class BookRAG:
 
         if not figures: return []
         return figures
-
