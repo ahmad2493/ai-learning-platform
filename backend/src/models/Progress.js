@@ -21,6 +21,7 @@ const ProgressSchema = new mongoose.Schema({
   overall_progress:   { type: Number, default: 0 },
   total_mcqs_seen:    { type: Number, default: 0 },
   total_mcqs_correct: { type: Number, default: 0 },
+  streak:              { type: Number, default: 0 },
   chapters:           { type: Map, of: ChapterProgressSchema, default: {} },
   last_updated:       { type: Date, default: Date.now },
 });
