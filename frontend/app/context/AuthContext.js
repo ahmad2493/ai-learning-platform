@@ -9,6 +9,40 @@ export const AuthProvider = ({ children }) => {
   const [userToken, setUserToken] = useState(null);
   const [user, setUser] = useState(null);
 
+  // Robust helper to decode JWT token in React Native
+  const getUserIdFromToken = (token) => {
+    try {
+      if (!token) return null;
+      const payload = token.split('.')[1];
+      if (!payload) return null;
+
+      // Manual Base64 decoding (Base64Url to Base64)
+      const base64 = payload.replace(/-/g, '+').replace(/_/g, '/');
+      const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=';
+      let str = String(base64).replace(/[=]+$/, '');
+      let output = '';
+      
+      for (
+        let bc = 0, bs, buffer, idx = 0;
+        (buffer = str.charAt(idx++));
+        ~buffer && ((bs = bc % 4 ? bs * 64 + buffer : buffer), bc++ % 4)
+          ? (output += String.fromCharCode(255 & (bs >> ((-2 * bc) & 6))))
+          : 0
+      ) {
+        buffer = chars.indexOf(buffer);
+      }
+
+      const decodedPayload = JSON.parse(output);
+      console.log('🗝️ [AuthContext] Decoded ID from Token:', decodedPayload.userId || decodedPayload.id || decodedPayload.sub);
+      
+      // Look for common ID fields in JWT payloads
+      return decodedPayload.userId || decodedPayload.id || decodedPayload.sub || decodedPayload._id;
+    } catch (e) {
+      console.error('[AuthContext] Token decode error:', e);
+      return null;
+    }
+  };
+
   useEffect(() => {
     const bootstrapAsync = async () => {
       try {
@@ -17,6 +51,7 @@ export const AuthProvider = ({ children }) => {
           await signIn(token);
         }
       } catch (e) {
+        console.error('[AuthContext] Bootstrap error:', e);
         await signOut();
       } finally {
         setIsLoading(false);
@@ -34,19 +69,33 @@ export const AuthProvider = ({ children }) => {
         },
       });
       const result = await response.json();
+      
       if (!response.ok || !result.success) {
         throw new Error(result.message || 'Failed to fetch profile on sign-in');
       }
-      // THE FIX: The user data is nested under the `data` property.
-      const userData = result.data;
 
-      setUser(userData);
+      // Profile API data
+      let userData = result.data;
+      
+      // EXTRACT ID FROM TOKEN if not present in profile data
+      const idFromToken = getUserIdFromToken(token);
+      
+      // Merge profile data with the extracted ID
+      const userWithId = {
+        ...userData,
+        userId: userData.userId || userData._id || userData.id || idFromToken
+      };
+
+      console.log('👤 [AuthContext] User Session Ready:', userWithId.name, 'ID:', userWithId.userId);
+
+      setUser(userWithId);
       setUserToken(token);
 
       await AsyncStorage.setItem('userToken', token);
-      await AsyncStorage.setItem('user', JSON.stringify(userData));
+      await AsyncStorage.setItem('user', JSON.stringify(userWithId));
 
     } catch (error) {
+      console.error('[AuthContext] Sign-in error:', error);
       await signOut();
       throw error;
     }

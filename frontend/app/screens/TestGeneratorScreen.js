@@ -1,9 +1,10 @@
 /**
  * Test Generator Screen - Refactored Multi-step Flow with Custom Alerts
+ * Integrated with Real Test History & Single Test View API
  * Author: Momna Butt (BCSF22M021)
  */
 
-import React, { useState, useReducer, useRef, useEffect } from 'react';
+import React, { useState, useReducer, useRef, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -17,19 +18,20 @@ import {
   Animated,
   Dimensions,
   Platform,
-  Alert,
+  RefreshControl
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../utils/ThemeContext';
-import { AI_BASE_URL } from '../utils/apiConfig';
+import { AI_GENERATE_TEST_URL, AI_TEST_HISTORY_URL, AI_SUBMIT_TEST_URL } from '../utils/apiConfig';
+import { useAuth } from '../context/AuthContext';
 import Sidebar from './SidebarComponent';
 import CustomAlert from '../components/CustomAlert';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const CARD_WIDTH = SCREEN_WIDTH * 0.9;
 
-// Mock Data
+// Mock Data for Subjects
 const SUBJECTS = [
   { id: '1', name: 'Physics', icon: 'flash' },
   { id: '2', name: 'Chemistry', icon: 'flask' },
@@ -184,11 +186,6 @@ const CONTENT_DATA = {
   ],
 };
 
-const RECENT_TESTS = [
-  { id: 'r1', title: 'Physics: Newton\'s Law', details: '15 MCQS | Medium', time: '2 hours ago' },
-  { id: 'r2', title: 'Chemistry: Periodic table', details: '10 MCQS, 5 SQs | Hard', time: 'Yesterday' },
-];
-
 const initialState = {
   step: 0,
   selectedSubject: null,
@@ -316,13 +313,88 @@ const ChapterItem = ({ chapter, state, dispatch, theme }) => {
 
 export default function TestGeneratorScreen({ navigation }) {
   const { theme } = useTheme();
+  const { user, userToken } = useAuth();
   const [sidebarVisible, setSidebarVisible] = useState(false);
   const [state, dispatch] = useReducer(reducer, initialState);
   const slideAnim = useRef(new Animated.Value(0)).current;
   const pulseAnim = useRef(new Animated.Value(1)).current;
 
+  // Real History State
+  const [history, setHistory] = useState([]);
+  const [historyLoading, setHistoryLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+
   // Custom Alert State
   const [alertConfig, setAlertConfig] = useState({ visible: false, title: '', message: '', type: 'error' });
+
+  const fetchHistory = useCallback(async () => {
+    const userId = user?._id || user?.userId || user?.id;
+    if (!userId) return;
+
+    try {
+      const response = await fetch(`${AI_TEST_HISTORY_URL}/${userId}`, {
+        headers: { 'Authorization': `Bearer ${userToken}` }
+      });
+      const result = await response.json();
+      if (response.ok && result.success) {
+        setHistory(result.data);
+      }
+    } catch (error) {
+      console.error("❌ [HISTORY] Error:", error);
+    } finally {
+      setHistoryLoading(false);
+      setRefreshing(false);
+    }
+  }, [user, userToken]);
+
+  useEffect(() => {
+    fetchHistory();
+  }, [fetchHistory]);
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    fetchHistory();
+  };
+
+  const handleViewTest = async (testId, status) => {
+    dispatch({ type: 'SET_LOADING', payload: true });
+    try {
+      const response = await fetch(`${AI_SUBMIT_TEST_URL}/${testId}`, {
+        headers: { 'Authorization': `Bearer ${userToken}` }
+      });
+      const result = await response.json();
+      
+      if (response.ok && result.success) {
+        const fullTest = result.data;
+        if (status === 'attempted') {
+          // Reconstruct user answers and calculate score from test data
+          const userAnswers = {};
+          let correct = 0;
+          fullTest.mcqs.forEach(q => {
+            if (q.student_answer) userAnswers[q.question_number] = q.student_answer;
+            if (q.student_answer?.toLowerCase() === q.correct_option?.toLowerCase()) correct++;
+          });
+          
+          const score = {
+            correct,
+            total: fullTest.mcqs.length,
+            percentage: fullTest.mcqs.length > 0 ? ((correct / fullTest.mcqs.length) * 100).toFixed(1) : 0
+          };
+
+          navigation.navigate('TestResult', { test: fullTest, userAnswers, score });
+        } else {
+          navigation.navigate('TestViewScreen', { generatedTest: fullTest });
+        }
+      } else {
+        showAlert("Error", "Failed to fetch test details.");
+      }
+    } catch (error) {
+      console.error("❌ [VIEW TEST] Error:", error);
+      showAlert("Error", "Network error while fetching test.");
+    } finally {
+      dispatch({ type: 'SET_LOADING', payload: false });
+    }
+  };
 
   useEffect(() => {
     if (state.loading) {
@@ -409,16 +481,19 @@ export default function TestGeneratorScreen({ navigation }) {
 
       const payload = {
         mode: state.pattern,
-        mcq_count: state.pattern === 'board' ? 12 : (state.customConfig.mcqs.selected ? state.customConfig.mcqs.quantity : 0),
-        short_count: state.pattern === 'board' ? 15 : (state.customConfig.short.selected ? state.customConfig.short.quantity : 0),
-        long_count: state.pattern === 'board' ? 3 : (state.customConfig.long.selected ? state.customConfig.long.quantity : 0),
+        mcq_count: state.pattern === 'board' ? 0 : (state.customConfig.mcqs.selected ? state.customConfig.mcqs.quantity : 0),
+        short_count: state.pattern === 'board' ? 0 : (state.customConfig.short.selected ? state.customConfig.short.quantity : 0),
+        long_count: state.pattern === 'board' ? 0 : (state.customConfig.long.selected ? state.customConfig.long.quantity : 0),
         full_chapters: full_chapters,
         topic_selections: topic_selections
       };
 
-      const response = await fetch(`${AI_BASE_URL}/generate-test`, {
+      const response = await fetch(AI_GENERATE_TEST_URL, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${userToken}`
+        },
         body: JSON.stringify(payload),
       });
 
@@ -428,8 +503,9 @@ export default function TestGeneratorScreen({ navigation }) {
         navigation.navigate('TestViewScreen', { generatedTest: result });
         dispatch({ type: 'RESET' });
         slideAnim.setValue(0);
+        fetchHistory(); // Refresh history after generation
       } else {
-        showAlert("Generation Failed", "The AI service is currently unavailable. Would you like to try demo mode?", "confirm", navigateWithDemo);
+        showAlert("Generation Failed", result.error || "The AI service encountered an error.", "confirm", navigateWithDemo);
       }
     } catch (error) {
       showAlert("Connection Error", "Cannot reach server. Use sample data instead?", "confirm", navigateWithDemo);
@@ -445,6 +521,56 @@ export default function TestGeneratorScreen({ navigation }) {
   
   const isGenerateEnabled = state.pattern === 'board' || (state.pattern === 'custom' && isAtLeastOneTypeSelected);
 
+  const renderHistoryItem = ({ item }) => {
+    // Better Recognized Title
+    let title = "Physics Test";
+    if (item.test_details.selected_chapters && item.test_details.selected_chapters.length > 0) {
+      title = item.test_details.selected_chapters.map(c => c.chapter_name.split(':').pop().trim()).join(', ');
+    } else if (item.test_details.selected_topics && item.test_details.selected_topics.length > 0) {
+      // Show first few topics
+      const topicNames = item.test_details.selected_topics.map(t => t.topic_name);
+      title = topicNames.length > 2 ? `${topicNames.slice(0, 2).join(', ')}...` : topicNames.join(', ');
+    }
+
+    const mcqCount = item.test_details.mcq_count || 0;
+    const shortCount = item.test_details.short_count || 0;
+    const longCount = item.test_details.long_count || 0;
+    
+    let stats = [];
+    if (mcqCount > 0) stats.push(`${mcqCount} MCQs`);
+    if (shortCount > 0) stats.push(`${shortCount} SQs`);
+    if (longCount > 0) stats.push(`${longCount} LQs`);
+    
+    const details = stats.join(' | ') + ` | ${item.test_details.mode.toUpperCase()}`;
+    const date = new Date(item.created_at).toLocaleDateString();
+    const statusColor = item.status === 'attempted' ? '#4CAF50' : item.status === 'expired' ? '#F44336' : '#FF9800';
+
+    return (
+      <TouchableOpacity 
+        style={[styles.recentCard, { backgroundColor: theme.surface }]}
+        onPress={() => handleViewTest(item._id, item.status)}
+      >
+        <View style={{ flex: 1 }}>
+          <View style={{flexDirection: 'row', alignItems: 'center', gap: 8}}>
+             <Text style={[styles.recentTitle, { color: theme.text }]} numberOfLines={1}>{title}</Text>
+             <View style={[styles.statusBadge, { backgroundColor: statusColor + '20' }]}>
+                <Text style={[styles.statusText, { color: statusColor }]}>{item.status.toUpperCase()}</Text>
+             </View>
+          </View>
+          <Text style={[styles.recentDetails, { color: theme.textSecondary }]}>{details}</Text>
+          <Text style={[styles.recentTime, { color: theme.textSecondary }]}>{date}</Text>
+        </View>
+        <View style={styles.actionIcon}>
+          <Ionicons 
+            name={item.status === 'attempted' ? "eye-outline" : item.status === 'expired' ? "lock-closed-outline" : "play-outline"} 
+            size={22} 
+            color={theme.primary} 
+          />
+        </View>
+      </TouchableOpacity>
+    );
+  };
+
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
       <View style={styles.contentWrapper}>
@@ -456,7 +582,10 @@ export default function TestGeneratorScreen({ navigation }) {
           <TouchableOpacity onPress={toggleSidebar}><Ionicons name="menu" size={24} color={theme.primary} /></TouchableOpacity>
         </View>
 
-        <ScrollView contentContainerStyle={styles.scrollContent}>
+        <ScrollView 
+            contentContainerStyle={styles.scrollContent}
+            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[theme.primary]} />}
+        >
           <Text style={[styles.mainTitle, { color: theme.text }]}>Test Generator</Text>
           <Text style={[styles.subtitle, { color: theme.textSecondary }]}>Create customized tests for any subject and topic</Text>
 
@@ -484,20 +613,24 @@ export default function TestGeneratorScreen({ navigation }) {
             style={styles.subjectGrid}
           />
 
-          <Text style={[styles.sectionTitle, { color: theme.text }]}>Recent Tests</Text>
-          {RECENT_TESTS.map(test => (
-            <View key={test.id} style={[styles.recentCard, { backgroundColor: theme.surface }]}>
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.recentTitle, { color: theme.text }]}>{test.title}</Text>
-                <Text style={[styles.recentDetails, { color: theme.textSecondary }]}>{test.details}</Text>
-              </View>
-              <View style={styles.recentActions}>
-                <Ionicons name="eye-outline" size={20} color={theme.primary} />
-                <Ionicons name="download-outline" size={20} color={theme.primary} />
-                <Ionicons name="refresh-outline" size={20} color={theme.primary} />
-              </View>
+          <View style={styles.historyHeader}>
+            <Text style={[styles.sectionTitle, { color: theme.text }]}>Recent Tests</Text>
+            <TouchableOpacity onPress={fetchHistory}>
+                <Ionicons name="refresh" size={20} color={theme.primary} />
+            </TouchableOpacity>
+          </View>
+
+          {historyLoading ? (
+            <ActivityIndicator size="small" color={theme.primary} style={{ marginVertical: 20 }} />
+          ) : history.length > 0 ? (
+            history.map((item) => (
+                <View key={item._id}>{renderHistoryItem({ item })}</View>
+            ))
+          ) : (
+            <View style={styles.emptyHistory}>
+                <Text style={{ color: theme.textSecondary }}>No test history found.</Text>
             </View>
-          ))}
+          )}
         </ScrollView>
       </View>
 
@@ -619,11 +752,16 @@ const styles = StyleSheet.create({
   subjectName: { fontSize: 16, fontWeight: 'bold', marginTop: 10, marginBottom: 15 },
   generateBtn: { paddingVertical: 8, paddingHorizontal: 12, borderRadius: 8 },
   generateBtnText: { color: 'white', fontSize: 12, fontWeight: 'bold' },
-  sectionTitle: { fontSize: 18, fontWeight: 'bold', marginVertical: 15 },
-  recentCard: { flexDirection: 'row', padding: 15, borderRadius: 12, marginBottom: 10, alignItems: 'center' },
-  recentTitle: { fontSize: 16, fontWeight: '600' },
+  historyHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 10, marginBottom: 15 },
+  sectionTitle: { fontSize: 18, fontWeight: 'bold' },
+  recentCard: { flexDirection: 'row', padding: 15, borderRadius: 12, marginBottom: 10, alignItems: 'center', elevation: 1 },
+  recentTitle: { fontSize: 15, fontWeight: 'bold' },
   recentDetails: { fontSize: 13, marginTop: 4 },
-  recentActions: { flexDirection: 'row', gap: 12 },
+  recentTime: { fontSize: 11, marginTop: 4, fontStyle: 'italic' },
+  statusBadge: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 },
+  statusText: { fontSize: 10, fontWeight: 'bold' },
+  actionIcon: { padding: 8 },
+  emptyHistory: { padding: 20, alignItems: 'center' },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
   stepCard: { width: CARD_WIDTH, height: '75%', borderRadius: 20, overflow: 'hidden' },
   animatedContainer: { flexDirection: 'row', width: CARD_WIDTH * 2, height: '100%' },

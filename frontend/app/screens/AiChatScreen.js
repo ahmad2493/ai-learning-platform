@@ -1,8 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import {
   View, Text, StyleSheet, TextInput, TouchableOpacity, FlatList, 
-  KeyboardAvoidingView, Platform, ActivityIndicator, Animated,
-  ScrollView
+  KeyboardAvoidingView, Platform, ActivityIndicator, Animated
 } from "react-native";
 import { Image } from 'expo-image';
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -32,6 +31,15 @@ export default function AiChatScreen({ navigation, route }) {
   const flatListRef = useRef();
   const sendButtonAnim = useRef(new Animated.Value(1)).current;
 
+  // Controlled scroll to end
+  const scrollToBottom = (animated = true) => {
+    if (messages.length > 0) {
+      setTimeout(() => {
+        flatListRef.current?.scrollToEnd({ animated });
+      }, 100);
+    }
+  };
+
   useEffect(() => {
     const initializeChat = async () => {
       const chatIdFromParams = route.params?.chatId;
@@ -47,6 +55,8 @@ export default function AiChatScreen({ navigation, route }) {
           if (data.success) {
             setMessages(data.data.messages);
             setCurrentChatId(data.data._id);
+            // Scroll to bottom after loading history
+            scrollToBottom(false);
           } else {
             setMessages([{ id: "error-1", text: "Could not load this chat session.", sender: "ai" }]);
           }
@@ -65,6 +75,13 @@ export default function AiChatScreen({ navigation, route }) {
     };
     initializeChat();
   }, [route.params?.chatId, userToken]);
+
+  // Scroll to bottom when new messages arrive
+  useEffect(() => {
+    if (messages.length > 0 && !isLoadingHistory) {
+      scrollToBottom(true);
+    }
+  }, [messages.length]);
 
   const handleSend = async (text = inputText) => {
     if (text.trim().length === 0 || isTyping) return;
@@ -94,7 +111,7 @@ export default function AiChatScreen({ navigation, route }) {
           id: (Date.now() + 1).toString(), 
           text: data.answer, 
           sender: "ai",
-          figures: data.figures || [] // Store figures in the local state
+          figures: data.figures || [] 
         };
         setMessages(prev => [...prev, aiMessage]);
 
@@ -150,7 +167,6 @@ export default function AiChatScreen({ navigation, route }) {
             {item.text}
           </Text>
 
-          {/* Render Figures/Images if they exist */}
           {!isUser && item.figures && item.figures.length > 0 && (
             <View style={styles.figuresContainer}>
               {item.figures.map((fig, idx) => (
@@ -212,8 +228,9 @@ export default function AiChatScreen({ navigation, route }) {
                 contentContainerStyle={styles.messagesContainer}
                 ListFooterComponent={isTyping ? <ActivityIndicator style={{ margin: 10 }} color={theme.primary} /> : null}
                 keyboardShouldPersistTaps="handled"
-                onContentSizeChange={() => flatListRef.current.scrollToEnd({ animated: true })}
-                onLayout={() => flatListRef.current.scrollToEnd({ animated: true })}
+                maintainVisibleContentPosition={{
+                  minIndexForVisible: 0,
+                }}
               />
       
               {messages.length <= 1 && (

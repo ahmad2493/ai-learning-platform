@@ -1,12 +1,6 @@
 /**
  * Custom Alert Component - Reusable Alert Dialog
  * Author: Momna Butt (BCSF22M021)
- * 
- * Functionality:
- * - Displays custom alert dialogs with animations
- * - Supports different alert types (success, error, warning, info)
- * - Provides user-friendly notification system
- * - Handles modal display and dismissal
  */
 
 import React, { useEffect, useRef } from 'react';
@@ -34,23 +28,25 @@ const CustomAlert = ({ visible, title, message, type, onClose, onConfirm }) => {
       // Auto-close only for success type
       if (type === 'success') {
         const timer = setTimeout(() => {
+          // If onConfirm is provided for success, trigger it (usually for navigation)
+          if (onConfirm) {
+            onConfirm();
+          }
           onClose();
-        }, 2500);
+        }, 2200);
         return () => clearTimeout(timer);
       }
     } else {
-      // Reset animation when closing
       Animated.timing(scaleAnim, {
         toValue: 0,
         duration: 200,
         useNativeDriver: true,
       }).start();
     }
-  }, [visible, type, onClose, scaleAnim]);
+  }, [visible, type, onClose, onConfirm, scaleAnim]);
 
   if (!visible) return null;
 
-  // Configuration for different alert types
   const alertConfig = {
     success: {
       icon: 'checkmark-done-circle',
@@ -64,7 +60,7 @@ const CustomAlert = ({ visible, title, message, type, onClose, onConfirm }) => {
     },
     confirm: {
       icon: 'help-circle-outline',
-      color: '#FF9800', // Orange for confirmation
+      color: '#FF9800',
       size: 40,
     },
     info: {
@@ -90,10 +86,16 @@ const CustomAlert = ({ visible, title, message, type, onClose, onConfirm }) => {
           
           {message && <Text style={styles.message}>{message}</Text>}
 
-          {type === 'error' || type === 'info' ? (
+          {(type === 'error' || type === 'info') ? (
             <TouchableOpacity style={[styles.button, { backgroundColor: config.color }]} onPress={onClose}>
               <Text style={styles.buttonText}>OK</Text>
             </TouchableOpacity>
+          ) : null}
+
+          {type === 'success' ? (
+             <TouchableOpacity style={[styles.button, { backgroundColor: config.color, marginTop: 10 }]} onPress={onConfirm || onClose}>
+                <Text style={styles.buttonText}>Great!</Text>
+             </TouchableOpacity>
           ) : null}
 
           {type === 'confirm' ? (
@@ -159,6 +161,7 @@ const styles = StyleSheet.create({
     flex: 1,
     marginHorizontal: 5,
     alignItems: 'center',
+    minWidth: 100,
   },
   cancelButton: {
     backgroundColor: '#E0E0E0',
