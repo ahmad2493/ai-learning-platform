@@ -56,9 +56,21 @@ async function saveTest(req, res) {
       user_id, status: 'unattempted', submitted_at: null,
       test_details, mcqs: mcqs || [], short_questions: short_questions || [], long_questions: long_questions || [],
     });
+
+    // Auto-submit if no MCQs — nothing to mark
+    if (!mcqs || mcqs.length === 0) {
+      newTest.status = 'attempted';
+      newTest.submitted_at = new Date();
+    }
+
     await newTest.save();
-    console.log(`[TEST SAVED] test_id=${newTest._id} user_id=${user_id}`);
-    return res.status(201).json({ success: true, message: 'Test saved successfully.', test_id: newTest._id.toString(), expires_at: test_details.expires_at });
+    console.log(`[TEST SAVED] test_id=${newTest._id} user_id=${user_id} status=${newTest.status}`);
+    return res.status(201).json({
+      success: true,
+      message: 'Test saved successfully.',
+      test_id: newTest._id.toString(),
+      expires_at: test_details.expires_at,
+    });
   } catch (error) {
     console.error('[SAVE TEST ERROR]', error);
     return res.status(500).json({ success: false, message: 'Server error while saving test.' });
@@ -90,4 +102,74 @@ async function getTestHistory(req, res) {
   }
 }
 
-module.exports = { saveTest, getTest, getTestHistory, submitTest };
+async function getDashboard(req, res) {
+  try {
+    const { user_id } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(user_id)) {
+      return res.status(400).json({ success: false, message: 'Invalid user_id format.' });
+    }
+
+    const userObjectId = new mongoose.Types.ObjectId(user_id);
+
+    // ── Progress data ─────────────────────────────────────────────
+    const Progress = require('../models/Progress');
+    const progressDoc = await Progress.findOne({ user_id });
+
+    const overall_progress   = progressDoc?.overall_progress?.toFixed(1) || 0;
+    const total_mcqs_seen    = progressDoc?.total_mcqs_seen || 0;
+    const total_mcqs_correct = progressDoc?.total_mcqs_correct || 0;
+    const accuracy_percentage = total_mcqs_seen > 0
+      ? ((total_mcqs_correct / total_mcqs_seen) * 100).toFixed(1)
+      : 0;
+
+    // ── Test stats ────────────────────────────────────────────────
+    const total_tests_generated = await Test.countDocuments({ user_id });
+    const total_tests_attempted = await Test.countDocuments({ user_id, status: 'attempted' });
+    const total_tests_expired   = await Test.countDocuments({ user_id, status: 'expired' });
+
+    // Average score across submitted tests
+    const submittedTests = await Test.find(
+      { user_id, status: 'attempted' },
+      { mcqs: 1 }
+    );
+
+    let average_score = 0;
+    if (submittedTests.length > 0) {
+      let score_sum = 0;
+      let valid_tests = 0;
+      for (const t of submittedTests) {
+        const total = t.mcqs.length;
+        if (total === 0) continue;
+        const correct = t.mcqs.filter(
+          m => m.student_answer && m.student_answer.toLowerCase() === m.correct_option.toLowerCase()
+        ).length;
+        score_sum += (correct / total) * 100;
+        valid_tests++;
+      }
+      average_score = valid_tests > 0 ? (score_sum / valid_tests).toFixed(1) : 0;
+    }
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        // CLO / Progress
+        overall_progress:    Number(overall_progress),
+        total_mcqs_seen,
+        total_mcqs_correct,
+        accuracy_percentage: Number(accuracy_percentage),
+
+        // Test stats
+        total_tests_generated,
+        total_tests_attempted,
+        total_tests_expired,
+        average_score:       Number(average_score)
+      },
+    });
+
+  } catch (error) {
+    console.error('[DASHBOARD ERROR]', error);
+    return res.status(500).json({ success: false, message: 'Server error while fetching dashboard.' });
+  }
+}
+
+module.exports = { saveTest, getTest, getTestHistory, submitTest, getDashboard };

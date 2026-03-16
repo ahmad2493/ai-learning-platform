@@ -1,6 +1,6 @@
 const Progress = require('../models/Progress');
 
-const K = 15;
+const K = 20;
 
 const CHAPTER_TOPIC_COUNTS = {
   "1": 13, "2": 13, "3": 10, "4": 13,
