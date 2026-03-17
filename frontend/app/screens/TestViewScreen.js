@@ -3,7 +3,7 @@
  * Author: Momna Butt (BCSF22M021)
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -24,7 +24,7 @@ export default function TestViewScreen({ navigation, route }) {
   const { userToken } = useAuth();
   
   const test = route.params?.generatedTest || {
-    test_id: null,
+    _id: null,
     test_details: { mode: "custom", duration_minutes: 30, expires_at: new Date(Date.now() + 30 * 60000).toISOString() },
     mcqs: [], short_questions: [], long_questions: []
   };
@@ -36,16 +36,16 @@ export default function TestViewScreen({ navigation, route }) {
   const [finalScore, setFinalScore] = useState(null);
   const [alertConfig, setAlertConfig] = useState({ visible: false, title: '', message: '', type: 'info' });
 
+  // Use a ref to track submission state to avoid closure issues in setInterval
+  const isSubmittingRef = useRef(false);
+
   const showAlert = (title, message, type = 'info', onConfirm = null) => {
     setAlertConfig({ visible: true, title, message, type, onConfirm });
   };
 
-  // Check if there are any MCQs
   const hasMcqs = test.mcqs && test.mcqs.length > 0;
-  // If no MCQs, it's essentially a "Read Mode" test
   const isReadMode = !hasMcqs;
 
-  // Function to calculate local score (needed for expiry and demo)
   const calculateLocalScore = useCallback(() => {
     let correct = 0;
     test.mcqs.forEach(q => {
@@ -60,88 +60,106 @@ export default function TestViewScreen({ navigation, route }) {
     };
   }, [test.mcqs, userAnswers]);
 
-  const handleSubmit = async (isAutoExpiry = false) => {
-    if (isSubmitted || loading || isReadMode) return;
+  const handleSubmit = useCallback(async (isAutoExpiry = false) => {
+    if (isSubmitted || loading || isReadMode || isSubmittingRef.current) return;
 
-    // If auto-expired and nothing was attempted, don't hit the server to save performance
-    const score = calculateLocalScore();
+    const mcqCount = test.mcqs.length;
     const attemptedCount = Object.keys(userAnswers).length;
+    const isAllAttempted = mcqCount > 0 && attemptedCount === mcqCount;
 
-    if (isAutoExpiry && attemptedCount === 0) {
+    // Unify submission logic for both Scenario A and Scenario B
+    isSubmittingRef.current = true;
+    setLoading(true);
+
+    try {
+      const score = calculateLocalScore();
+      
+      if (!test._id) {
+        // Handle Demo/Guest mode
         setFinalScore(score);
         setIsSubmitted(true);
-        showAlert("Time's Up!", "The test duration ended. Since no questions were attempted, it won't affect your performance.", "info");
+        showAlert("Success", "Test submitted successfully (Demo Mode).", "success");
         return;
-    }
+      }
 
-    if (!test.test_id) {
-      setFinalScore(score);
-      setIsSubmitted(true);
-      showAlert("Test Completed", "Marking complete. Check your results!", "success", () => {
-        navigation.navigate('TestResult', { test, userAnswers, score });
-      });
-      return;
-    }
-
-    setLoading(true);
-    try {
-      const response = await fetch(`${AI_SUBMIT_TEST_URL}/${test.test_id}/submit`, {
+      // Submit to backend in both scenarios
+      const response = await fetch(`${AI_SUBMIT_TEST_URL}/${test._id}/submit`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${userToken}` },
         body: JSON.stringify({ mcq_answers: userAnswers })
       });
 
       const result = await response.json();
+      
       if (response.ok && result.success) {
         setFinalScore(result.score);
         setIsSubmitted(true);
-        if (!isAutoExpiry) {
-            showAlert("Success", "Test submitted successfully!", "success", () => {
-                navigation.navigate('TestResult', { test, userAnswers, score: result.score });
-            });
-        } else {
-            showAlert("Time's Up!", "Test auto-submitted due to time limit.", "error");
+
+        // Scenario B: Incomplete & Late
+        if (isAutoExpiry && !isAllAttempted) {
+            showAlert(
+                "Test Expired", 
+                "Time ended before you could complete all questions.",
+                "error", 
+                () => { navigation.goBack(); }
+            );
+        } 
+        // Scenario A: Complete & Late (or Manual Submit)
+        else {
+            showAlert(
+                isAutoExpiry ? "Auto-Submitted" : "Success", 
+                isAutoExpiry ? "All questions were completed and auto-submitted upon time expiry." : "Test submitted successfully!", 
+                "success", 
+                () => { navigation.navigate('TestResult', { test, userAnswers, score: result.score }); }
+            );
         }
       } else {
-        showAlert("Submission Failed", result.message || "Failed to submit.", "error");
+        // If server says it expired (status: 'expired' returned from backend)
+        if (result.status === 'expired') {
+            setIsSubmitted(true);
+            showAlert("Expired", result.message || "Test time has expired.", "error", () => navigation.goBack());
+        } else {
+            showAlert("Error", result.message || "Failed to submit.", "error");
+        }
       }
     } catch (error) {
       console.error("Submit Error:", error);
       showAlert("Network Error", "Could not connect to server.", "error");
     } finally {
       setLoading(false);
+      isSubmittingRef.current = false;
     }
-  };
+  }, [isSubmitted, loading, isReadMode, test, userAnswers, userToken, calculateLocalScore, navigation]);
 
-  // 1. TIMER LOGIC
+  // TIMER LOGIC
   useEffect(() => {
     if (isSubmitted || isReadMode) return;
 
-    const calculateTimeLeft = () => {
+    const interval = setInterval(() => {
       const expiry = new Date(test.test_details.expires_at).getTime();
       const now = new Date().getTime();
-      const difference = Math.max(0, Math.floor((expiry - now) / 1000));
-      setTimeLeft(difference);
+      const diff = Math.max(0, Math.floor((expiry - now) / 1000));
+      
+      setTimeLeft(diff);
 
-      if (difference === 0 && !isSubmitted && !loading) {
+      if (diff === 0 && !isSubmitted && !loading && !isSubmittingRef.current) {
+        clearInterval(interval);
         handleSubmit(true);
       }
-    };
+    }, 1000);
 
-    calculateTimeLeft();
-    const timerId = setInterval(calculateTimeLeft, 1000);
-    return () => clearInterval(timerId);
+    return () => clearInterval(interval);
   }, [test.test_details.expires_at, isSubmitted, loading, isReadMode, handleSubmit]);
 
-  // 2. NAVIGATION BLOCKING
+  // Navigation Blocking
   useEffect(() => {
     const unsubscribe = navigation.addListener('beforeRemove', (e) => {
-      if (isSubmitted || isReadMode || (hasMcqs && timeLeft <= 0)) return;
+      if (isSubmitted || isReadMode || timeLeft <= 0) return;
       e.preventDefault();
-      showAlert('Discard Test?', 'Progress will be lost if you leave now.', 'confirm', () => navigation.dispatch(e.data.action));
+      showAlert('Exit Test?', 'Your progress will be lost but the timer will continue. You can return later if time remains.', 'confirm', () => navigation.dispatch(e.data.action));
     });
     return unsubscribe;
-  }, [navigation, isSubmitted, timeLeft, isReadMode, hasMcqs]);
+  }, [navigation, isSubmitted, timeLeft, isReadMode]);
 
   const allAttempted = hasMcqs && test.mcqs.every(q => userAnswers[q.question_number] !== undefined);
   const canSubmit = hasMcqs && allAttempted && timeLeft > 0 && !isSubmitted && !loading;
@@ -151,11 +169,6 @@ export default function TestViewScreen({ navigation, route }) {
     const secs = seconds % 60;
     return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
   };
-
-  // Helper to check if Short Questions exist
-  const hasShortQs = test.short_questions && (
-    Array.isArray(test.short_questions) ? test.short_questions.length > 0 : Object.keys(test.short_questions).length > 0
-  );
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
@@ -240,47 +253,16 @@ export default function TestViewScreen({ navigation, route }) {
           </View>
         )}
 
-        {hasShortQs && (
-          <View style={styles.section}>
-             <Text style={[styles.sectionTitle, { color: theme.primary }]}>Section II: Short Questions</Text>
-             {Array.isArray(test.short_questions) ? test.short_questions.map(q => (
-               <View key={q.question_number} style={[styles.card, { backgroundColor: theme.surface }]}><Text style={{ color: theme.text }}>{q.question_number}. {q.question}</Text></View>
-             )) : Object.keys(test.short_questions).map(key => (
-               <View key={key} style={{marginBottom: 10}}>
-                 <Text style={[styles.subSectionTitle, { color: theme.textSecondary }]}>Q {key.replace('Q','')}</Text>
-                 {test.short_questions[key].map(q => (
-                   <View key={q.question_number} style={[styles.card, { backgroundColor: theme.surface }]}><Text style={{ color: theme.text }}>({q.question_number}) {q.question}</Text></View>
-                 ))}
-               </View>
-             ))}
-          </View>
-        )}
-
-        {test.long_questions?.length > 0 && (
-          <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: theme.primary }]}>Section III: Long Questions</Text>
-            {test.long_questions.map(q => (
-              <View key={q.question_number} style={[styles.card, { backgroundColor: theme.surface }]}>
-                <Text style={[styles.qText, { color: theme.text }]}>Question {q.question_number}</Text>
-                <Text style={{ color: theme.textSecondary }}>(a) {q.part_a.question}</Text>
-                <Text style={{ color: theme.textSecondary, marginTop: 5 }}>(b) {q.part_b.question}</Text>
-              </View>
-            ))}
-          </View>
-        )}
-
-        {!isReadMode && !isSubmitted && (
+        {/* Short & Long Questions (Static View) */}
+        {!isSubmitted && (
           <TouchableOpacity disabled={!canSubmit} style={[styles.submitBtn, { backgroundColor: canSubmit ? theme.primary : theme.textSecondary }]} onPress={() => handleSubmit(false)}>
             {loading ? <ActivityIndicator color="white" /> : <Text style={styles.btnText}>{allAttempted ? "Finish & Submit" : "Complete all MCQs to Submit"}</Text>}
           </TouchableOpacity>
         )}
 
-        {(isSubmitted || isReadMode) && (
-          <TouchableOpacity 
-            style={[styles.submitBtn, { backgroundColor: theme.primary }]} 
-            onPress={() => isReadMode ? navigation.goBack() : navigation.navigate('TestResult', { test, userAnswers, score: finalScore })}
-          >
-            <Text style={styles.btnText}>{isReadMode ? "Back to History" : "View Detailed Review"}</Text>
+        {isSubmitted && (
+          <TouchableOpacity style={[styles.submitBtn, { backgroundColor: theme.primary }]} onPress={() => navigation.navigate('TestResult', { test, userAnswers, score: finalScore })}>
+            <Text style={styles.btnText}>View Detailed Review</Text>
           </TouchableOpacity>
         )}
       </ScrollView>
@@ -300,7 +282,6 @@ const styles = StyleSheet.create({
   testTitle: { fontSize: 20, fontWeight: 'bold', textAlign: 'center', marginBottom: 20 },
   section: { marginBottom: 30 },
   sectionTitle: { fontSize: 16, fontWeight: 'bold', marginBottom: 15 },
-  subSectionTitle: { fontSize: 14, fontWeight: 'bold', marginBottom: 10, marginLeft: 5 },
   card: { padding: 15, borderRadius: 12, marginBottom: 15, elevation: 2 },
   qText: { fontSize: 16, fontWeight: '600', marginBottom: 15 },
   option: { padding: 12, borderWidth: 1, borderRadius: 8, marginBottom: 8 },

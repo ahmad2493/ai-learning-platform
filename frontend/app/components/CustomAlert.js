@@ -11,106 +11,139 @@ import {
   TouchableOpacity,
   Modal,
   Animated,
+  Dimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+
 const CustomAlert = ({ visible, title, message, type, onClose, onConfirm }) => {
   const scaleAnim = useRef(new Animated.Value(0)).current;
+  const opacityAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     if (visible) {
-      Animated.spring(scaleAnim, {
-        toValue: 1,
-        friction: 6,
-        useNativeDriver: true,
-      }).start();
+      Animated.parallel([
+        Animated.spring(scaleAnim, {
+          toValue: 1,
+          friction: 7,
+          tension: 40,
+          useNativeDriver: true,
+        }),
+        Animated.timing(opacityAnim, {
+          toValue: 1,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+      ]).start();
 
-      // Auto-close only for success type
-      if (type === 'success') {
+      // Auto-close logic for success type (optional, keep it flexible)
+      if (type === 'success' && !onConfirm) {
         const timer = setTimeout(() => {
-          // If onConfirm is provided for success, trigger it (usually for navigation)
-          if (onConfirm) {
-            onConfirm();
-          }
           onClose();
-        }, 2200);
+        }, 2500);
         return () => clearTimeout(timer);
       }
     } else {
-      Animated.timing(scaleAnim, {
-        toValue: 0,
-        duration: 200,
-        useNativeDriver: true,
-      }).start();
+      Animated.parallel([
+        Animated.timing(scaleAnim, {
+          toValue: 0,
+          duration: 150,
+          useNativeDriver: true,
+        }),
+        Animated.timing(opacityAnim, {
+          toValue: 0,
+          duration: 150,
+          useNativeDriver: true,
+        }),
+      ]).start();
     }
-  }, [visible, type, onClose, onConfirm, scaleAnim]);
+  }, [visible, type, onClose, onConfirm, scaleAnim, opacityAnim]);
 
   if (!visible) return null;
 
   const alertConfig = {
     success: {
-      icon: 'checkmark-done-circle',
+      icon: 'checkmark-circle',
       color: '#4CAF50',
-      size: 50,
+      buttonText: 'Great!',
     },
     error: {
-      icon: 'alert-circle-outline',
+      icon: 'close-circle',
       color: '#F44336',
-      size: 40,
+      buttonText: 'Try Again',
     },
     confirm: {
-      icon: 'help-circle-outline',
+      icon: 'help-circle',
       color: '#FF9800',
-      size: 40,
+      buttonText: 'Confirm',
     },
     info: {
-      icon: 'information-circle-outline',
+      icon: 'information-circle',
       color: '#2196F3',
-      size: 40,
+      buttonText: 'Got it',
     },
+    warning: {
+      icon: 'alert-circle',
+      color: '#FFC107',
+      buttonText: 'OK',
+    }
   };
 
-  const config = alertConfig[type] || alertConfig.error;
+  const config = alertConfig[type] || alertConfig.info;
 
   return (
     <Modal
       transparent={true}
-      animationType="fade"
+      animationType="none"
       visible={visible}
       onRequestClose={onClose}
     >
-      <View style={styles.overlay}>
+      <Animated.View style={[styles.overlay, { opacity: opacityAnim }]}>
         <Animated.View style={[styles.alertBox, { transform: [{ scale: scaleAnim }] }]}>
-          <Ionicons name={config.icon} size={config.size} color={config.color} style={{ marginBottom: 15 }} />
-          <Text style={styles.title}>{title}</Text>
+          <View style={[styles.iconContainer, { backgroundColor: config.color + '15' }]}>
+            <Ionicons name={config.icon} size={50} color={config.color} />
+          </View>
           
-          {message && <Text style={styles.message}>{message}</Text>}
+          <Text style={[styles.title, { color: '#333' }]}>{title}</Text>
+          {message ? <Text style={styles.message}>{message}</Text> : null}
 
-          {(type === 'error' || type === 'info') ? (
-            <TouchableOpacity style={[styles.button, { backgroundColor: config.color }]} onPress={onClose}>
-              <Text style={styles.buttonText}>OK</Text>
-            </TouchableOpacity>
-          ) : null}
-
-          {type === 'success' ? (
-             <TouchableOpacity style={[styles.button, { backgroundColor: config.color, marginTop: 10 }]} onPress={onConfirm || onClose}>
-                <Text style={styles.buttonText}>Great!</Text>
-             </TouchableOpacity>
-          ) : null}
-
-          {type === 'confirm' ? (
-            <View style={styles.buttonContainer}>
-              <TouchableOpacity style={[styles.button, styles.cancelButton]} onPress={onClose}>
-                <Text style={styles.cancelButtonText}>Cancel</Text>
+          <View style={styles.buttonWrapper}>
+            {type === 'confirm' ? (
+              <View style={styles.rowButtons}>
+                <TouchableOpacity 
+                  style={[styles.button, styles.cancelButton]} 
+                  onPress={onClose}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.cancelButtonText}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  style={[styles.button, { backgroundColor: config.color }]} 
+                  onPress={() => {
+                    if (onConfirm) onConfirm();
+                    onClose();
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.buttonText}>{config.buttonText}</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <TouchableOpacity 
+                style={[styles.button, { backgroundColor: config.color, width: '100%' }]} 
+                onPress={() => {
+                  if (onConfirm) onConfirm();
+                  onClose();
+                }}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.buttonText}>{config.buttonText}</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={[styles.button, { backgroundColor: config.color }]} onPress={onConfirm}>
-                <Text style={styles.buttonText}>Confirm</Text>
-              </TouchableOpacity>
-            </View>
-          ) : null}
-
+            )}
+          </View>
         </Animated.View>
-      </View>
+      </Animated.View>
     </Modal>
   );
 };
@@ -118,63 +151,74 @@ const CustomAlert = ({ visible, title, message, type, onClose, onConfirm }) => {
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
   },
   alertBox: {
-    width: '100%',
-    maxWidth: 320,
+    width: SCREEN_WIDTH * 0.85,
+    maxWidth: 340,
     backgroundColor: 'white',
-    borderRadius: 20,
+    borderRadius: 25,
     padding: 25,
     alignItems: 'center',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 5 },
-    shadowOpacity: 0.3,
-    shadowRadius: 10,
-    elevation: 10,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.25,
+    shadowRadius: 15,
+    elevation: 15,
+  },
+  iconContainer: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 20,
   },
   title: {
     fontSize: 22,
     fontWeight: 'bold',
     textAlign: 'center',
-    color: '#333',
+    marginBottom: 10,
   },
   message: {
     fontSize: 16,
     textAlign: 'center',
-    marginVertical: 10,
     color: '#666',
     lineHeight: 22,
+    marginBottom: 25,
   },
-  buttonContainer: {
-    flexDirection: 'row',
-    marginTop: 20,
-    justifyContent: 'space-between',
+  buttonWrapper: {
     width: '100%',
   },
-  button: {
-    borderRadius: 12,
-    paddingVertical: 12,
-    flex: 1,
-    marginHorizontal: 5,
-    alignItems: 'center',
-    minWidth: 100,
+  rowButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 12,
   },
-  cancelButton: {
-    backgroundColor: '#E0E0E0',
+  button: {
+    height: 55,
+    borderRadius: 15,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 20,
   },
   buttonText: {
     color: 'white',
-    fontSize: 16,
+    fontSize: 17,
     fontWeight: 'bold',
   },
+  cancelButton: {
+    flex: 1,
+    backgroundColor: '#F5F5F5',
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+  },
   cancelButtonText: {
-    color: '#333',
-    fontSize: 16,
-    fontWeight: 'bold',
+    color: '#666',
+    fontSize: 17,
+    fontWeight: '600',
   },
 });
 

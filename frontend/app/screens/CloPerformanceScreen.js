@@ -50,7 +50,7 @@ const ChapterDetails = ({ chapterId, chapterData, theme }) => {
                 </Text>
                 <Text style={{color: theme.primary, fontWeight: 'bold'}}>{Math.round(chapterData.progress || 0)}%</Text>
             </TouchableOpacity>
-            
+
             {expanded && (
                 <View style={styles.topicsWrapper}>
                     {topics.length > 0 ? topics.map(([topicId, topic]) => (
@@ -98,7 +98,7 @@ export default function CloPerformanceScreen({ navigation }) {
     }
 
     if (!isRefreshing) setLoading(true);
-    
+
     try {
       console.log(`📊 [CLO] Calling API: ${AI_PROGRESS_URL}/${currentUserId}`);
       const response = await fetch(`${AI_PROGRESS_URL}/${currentUserId}`, {
@@ -107,7 +107,7 @@ export default function CloPerformanceScreen({ navigation }) {
           'Accept': 'application/json'
         }
       });
-      
+
       const result = await response.json();
 
       if (response.ok && result.success) {
@@ -154,8 +154,8 @@ export default function CloPerformanceScreen({ navigation }) {
   const toggleSidebar = () => setSidebarVisible(!sidebarVisible);
 
   const chapters = progressData?.chapters ? Object.entries(progressData.chapters) : [];
-  const filteredChapters = chapters.filter(([id, data]) => 
-    data.chapter_name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+  const filteredChapters = chapters.filter(([id, data]) =>
+    data.chapter_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     id.includes(searchQuery)
   );
 
@@ -172,7 +172,7 @@ export default function CloPerformanceScreen({ navigation }) {
             </TouchableOpacity>
         </View>
 
-        <ScrollView 
+        <ScrollView
             contentContainerStyle={styles.scrollContent}
             refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[theme.primary]} tintColor={theme.primary} />}
         >
@@ -194,9 +194,9 @@ export default function CloPerformanceScreen({ navigation }) {
 
              <View style={[styles.searchContainer, {backgroundColor: theme.surface}]}>
                 <Ionicons name="search-outline" size={22} color="#888" />
-                <TextInput 
-                    style={{flex:1, marginLeft: 10, color: theme.text}} 
-                    placeholder="Search chapters..." 
+                <TextInput
+                    style={{flex:1, marginLeft: 10, color: theme.text}}
+                    placeholder="Search chapters..."
                     placeholderTextColor="#888"
                     value={searchQuery}
                     onChangeText={setSearchQuery}
@@ -250,15 +250,15 @@ export default function CloPerformanceScreen({ navigation }) {
 
         </ScrollView>
       </View>
-      
-      <CustomAlert 
-        visible={alertConfig.visible} 
-        title={alertConfig.title} 
-        message={alertConfig.message} 
-        type={alertConfig.type} 
-        onClose={() => setAlertConfig({ ...alertConfig, visible: false })} 
+
+      <CustomAlert
+        visible={alertConfig.visible}
+        title={alertConfig.title}
+        message={alertConfig.message}
+        type={alertConfig.type}
+        onClose={() => setAlertConfig({ ...alertConfig, visible: false })}
       />
-      
+
       <Sidebar isVisible={sidebarVisible} onClose={toggleSidebar} activeScreen="CloPerformance" />
     </SafeAreaView>
   );

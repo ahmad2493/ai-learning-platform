@@ -31,7 +31,6 @@ import CustomAlert from '../components/CustomAlert';
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const CARD_WIDTH = SCREEN_WIDTH * 0.9;
 
-// Mock Data for Subjects
 const SUBJECTS = [
   { id: '1', name: 'Physics', icon: 'flash' },
   { id: '2', name: 'Chemistry', icon: 'flask' },
@@ -201,47 +200,33 @@ const initialState = {
 
 function reducer(state, action) {
   switch (action.type) {
-    case 'SET_STEP':
-      return { ...state, step: action.payload };
-    case 'SELECT_SUBJECT':
-      return { ...state, selectedSubject: action.payload, step: 1 };
+    case 'SET_STEP': return { ...state, step: action.payload };
+    case 'SELECT_SUBJECT': return { ...state, selectedSubject: action.payload, step: 1 };
     case 'TOGGLE_TOPIC': {
       const { chapterId, topicId } = action.payload;
       const currentTopics = state.selectedContent[chapterId] || [];
-      const newTopics = currentTopics.includes(topicId)
-        ? currentTopics.filter(id => id !== topicId)
-        : [...currentTopics, topicId];
-      return {
-        ...state,
-        selectedContent: { ...state.selectedContent, [chapterId]: newTopics }
-      };
+      const newTopics = currentTopics.includes(topicId) ? currentTopics.filter(id => id !== topicId) : [...currentTopics, topicId];
+      return { ...state, selectedContent: { ...state.selectedContent, [chapterId]: newTopics } };
     }
     case 'TOGGLE_CHAPTER': {
       const { chapterId, allTopicIds } = action.payload;
       const isSelected = state.selectedContent[chapterId]?.length === allTopicIds.length;
-      return {
-        ...state,
-        selectedContent: {
-          ...state.selectedContent,
-          [chapterId]: isSelected ? [] : [...allTopicIds]
-        }
-      };
+      return { ...state, selectedContent: { ...state.selectedContent, [chapterId]: isSelected ? [] : [...allTopicIds] } };
     }
-    case 'SET_PATTERN':
-      return { ...state, pattern: action.payload };
+    case 'SET_PATTERN': return { ...state, pattern: action.payload };
     case 'UPDATE_CUSTOM_CONFIG': {
-      let qty = action.payload.quantity;
-      let isSelected = action.payload.selected;
+      const { key, payload } = action;
+      let { quantity, selected } = payload;
       
-      const currentConfig = state.customConfig[action.key];
-      const nextSelected = isSelected !== undefined ? isSelected : currentConfig.selected;
-      let nextQty = qty !== undefined ? qty : currentConfig.quantity;
+      const currentConfig = state.customConfig[key];
+      const nextSelected = selected !== undefined ? selected : currentConfig.selected;
+      let nextQty = quantity !== undefined ? quantity : currentConfig.quantity;
 
-      if (isSelected === true && nextQty === 0) nextQty = 1;
+      if (selected === true && nextQty === 0) nextQty = 1;
 
-      if (action.key === 'mcqs' || action.key === 'short') {
+      if (key === 'mcqs' || key === 'short') {
         nextQty = Math.max(0, Math.min(20, nextQty));
-      } else if (action.key === 'long') {
+      } else if (key === 'long') {
         nextQty = Math.max(0, Math.min(4, nextQty));
       }
 
@@ -249,26 +234,19 @@ function reducer(state, action) {
         ...state,
         customConfig: {
           ...state.customConfig,
-          [action.key]: { ...currentConfig, selected: nextSelected, quantity: nextQty }
+          [key]: { ...currentConfig, selected: nextSelected, quantity: nextQty }
         }
       };
     }
-    case 'SET_LOADING':
-      return { ...state, loading: action.payload };
-    case 'RESET':
-      return initialState;
-    default:
-      return state;
+    case 'SET_LOADING': return { ...state, loading: action.payload };
+    case 'RESET': return initialState;
+    default: return state;
   }
 }
 
 const Checkbox = ({ selected, onPress, label, theme }) => (
   <TouchableOpacity style={styles.checkboxRow} onPress={onPress}>
-    <Ionicons
-      name={selected ? "checkbox" : "square-outline"}
-      size={22}
-      color={theme.primary}
-    />
+    <Ionicons name={selected ? "checkbox" : "square-outline"} size={22} color={theme.primary} />
     {label && <Text style={[styles.checkboxLabel, { color: theme.text }]}>{label}</Text>}
   </TouchableOpacity>
 );
@@ -277,32 +255,20 @@ const ChapterItem = ({ chapter, state, dispatch, theme }) => {
   const [expanded, setExpanded] = useState(false);
   const selectedTopics = state.selectedContent[chapter.id] || [];
   const isAllSelected = selectedTopics.length === chapter.topics.length;
-
   return (
     <View style={styles.chapterContainer}>
       <View style={styles.chapterHeader}>
-        <Checkbox
-          selected={isAllSelected}
-          onPress={() => dispatch({ type: 'TOGGLE_CHAPTER', payload: { chapterId: chapter.id, allTopicIds: chapter.topics.map(t => t.id) } })}
-          theme={theme}
-        />
+        <Checkbox selected={isAllSelected} onPress={() => dispatch({ type: 'TOGGLE_CHAPTER', payload: { chapterId: chapter.id, allTopicIds: chapter.topics.map(t => t.id) } })} theme={theme} />
         <TouchableOpacity style={{ flex: 1, marginLeft: 10 }} onPress={() => setExpanded(!expanded)}>
           <Text style={[styles.chapterTitle, { color: theme.text }]}>{chapter.title}</Text>
         </TouchableOpacity>
-        <TouchableOpacity onPress={() => setExpanded(!expanded)}>
-          <Ionicons name={expanded ? "chevron-up" : "chevron-down"} size={20} color={theme.textSecondary} />
-        </TouchableOpacity>
+        <TouchableOpacity onPress={() => setExpanded(!expanded)}><Ionicons name={expanded ? "chevron-up" : "chevron-down"} size={20} color={theme.textSecondary} /></TouchableOpacity>
       </View>
       {expanded && (
         <View style={styles.topicsList}>
           {chapter.topics.map(topic => (
             <View key={topic.id} style={styles.topicRow}>
-              <Checkbox
-                selected={selectedTopics.includes(topic.id)}
-                onPress={() => dispatch({ type: 'TOGGLE_TOPIC', payload: { chapterId: chapter.id, topicId: topic.id } })}
-                label={topic.title}
-                theme={theme}
-              />
+              <Checkbox selected={selectedTopics.includes(topic.id)} onPress={() => dispatch({ type: 'TOGGLE_TOPIC', payload: { chapterId: chapter.id, topicId: topic.id } })} label={topic.title} theme={theme} />
             </View>
           ))}
         </View>
@@ -319,125 +285,32 @@ export default function TestGeneratorScreen({ navigation }) {
   const slideAnim = useRef(new Animated.Value(0)).current;
   const pulseAnim = useRef(new Animated.Value(1)).current;
 
-  // Real History State
   const [history, setHistory] = useState([]);
   const [historyLoading, setHistoryLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-
-  // Custom Alert State
   const [alertConfig, setAlertConfig] = useState({ visible: false, title: '', message: '', type: 'error' });
 
   const fetchHistory = useCallback(async () => {
     const userId = user?._id || user?.userId || user?.id;
     if (!userId) return;
-
     try {
-      const response = await fetch(`${AI_TEST_HISTORY_URL}/${userId}`, {
-        headers: { 'Authorization': `Bearer ${userToken}` }
-      });
+      const response = await fetch(`${AI_TEST_HISTORY_URL}/${userId}`, { headers: { 'Authorization': `Bearer ${userToken}` } });
       const result = await response.json();
-      if (response.ok && result.success) {
-        setHistory(result.data);
-      }
-    } catch (error) {
-      console.error("❌ [HISTORY] Error:", error);
-    } finally {
-      setHistoryLoading(false);
-      setRefreshing(false);
-    }
+      if (response.ok && result.success) setHistory(result.data);
+    } catch (error) { console.error("❌ [HISTORY] Error:", error); }
+    finally { setHistoryLoading(false); setRefreshing(false); }
   }, [user, userToken]);
 
-  useEffect(() => {
-    fetchHistory();
-  }, [fetchHistory]);
-
-  const onRefresh = () => {
-    setRefreshing(true);
-    fetchHistory();
-  };
-
-  const handleViewTest = async (testId, status) => {
-    dispatch({ type: 'SET_LOADING', payload: true });
-    try {
-      const response = await fetch(`${AI_SUBMIT_TEST_URL}/${testId}`, {
-        headers: { 'Authorization': `Bearer ${userToken}` }
-      });
-      const result = await response.json();
-      
-      if (response.ok && result.success) {
-        const fullTest = result.data;
-        if (status === 'attempted') {
-          // Reconstruct user answers and calculate score from test data
-          const userAnswers = {};
-          let correct = 0;
-          fullTest.mcqs.forEach(q => {
-            if (q.student_answer) userAnswers[q.question_number] = q.student_answer;
-            if (q.student_answer?.toLowerCase() === q.correct_option?.toLowerCase()) correct++;
-          });
-          
-          const score = {
-            correct,
-            total: fullTest.mcqs.length,
-            percentage: fullTest.mcqs.length > 0 ? ((correct / fullTest.mcqs.length) * 100).toFixed(1) : 0
-          };
-
-          navigation.navigate('TestResult', { test: fullTest, userAnswers, score });
-        } else {
-          navigation.navigate('TestViewScreen', { generatedTest: fullTest });
-        }
-      } else {
-        showAlert("Error", "Failed to fetch test details.");
-      }
-    } catch (error) {
-      console.error("❌ [VIEW TEST] Error:", error);
-      showAlert("Error", "Network error while fetching test.");
-    } finally {
-      dispatch({ type: 'SET_LOADING', payload: false });
-    }
-  };
-
-  useEffect(() => {
-    if (state.loading) {
-      Animated.loop(
-        Animated.sequence([
-          Animated.timing(pulseAnim, { toValue: 1.2, duration: 800, useNativeDriver: true }),
-          Animated.timing(pulseAnim, { toValue: 1, duration: 800, useNativeDriver: true }),
-        ])
-      ).start();
-    } else {
-      pulseAnim.setValue(1);
-    }
-  }, [state.loading]);
-
-  const toggleSidebar = () => setSidebarVisible(!sidebarVisible);
+  useEffect(() => { fetchHistory(); }, [fetchHistory]);
 
   const showAlert = (title, message, type = 'error', onConfirm = null) => {
     setAlertConfig({ visible: true, title, message, type, onConfirm });
   };
 
-  const closeAlert = () => setAlertConfig({ ...alertConfig, visible: false });
-
-  const goToStep2 = () => {
-    Animated.timing(slideAnim, { toValue: -CARD_WIDTH, duration: 300, useNativeDriver: true }).start(() => dispatch({ type: 'SET_STEP', payload: 2 }));
-  };
-
-  const goBackToStep1 = () => {
-    Animated.timing(slideAnim, { toValue: 0, duration: 300, useNativeDriver: true }).start(() => dispatch({ type: 'SET_STEP', payload: 1 }));
-  };
-
-  const handleCancel = () => {
-    slideAnim.setValue(0);
-    dispatch({ type: 'SET_STEP', payload: 0 });
-  };
-
   const navigateWithDemo = () => {
-    closeAlert();
+    setAlertConfig({ ...alertConfig, visible: false });
     const demoData = {
-      test_details: {
-        mode: "custom",
-        duration_minutes: 30,
-        expires_at: new Date(Date.now() + 30 * 60000).toISOString(),
-      },
+      test_details: { mode: "custom", duration_minutes: 30, expires_at: new Date(Date.now() + 30 * 60000).toISOString() },
       mcqs: [
         { question_number: 1, question: "Which is a base quantity?", options: { a: "Velocity", b: "Length", c: "Force", d: "Area" }, correct_option: "b" },
         { question_number: 2, question: "The study of motion without considering its cause is:", options: { a: "Dynamics", b: "Kinematics", c: "Statics", d: "Mechanics" }, correct_option: "b" },
@@ -446,17 +319,48 @@ export default function TestGeneratorScreen({ navigation }) {
       long_questions: [{ question_number: 4, part_a: { marks: 4, question: "Describe characteristics of gravitational force." }, part_b: { marks: 5, question: "A body weighs 20N. Find its mass." } }]
     };
     navigation.navigate('TestViewScreen', { generatedTest: demoData });
-    dispatch({ type: 'SET_STEP', payload: 0 });
+    dispatch({ type: 'RESET' });
+    slideAnim.setValue(0);
+  };
+
+  const handleViewTest = async (testId, currentStatus, expiresAt) => {
+    const now = new Date();
+    const expires = new Date(expiresAt);
+    const isExpiredLocally = currentStatus === 'unattempted' && now > expires;
+
+    dispatch({ type: 'SET_LOADING', payload: true });
+    try {
+      const response = await fetch(`${AI_SUBMIT_TEST_URL}/${testId}`, { headers: { 'Authorization': `Bearer ${userToken}` } });
+      const result = await response.json();
+      if (response.ok && result.success) {
+        const fullTest = result.data;
+        if (fullTest.status === 'attempted' || isExpiredLocally || fullTest.status === 'expired') {
+          const userAnswers = {};
+          let correct = 0;
+          fullTest.mcqs.forEach(q => {
+            if (q.student_answer) userAnswers[q.question_number] = q.student_answer;
+            if (q.student_answer?.toLowerCase() === q.correct_option?.toLowerCase()) correct++;
+          });
+          const score = { 
+            correct, 
+            total: fullTest.mcqs.length, 
+            percentage: fullTest.mcqs.length > 0 ? ((correct / fullTest.mcqs.length) * 100).toFixed(1) : 0 
+          };
+          navigation.navigate('TestResult', { test: fullTest, userAnswers, score });
+        } else {
+          navigation.navigate('TestViewScreen', { generatedTest: fullTest });
+        }
+      } else { showAlert("Error", "Failed to fetch test details."); }
+    } catch (error) { showAlert("Error", "Network error."); }
+    finally { dispatch({ type: 'SET_LOADING', payload: false }); }
   };
 
   const handleGenerateTest = async () => {
     if (state.loading) return;
     dispatch({ type: 'SET_LOADING', payload: true });
-
     try {
       const full_chapters = [];
       const topic_selections = [];
-
       Object.keys(state.selectedContent).forEach(chId => {
         const selectedTopicIds = state.selectedContent[chId];
         const chapterData = CONTENT_DATA['1']?.find(c => c.id === chId);
@@ -478,7 +382,6 @@ export default function TestGeneratorScreen({ navigation }) {
           }
         }
       });
-
       const payload = {
         mode: state.pattern,
         mcq_count: state.pattern === 'board' ? 0 : (state.customConfig.mcqs.selected ? state.customConfig.mcqs.quantity : 0),
@@ -487,89 +390,75 @@ export default function TestGeneratorScreen({ navigation }) {
         full_chapters: full_chapters,
         topic_selections: topic_selections
       };
-
       const response = await fetch(AI_GENERATE_TEST_URL, {
         method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${userToken}`
-        },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${userToken}` },
         body: JSON.stringify(payload),
       });
-
       const result = await response.json();
-
       if (response.ok) {
         navigation.navigate('TestViewScreen', { generatedTest: result });
         dispatch({ type: 'RESET' });
         slideAnim.setValue(0);
-        fetchHistory(); // Refresh history after generation
-      } else {
-        showAlert("Generation Failed", result.error || "The AI service encountered an error.", "confirm", navigateWithDemo);
-      }
-    } catch (error) {
-      showAlert("Connection Error", "Cannot reach server. Use sample data instead?", "confirm", navigateWithDemo);
-    } finally {
-      dispatch({ type: 'SET_LOADING', payload: false });
+        fetchHistory();
+      } else { showAlert("Generation Failed", result.error || "AI service error.", "confirm", navigateWithDemo); }
+    } catch (error) { showAlert("Connection Error", "Cannot reach server. Use sample data instead?", "confirm", navigateWithDemo); }
+    finally { dispatch({ type: 'SET_LOADING', payload: false }); }
+  };
+
+  const renderHistoryItem = ({ item }) => {
+    const now = new Date();
+    const expiresAt = new Date(item.test_details.expires_at);
+    const isExpired = item.status === 'unattempted' && now > expiresAt;
+    const displayStatus = isExpired ? 'expired' : item.status;
+
+    let title = "Physics Test";
+    const { selected_chapters, selected_topics } = item.test_details;
+    if (selected_chapters?.length > 0) {
+        const names = selected_chapters.map(c => c.chapter_name.split(':').pop().trim());
+        title = selected_chapters.length === 1 ? `Full Chapter: ${names[0]}` : `Chapters: ${names.join(', ')}`;
+    } else if (selected_topics?.length > 0) {
+        const names = selected_topics.map(t => t.topic_name);
+        title = names.length > 2 ? `Topics: ${names.slice(0, 2).join(', ')}...` : `Topics: ${names.join(', ')}`;
     }
+
+    const stats = [];
+    if (item.test_details.mcq_count > 0) stats.push(`${item.test_details.mcq_count} MCQs`);
+    if (item.test_details.short_count > 0) stats.push(`${item.test_details.short_count} SQs`);
+    if (item.test_details.long_count > 0) stats.push(`${item.test_details.long_count} LQs`);
+    const details = stats.join(' | ') + ` | ${item.test_details.mode.toUpperCase()}`;
+    const date = new Date(item.created_at).toLocaleDateString();
+    const statusColor = displayStatus === 'attempted' ? '#4CAF50' : displayStatus === 'expired' ? '#F44336' : '#FF9800';
+
+    return (
+      <TouchableOpacity 
+        style={[styles.recentCard, { backgroundColor: theme.surface }]}
+        onPress={() => handleViewTest(item._id, item.status, item.test_details.expires_at)}
+      >
+        <View style={{ flex: 1 }}>
+          <Text style={[styles.recentTitle, { color: theme.text }]} numberOfLines={1}>{title}</Text>
+          
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 }}>
+             <Text style={[styles.recentDetails, { color: theme.textSecondary, flex: 1 }]} numberOfLines={1}>{details}</Text>
+             <View style={[styles.statusBadge, { backgroundColor: statusColor + '20', marginLeft: 10 }]}>
+                <Text style={[styles.statusText, { color: statusColor }]}>{displayStatus.toUpperCase()}</Text>
+             </View>
+          </View>
+
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 6 }}>
+            <Text style={[styles.recentTime, { color: theme.textSecondary }]}>{date}</Text>
+            <Ionicons name={displayStatus === 'attempted' || displayStatus === 'expired' ? "eye-outline" : "play-outline"} size={20} color={theme.primary} />
+          </View>
+        </View>
+      </TouchableOpacity>
+    );
   };
 
   const isContentSelected = Object.values(state.selectedContent).some(topics => topics.length > 0);
   const isAtLeastOneTypeSelected = (state.customConfig.mcqs.selected && state.customConfig.mcqs.quantity > 0) || 
                                    (state.customConfig.short.selected && state.customConfig.short.quantity > 0) || 
                                    (state.customConfig.long.selected && state.customConfig.long.quantity > 0);
-  
   const isGenerateEnabled = state.pattern === 'board' || (state.pattern === 'custom' && isAtLeastOneTypeSelected);
-
-  const renderHistoryItem = ({ item }) => {
-    // Better Recognized Title
-    let title = "Physics Test";
-    if (item.test_details.selected_chapters && item.test_details.selected_chapters.length > 0) {
-      title = item.test_details.selected_chapters.map(c => c.chapter_name.split(':').pop().trim()).join(', ');
-    } else if (item.test_details.selected_topics && item.test_details.selected_topics.length > 0) {
-      // Show first few topics
-      const topicNames = item.test_details.selected_topics.map(t => t.topic_name);
-      title = topicNames.length > 2 ? `${topicNames.slice(0, 2).join(', ')}...` : topicNames.join(', ');
-    }
-
-    const mcqCount = item.test_details.mcq_count || 0;
-    const shortCount = item.test_details.short_count || 0;
-    const longCount = item.test_details.long_count || 0;
-    
-    let stats = [];
-    if (mcqCount > 0) stats.push(`${mcqCount} MCQs`);
-    if (shortCount > 0) stats.push(`${shortCount} SQs`);
-    if (longCount > 0) stats.push(`${longCount} LQs`);
-    
-    const details = stats.join(' | ') + ` | ${item.test_details.mode.toUpperCase()}`;
-    const date = new Date(item.created_at).toLocaleDateString();
-    const statusColor = item.status === 'attempted' ? '#4CAF50' : item.status === 'expired' ? '#F44336' : '#FF9800';
-
-    return (
-      <TouchableOpacity 
-        style={[styles.recentCard, { backgroundColor: theme.surface }]}
-        onPress={() => handleViewTest(item._id, item.status)}
-      >
-        <View style={{ flex: 1 }}>
-          <View style={{flexDirection: 'row', alignItems: 'center', gap: 8}}>
-             <Text style={[styles.recentTitle, { color: theme.text }]} numberOfLines={1}>{title}</Text>
-             <View style={[styles.statusBadge, { backgroundColor: statusColor + '20' }]}>
-                <Text style={[styles.statusText, { color: statusColor }]}>{item.status.toUpperCase()}</Text>
-             </View>
-          </View>
-          <Text style={[styles.recentDetails, { color: theme.textSecondary }]}>{details}</Text>
-          <Text style={[styles.recentTime, { color: theme.textSecondary }]}>{date}</Text>
-        </View>
-        <View style={styles.actionIcon}>
-          <Ionicons 
-            name={item.status === 'attempted' ? "eye-outline" : item.status === 'expired' ? "lock-closed-outline" : "play-outline"} 
-            size={22} 
-            color={theme.primary} 
-          />
-        </View>
-      </TouchableOpacity>
-    );
-  };
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
@@ -579,156 +468,107 @@ export default function TestGeneratorScreen({ navigation }) {
             <Ionicons name="book" size={30} color={theme.primary} style={styles.logo} />
             <Text style={[styles.headerTitle, { color: theme.text }]}>DarsGah</Text>
           </View>
-          <TouchableOpacity onPress={toggleSidebar}><Ionicons name="menu" size={24} color={theme.primary} /></TouchableOpacity>
+          <TouchableOpacity onPress={() => setSidebarVisible(true)}><Ionicons name="menu" size={24} color={theme.primary} /></TouchableOpacity>
         </View>
-
-        <ScrollView 
-            contentContainerStyle={styles.scrollContent}
-            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[theme.primary]} />}
-        >
+        <ScrollView contentContainerStyle={styles.scrollContent} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={fetchHistory} colors={[theme.primary]} />}>
           <Text style={[styles.mainTitle, { color: theme.text }]}>Test Generator</Text>
-          <Text style={[styles.subtitle, { color: theme.textSecondary }]}>Create customized tests for any subject and topic</Text>
-
+          <Text style={[styles.subtitle, { color: theme.textSecondary }]}>Create customized tests based on 9th Punjab board Physics Curriculum </Text>
+          
           <View style={[styles.mainCard, {backgroundColor: theme.primary}]}>
             <View style={{flex: 1}}>
-              <Text style={styles.mainCardTitle}>Generate custom tests in seconds</Text>
-              <Text style={styles.mainCardText}>AI-powered generation for any subject or topic.</Text>
+                <Text style={styles.mainCardTitle}>Generate Physics board pattern oriented and custom tests in seconds</Text>
+                <Text style={styles.mainCardText}>AI-powered test generation including MCQs, Short Questions and Long Questions for any chapter or topic.</Text>
             </View>
-            <Ionicons name="document-text-outline" size={40} color="#FFFFFF" style={{marginLeft: 10}}/>
+            <Ionicons name="document-text-outline" size={40} color="#FFFFFF" />
           </View>
 
-          <FlatList
-            data={SUBJECTS}
-            renderItem={({item}) => (
-              <TouchableOpacity style={[styles.subjectCard, { backgroundColor: theme.surface }]} onPress={() => dispatch({ type: 'SELECT_SUBJECT', payload: item })}>
-                <Ionicons name={item.icon} size={32} color={theme.primary} />
-                <Text style={[styles.subjectName, { color: theme.text }]}>{item.name}</Text>
-                <View style={[styles.generateBtn, { backgroundColor: theme.primary }]}><Text style={styles.generateBtnText}>Generate Test</Text></View>
-              </TouchableOpacity>
-            )}
-            keyExtractor={item => item.id}
-            numColumns={2}
-            scrollEnabled={false}
-            columnWrapperStyle={styles.row}
-            style={styles.subjectGrid}
-          />
+          <Text style={[styles.sectionTitle, { color: theme.text, marginBottom: 15 }]}>Available Subject</Text>
+          
+          {/* Featured Physics Card */}
+          <TouchableOpacity 
+            style={[styles.featuredCard, { backgroundColor: theme.surface, borderColor: theme.primary, borderWidth: 1 }]} 
+            onPress={() => dispatch({ type: 'SELECT_SUBJECT', payload: SUBJECTS[0] })}
+          >
+            <View style={styles.featuredContent}>
+                <View style={[styles.iconContainer, { backgroundColor: theme.primary + '15' }]}>
+                    <Ionicons name="flash" size={32} color={theme.primary} />
+                </View>
+                <View style={{ flex: 1, marginLeft: 15 }}>
+                    <Text style={[styles.featuredSubjectName, { color: theme.text }]}>Physics</Text>
+                    <Text style={[styles.featuredSubjectDetails, { color: theme.textSecondary }]}>9th Class - Punjab Board</Text>
+                </View>
+                <View style={[styles.activeGenerateBtn, { backgroundColor: theme.primary }]}>
+                    <Text style={styles.activeGenerateBtnText}>Generate</Text>
+                    <Ionicons name="arrow-forward" size={16} color="white" />
+                </View>
+            </View>
+          </TouchableOpacity>
 
-          <View style={styles.historyHeader}>
-            <Text style={[styles.sectionTitle, { color: theme.text }]}>Recent Tests</Text>
-            <TouchableOpacity onPress={fetchHistory}>
-                <Ionicons name="refresh" size={20} color={theme.primary} />
-            </TouchableOpacity>
+          <Text style={[styles.sectionTitle, { color: theme.text, marginTop: 25, marginBottom: 15, fontSize: 16 }]}>Coming Soon</Text>
+          <View style={styles.comingSoonRow}>
+            {SUBJECTS.slice(1).map(item => (
+                <View key={item.id} style={[styles.disabledCard, { backgroundColor: theme.surface }]}>
+                    <Ionicons name={item.icon} size={24} color={theme.textSecondary} />
+                    <Text style={[styles.disabledText, { color: theme.textSecondary }]}>{item.name}</Text>
+                </View>
+            ))}
           </View>
 
-          {historyLoading ? (
-            <ActivityIndicator size="small" color={theme.primary} style={{ marginVertical: 20 }} />
-          ) : history.length > 0 ? (
-            history.map((item) => (
-                <View key={item._id}>{renderHistoryItem({ item })}</View>
-            ))
-          ) : (
-            <View style={styles.emptyHistory}>
-                <Text style={{ color: theme.textSecondary }}>No test history found.</Text>
-            </View>
-          )}
+          <View style={styles.historyHeader}><Text style={[styles.sectionTitle, { color: theme.text }]}>Recent Tests</Text></View>
+          {historyLoading ? <ActivityIndicator size="small" color={theme.primary} /> : history.length > 0 ? history.map(item => <View key={item._id}>{renderHistoryItem({ item })}</View>) : <View style={styles.emptyHistory}><Text style={{ color: theme.textSecondary }}>No test history found.</Text></View>}
         </ScrollView>
       </View>
-
       <Modal visible={state.step > 0} transparent animationType="fade">
         <View style={styles.modalOverlay}>
-          <View style={[styles.stepCard, { backgroundColor: theme.surface }]}>
-            <Animated.View style={[styles.animatedContainer, { transform: [{ translateX: slideAnim }] }]}>
-              <View style={styles.stepPage}>
-                <Text style={[styles.stepHeader, { color: theme.text }]}>Select Content</Text>
-                <Text style={[styles.stepSubHeader, { color: theme.textSecondary }]}>{state.selectedSubject?.name}</Text>
-                <ScrollView style={styles.contentScroll}>
-                  {CONTENT_DATA[state.selectedSubject?.id]?.map(chapter => (
-                    <ChapterItem key={chapter.id} chapter={chapter} state={state} dispatch={dispatch} theme={theme} />
-                  ))}
-                </ScrollView>
-                <View style={styles.stepFooter}>
-                  <TouchableOpacity style={[styles.backBtn, { borderColor: theme.primary }]} onPress={handleCancel}><Text style={{ color: theme.primary }}>Cancel</Text></TouchableOpacity>
-                  <TouchableOpacity 
-                    disabled={!isContentSelected}
-                    style={[styles.nextBtn, { backgroundColor: isContentSelected ? theme.primary : theme.textSecondary }]} 
-                    onPress={goToStep2}
-                  >
-                    <Text style={styles.btnText}>Next</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-
-              <View style={styles.stepPage}>
-                <Text style={[styles.stepHeader, { color: theme.text }]}>Test Pattern</Text>
-                <ScrollView style={styles.contentScroll}>
-                  <TouchableOpacity style={styles.radioRow} onPress={() => dispatch({ type: 'SET_PATTERN', payload: 'board' })}>
-                    <Ionicons name={state.pattern === 'board' ? "radio-button-on" : "radio-button-off"} size={22} color={theme.primary} />
-                    <Text style={[styles.radioLabel, { color: theme.text }]}>Board Pattern</Text>
-                  </TouchableOpacity>
-                  {state.pattern === 'board' && (
-                    <View style={[styles.patternInfo, { backgroundColor: theme.background }]}>
-                      <Text style={[styles.patternTitle, { color: theme.primary }]}>Punjab Board 9th Physics Pattern:</Text>
-                      <Text style={{ color: theme.text }}>Total Marks: 60 | Time: 2 Hours</Text>
-                      <Text style={{ color: theme.text }}>Section A: 12 MCQs | Section B: 15 Short Qs | Section C: 2 Long Qs</Text>
-                    </View>
-                  )}
-                  <TouchableOpacity style={styles.radioRow} onPress={() => dispatch({ type: 'SET_PATTERN', payload: 'custom' })}>
-                    <Ionicons name={state.pattern === 'custom' ? "radio-button-on" : "radio-button-off"} size={22} color={theme.primary} />
-                    <Text style={[styles.radioLabel, { color: theme.text }]}>Customized</Text>
-                  </TouchableOpacity>
-                  {state.pattern === 'custom' && (
-                    <View style={styles.customOptions}>
-                      {['mcqs', 'short', 'long'].map(type => (
-                        <View key={type} style={styles.customRow}>
-                          <Checkbox selected={state.customConfig[type].selected} onPress={() => dispatch({ type: 'UPDATE_CUSTOM_CONFIG', key: type, payload: { selected: !state.customConfig[type].selected } })} label={type.toUpperCase()} theme={theme} />
-                          {state.customConfig[type].selected && (
-                            <View style={{alignItems: 'center'}}>
-                                <TextInput style={[styles.qtyInput, { color: theme.text, borderColor: theme.primary }]} keyboardType="numeric" value={state.customConfig[type].quantity.toString()} onChangeText={(val) => dispatch({ type: 'UPDATE_CUSTOM_CONFIG', key: type, payload: { quantity: parseInt(val) || 0 } })} />
-                                <Text style={{fontSize: 10, color: theme.textSecondary}}>Limit: {type === 'long' ? '4' : '20'}</Text>
-                            </View>
-                          )}
+            <View style={[styles.stepCard, { backgroundColor: theme.surface }]}>
+                <Animated.View style={[styles.animatedContainer, { transform: [{ translateX: slideAnim }] }]}>
+                    <View style={styles.stepPage}>
+                        <Text style={[styles.stepHeader, { color: theme.text }]}>Select Content</Text>
+                        <ScrollView style={styles.contentScroll}>{CONTENT_DATA[state.selectedSubject?.id]?.map(chapter => <ChapterItem key={chapter.id} chapter={chapter} state={state} dispatch={dispatch} theme={theme} />)}</ScrollView>
+                        <View style={styles.stepFooter}>
+                            <TouchableOpacity style={[styles.backBtn, { borderColor: theme.primary }]} onPress={() => dispatch({ type: 'SET_STEP', payload: 0 })}><Text style={{ color: theme.primary }}>Cancel</Text></TouchableOpacity>
+                            <TouchableOpacity disabled={!isContentSelected} style={[styles.nextBtn, { backgroundColor: isContentSelected ? theme.primary : theme.textSecondary }]} onPress={() => Animated.timing(slideAnim, { toValue: -CARD_WIDTH, duration: 300, useNativeDriver: true }).start(() => dispatch({ type: 'SET_STEP', payload: 2 }))}><Text style={styles.btnText}>Next</Text></TouchableOpacity>
                         </View>
-                      ))}
                     </View>
-                  )}
-                </ScrollView>
-                <View style={styles.stepFooter}>
-                  <TouchableOpacity style={[styles.backBtn, { borderColor: theme.primary }]} onPress={goBackToStep1} disabled={state.loading}><Text style={{ color: theme.primary }}>Back</Text></TouchableOpacity>
-                  <TouchableOpacity 
-                    style={[styles.nextBtn, { backgroundColor: isGenerateEnabled && !state.loading ? theme.primary : theme.textSecondary }]} 
-                    disabled={!isGenerateEnabled || state.loading} 
-                    onPress={handleGenerateTest}
-                  >
-                    {state.loading ? <ActivityIndicator size="small" color="white" /> : <Text style={styles.btnText}>Generate Test</Text>}
-                  </TouchableOpacity>
-                </View>
-              </View>
-            </Animated.View>
-          </View>
+                    <View style={styles.stepPage}>
+                        <Text style={[styles.stepHeader, { color: theme.text }]}>Test Pattern</Text>
+                        <ScrollView style={styles.contentScroll}>
+                            <TouchableOpacity style={styles.radioRow} onPress={() => dispatch({ type: 'SET_PATTERN', payload: 'board' })}><Ionicons name={state.pattern === 'board' ? "radio-button-on" : "radio-button-off"} size={22} color={theme.primary} /><Text style={[styles.radioLabel, { color: theme.text }]}>Board Pattern</Text></TouchableOpacity>
+                            {state.pattern === 'board' && (
+                                <View style={[styles.patternInfo, { backgroundColor: theme.background }]}>
+                                    <Text style={[styles.patternTitle, { color: theme.primary }]}>Punjab Board 9th Physics Pattern:</Text>
+                                    <Text style={{ color: theme.text }}>Total Marks: 60 | Time: 2 Hours</Text>
+                                    <Text style={{ color: theme.text }}>Section A: 12 MCQs | Section B: 15 Short Qs | Section C: 2 Long Qs</Text>
+                                </View>
+                            )}
+                            <TouchableOpacity style={styles.radioRow} onPress={() => dispatch({ type: 'SET_PATTERN', payload: 'custom' })}><Ionicons name={state.pattern === 'custom' ? "radio-button-on" : "radio-button-off"} size={22} color={theme.primary} /><Text style={[styles.radioLabel, { color: theme.text }]}>Customized</Text></TouchableOpacity>
+                            {state.pattern === 'custom' && (
+                                <View style={styles.customOptions}>
+                                    {['mcqs', 'short', 'long'].map(type => (
+                                        <View key={type} style={styles.customRow}>
+                                            <Checkbox selected={state.customConfig[type].selected} onPress={() => dispatch({ type: 'UPDATE_CUSTOM_CONFIG', key: type, payload: { selected: !state.customConfig[type].selected } })} label={type.toUpperCase()} theme={theme} />
+                                            {state.customConfig[type].selected && (
+                                                <View style={{alignItems: 'center'}}>
+                                                    <TextInput style={[styles.qtyInput, { color: theme.text, borderColor: theme.primary }]} keyboardType="numeric" value={state.customConfig[type].quantity.toString()} onChangeText={(val) => dispatch({ type: 'UPDATE_CUSTOM_CONFIG', key: type, payload: { quantity: parseInt(val) || 0 } })} />
+                                                    <Text style={{fontSize: 10, color: theme.textSecondary}}>Limit: {type === 'long' ? '4' : '20'}</Text>
+                                                </View>
+                                            )}
+                                        </View>
+                                    ))}
+                                </View>
+                            )}
+                        </ScrollView>
+                        <View style={styles.stepFooter}>
+                            <TouchableOpacity style={[styles.backBtn, { borderColor: theme.primary }]} onPress={() => Animated.timing(slideAnim, { toValue: 0, duration: 300, useNativeDriver: true }).start(() => dispatch({ type: 'SET_STEP', payload: 1 }))}><Text style={{ color: theme.primary }}>Back</Text></TouchableOpacity>
+                            <TouchableOpacity disabled={!isGenerateEnabled || state.loading} style={[styles.nextBtn, { backgroundColor: isGenerateEnabled ? theme.primary : theme.textSecondary }]} onPress={handleGenerateTest}>{state.loading ? <ActivityIndicator color="white" /> : <Text style={styles.btnText}>Generate</Text>}</TouchableOpacity>
+                        </View>
+                    </View>
+                </Animated.View>
+            </View>
         </View>
       </Modal>
-
-      <CustomAlert 
-        visible={alertConfig.visible} 
-        title={alertConfig.title} 
-        message={alertConfig.message} 
-        type={alertConfig.type} 
-        onClose={closeAlert} 
-        onConfirm={alertConfig.onConfirm} 
-      />
-
-      {state.loading && (
-        <View style={styles.loadingOverlay}>
-          <Animated.View style={{ transform: [{ scale: pulseAnim }], alignItems: 'center' }}>
-            <View style={[styles.loaderIconBg, { backgroundColor: theme.primary }]}>
-              <Ionicons name="sparkles" size={40} color="white" />
-            </View>
-          </Animated.View>
-          <Text style={[styles.loadingText, { color: 'white' }]}>DarsGah AI is crafting your test...</Text>
-          <ActivityIndicator size="small" color="white" style={{ marginTop: 20 }} />
-        </View>
-      )}
-      <Sidebar isVisible={sidebarVisible} onClose={toggleSidebar} activeScreen="TestGenerator" />
+      <CustomAlert visible={alertConfig.visible} title={alertConfig.title} message={alertConfig.message} type={alertConfig.type} onClose={() => setAlertConfig({ ...alertConfig, visible: false })} onConfirm={alertConfig.onConfirm} />
+      <Sidebar isVisible={sidebarVisible} onClose={() => setSidebarVisible(false)} activeScreen="TestGenerator" />
     </SafeAreaView>
   );
 }
@@ -743,31 +583,33 @@ const styles = StyleSheet.create({
   scrollContent: { padding: 20, paddingBottom: 50 },
   mainTitle: { fontSize: 26, fontWeight: 'bold' },
   subtitle: { fontSize: 16, marginBottom: 20 },
-  mainCard: { flexDirection: 'row', alignItems: 'center', borderRadius: 15, padding: 20, marginBottom: 20 },
+  mainCard: { flexDirection: 'row', alignItems: 'center', borderRadius: 15, padding: 20, marginBottom: 25 },
   mainCardTitle: { fontSize: 18, fontWeight: 'bold', color: 'white', marginBottom: 8 },
   mainCardText: { fontSize: 14, color: 'white' },
-  subjectGrid: { marginBottom: 20 },
-  row: { justifyContent: 'space-between' },
-  subjectCard: { width: '48%', borderRadius: 15, padding: 20, alignItems: 'center', marginBottom: 15, elevation: 3 },
-  subjectName: { fontSize: 16, fontWeight: 'bold', marginTop: 10, marginBottom: 15 },
-  generateBtn: { paddingVertical: 8, paddingHorizontal: 12, borderRadius: 8 },
-  generateBtnText: { color: 'white', fontSize: 12, fontWeight: 'bold' },
-  historyHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 10, marginBottom: 15 },
   sectionTitle: { fontSize: 18, fontWeight: 'bold' },
-  recentCard: { flexDirection: 'row', padding: 15, borderRadius: 12, marginBottom: 10, alignItems: 'center', elevation: 1 },
+  featuredCard: { borderRadius: 15, padding: 15, elevation: 4, marginBottom: 10 },
+  featuredContent: { flexDirection: 'row', alignItems: 'center' },
+  iconContainer: { padding: 10, borderRadius: 12 },
+  featuredSubjectName: { fontSize: 18, fontWeight: 'bold' },
+  featuredSubjectDetails: { fontSize: 12, marginTop: 2 },
+  activeGenerateBtn: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8, paddingHorizontal: 15, borderRadius: 10, gap: 5 },
+  activeGenerateBtnText: { color: 'white', fontWeight: 'bold', fontSize: 14 },
+  comingSoonRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 30 },
+  disabledCard: { width: '31%', borderRadius: 12, padding: 15, alignItems: 'center', opacity: 0.6, borderStyle: 'dashed', borderWidth: 1, borderColor: '#CCC' },
+  disabledText: { fontSize: 12, fontWeight: '600', marginTop: 8 },
+  historyHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 10, marginBottom: 15 },
+  recentCard: { padding: 15, borderRadius: 12, marginBottom: 10, elevation: 1 },
   recentTitle: { fontSize: 15, fontWeight: 'bold' },
-  recentDetails: { fontSize: 13, marginTop: 4 },
-  recentTime: { fontSize: 11, marginTop: 4, fontStyle: 'italic' },
+  recentDetails: { fontSize: 13 },
+  recentTime: { fontSize: 11, fontStyle: 'italic' },
   statusBadge: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 },
   statusText: { fontSize: 10, fontWeight: 'bold' },
-  actionIcon: { padding: 8 },
   emptyHistory: { padding: 20, alignItems: 'center' },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
   stepCard: { width: CARD_WIDTH, height: '75%', borderRadius: 20, overflow: 'hidden' },
   animatedContainer: { flexDirection: 'row', width: CARD_WIDTH * 2, height: '100%' },
   stepPage: { width: CARD_WIDTH, height: '100%', padding: 20 },
-  stepHeader: { fontSize: 20, fontWeight: 'bold', textAlign: 'center' },
-  stepSubHeader: { fontSize: 16, textAlign: 'center', marginBottom: 20 },
+  stepHeader: { fontSize: 20, fontWeight: 'bold', textAlign: 'center', marginBottom: 20 },
   contentScroll: { flex: 1 },
   chapterContainer: { marginBottom: 15 },
   chapterHeader: { flexDirection: 'row', alignItems: 'center' },
@@ -787,7 +629,4 @@ const styles = StyleSheet.create({
   customOptions: { paddingLeft: 30 },
   customRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginVertical: 10 },
   qtyInput: { borderWidth: 1, borderRadius: 5, padding: 5, width: 60, textAlign: 'center' },
-  loadingOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.85)', justifyContent: 'center', alignItems: 'center', zIndex: 2000 },
-  loaderIconBg: { width: 80, height: 80, borderRadius: 40, justifyContent: 'center', alignItems: 'center', marginBottom: 20, elevation: 10 },
-  loadingText: { marginTop: 10, fontSize: 18, fontWeight: 'bold', textAlign: 'center' },
 });

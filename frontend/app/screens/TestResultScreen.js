@@ -30,7 +30,8 @@ export default function TestResultScreen({ navigation, route }) {
         {/* Score Card */}
         <View style={[styles.scoreCard, { backgroundColor: theme.primary, elevation: 5 }]}>
           <Ionicons name="trophy-outline" size={60} color="white" />
-          <Text style={styles.scoreTitle}>Great Job!</Text>
+          <Text style={styles.scoreTitle}>Test Result</Text>
+
           <View style={styles.scoreRow}>
             <View style={styles.scoreItem}>
               <Text style={styles.scoreLabel}>Score</Text>
