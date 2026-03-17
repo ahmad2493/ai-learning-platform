@@ -134,7 +134,7 @@ async function getProgress(req, res) {
     }
 
     // Return effective streak — may differ from stored value if student missed a day
-    const response = doc.toObject();
+    const response = JSON.parse(JSON.stringify(doc));
     response.streak = getEffectiveStreak(doc);
 
     return res.status(200).json({ success: true, data: response });
