@@ -1,6 +1,6 @@
 /**
  * Test View Screen - Interactive Test Interface
- * Fixed: Submission loophole ensuring generated tests are saved to DB on 1st attempt.
+ * Fixed: Added rendering for Short and Long Questions sections.
  * Author: Momna Butt (BCSF22M021)
  */
 
@@ -24,9 +24,7 @@ export default function TestViewScreen({ navigation, route }) {
   const { theme } = useTheme();
   const { userToken } = useAuth();
   
-  // Robustly extract test data from route params
   const incomingData = route.params?.generatedTest || {};
-  // Handle both { data: {...} } and direct {...} formats
   const finalData = incomingData.data || incomingData;
 
   const test = {
@@ -79,7 +77,6 @@ export default function TestViewScreen({ navigation, route }) {
 
     try {
       if (!test._id) {
-        // Fallback for demo/guest mode if ID is genuinely missing
         const localScore = calculateLocalScore();
         setFinalScore(localScore);
         setIsSubmitted(true);
@@ -177,7 +174,10 @@ export default function TestViewScreen({ navigation, route }) {
           </View>
         )}
 
-        <View style={styles.section}>
+        {/* MCQs Section */}
+        {test.mcqs.length > 0 && (
+          <View style={styles.section}>
+            <Text style={[styles.sectionHeading, { color: theme.primary }]}>Section A: MCQs</Text>
             {test.mcqs.map((q) => (
               <View key={q.question_number} style={[styles.card, { backgroundColor: theme.surface }]}>
                 <Text style={[styles.qText, { color: theme.text }]}>{q.question_number}. {q.question}</Text>
@@ -202,11 +202,51 @@ export default function TestViewScreen({ navigation, route }) {
                 })}
               </View>
             ))}
-        </View>
+          </View>
+        )}
 
-        {!isSubmitted && (
+        {/* Short Questions Section */}
+        {test.short_questions && test.short_questions.length > 0 && (
+          <View style={styles.section}>
+            <Text style={[styles.sectionHeading, { color: theme.primary }]}>Section B: Short Questions</Text>
+            {test.short_questions.map((q) => (
+              <View key={q.question_number} style={[styles.card, { backgroundColor: theme.surface }]}>
+                <Text style={[styles.qText, { color: theme.text }]}>Q{q.question_number}. {q.question}</Text>
+                <Text style={[styles.marksLabel, { color: theme.textSecondary }]}>[Marks: 2]</Text>
+              </View>
+            ))}
+          </View>
+        )}
+
+        {/* Long Questions Section */}
+        {test.long_questions && test.long_questions.length > 0 && (
+          <View style={styles.section}>
+            <Text style={[styles.sectionHeading, { color: theme.primary }]}>Section C: Long Questions</Text>
+            {test.long_questions.map((q) => (
+              <View key={q.question_number} style={[styles.card, { backgroundColor: theme.surface }]}>
+                <Text style={[styles.qText, { color: theme.text, marginBottom: 10 }]}>Q{q.question_number}.</Text>
+                <View style={styles.longPart}>
+                  <Text style={[styles.partText, { color: theme.text }]}> (a) {q.part_a.question}</Text>
+                  <Text style={[styles.marksLabel, { color: theme.textSecondary }]}>[Marks: {q.part_a.marks}]</Text>
+                </View>
+                <View style={[styles.longPart, { marginTop: 10 }]}>
+                  <Text style={[styles.partText, { color: theme.text }]}> (b) {q.part_b.question}</Text>
+                  <Text style={[styles.marksLabel, { color: theme.textSecondary }]}>[Marks: {q.part_b.marks}]</Text>
+                </View>
+              </View>
+            ))}
+          </View>
+        )}
+
+        {!isSubmitted && hasMcqs && (
           <TouchableOpacity disabled={!canSubmit} style={[styles.submitBtn, { backgroundColor: canSubmit ? theme.primary : theme.textSecondary }]} onPress={() => handleSubmit(false)}>
             {loading ? <ActivityIndicator color="white" /> : <Text style={styles.btnText}>{allAttempted ? "Finish & Submit" : "Complete MCQs to Submit"}</Text>}
+          </TouchableOpacity>
+        )}
+
+        {isReadMode && !isSubmitted && (
+          <TouchableOpacity style={[styles.submitBtn, { backgroundColor: theme.primary }]} onPress={() => navigation.goBack()}>
+            <Text style={styles.btnText}>Back to Dashboard</Text>
           </TouchableOpacity>
         )}
 
@@ -230,9 +270,13 @@ const styles = StyleSheet.create({
   scrollContent: { padding: 20 },
   testTitle: { fontSize: 20, fontWeight: 'bold', textAlign: 'center', marginBottom: 20 },
   section: { marginBottom: 30 },
+  sectionHeading: { fontSize: 18, fontWeight: 'bold', marginBottom: 15, textDecorationLine: 'underline' },
   card: { padding: 15, borderRadius: 12, marginBottom: 15, elevation: 2 },
   qText: { fontSize: 16, fontWeight: '600', marginBottom: 15 },
   option: { padding: 12, borderWidth: 1, borderRadius: 8, marginBottom: 8, flexDirection: 'row', justifyContent: 'space-between' },
+  longPart: { borderLeftWidth: 2, borderLeftColor: '#EEE', paddingLeft: 10 },
+  partText: { fontSize: 15, flex: 1 },
+  marksLabel: { fontSize: 12, fontWeight: 'bold', marginTop: 4, textAlign: 'right' },
   submitBtn: { padding: 18, borderRadius: 15, alignItems: 'center', marginTop: 10, minHeight: 60, justifyContent: 'center', marginBottom: 30 },
   btnText: { color: 'white', fontWeight: 'bold', fontSize: 16 },
   scoreCard: { padding: 20, borderRadius: 15, borderWidth: 1, marginBottom: 25 },

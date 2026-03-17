@@ -1,6 +1,7 @@
 /**
  * Test Result Screen
- * Displays the final score and detailed feedback for MCQs.
+ * Displays the final score and detailed feedback for MCQs, Short, and Long questions.
+ * Updated: Added Section B and C rendering for comprehensive review.
  * Author: Momna Butt (BCSF22M021)
  */
 
@@ -30,11 +31,11 @@ export default function TestResultScreen({ navigation, route }) {
         {/* Score Card */}
         <View style={[styles.scoreCard, { backgroundColor: theme.primary, elevation: 5 }]}>
           <Ionicons name="trophy-outline" size={60} color="white" />
-          <Text style={styles.scoreTitle}>Test Result</Text>
+          <Text style={styles.scoreTitle}>Test Summary</Text>
 
           <View style={styles.scoreRow}>
             <View style={styles.scoreItem}>
-              <Text style={styles.scoreLabel}>Score</Text>
+              <Text style={styles.scoreLabel}>MCQ Score</Text>
               <Text style={styles.scoreValue}>{score.correct} / {score.total}</Text>
             </View>
             <View style={styles.divider} />
@@ -45,63 +46,106 @@ export default function TestResultScreen({ navigation, route }) {
           </View>
         </View>
 
-        {/* Detailed Feedback */}
-        <Text style={[styles.sectionTitle, { color: theme.text }]}>Detailed Review</Text>
+        {/* Detailed Feedback Header */}
+        <Text style={[styles.sectionTitle, { color: theme.text, fontSize: 22, textAlign: 'center', marginVertical: 10 }]}>Detailed Review</Text>
         
-        {test.mcqs.map((q) => {
-          const userAnswer = userAnswers[q.question_number];
-          // Robust case-insensitive comparison
-          const isCorrect = userAnswer?.toString().toLowerCase() === q.correct_option?.toString().toLowerCase();
+        {/* Section A: MCQs */}
+        {test.mcqs.length > 0 && (
+          <View style={styles.resultSection}>
+            <Text style={[styles.sectionHeading, { color: theme.primary }]}>Section A: MCQs</Text>
+            {test.mcqs.map((q) => {
+              const userAnswer = userAnswers[q.question_number];
+              const isCorrect = userAnswer?.toString().toLowerCase() === q.correct_option?.toString().toLowerCase();
 
-          return (
-            <View key={q.question_number} style={[styles.card, { backgroundColor: theme.surface }]}>
-              <View style={styles.qHeader}>
-                <Text style={[styles.qNumber, { color: theme.primary }]}>Question {q.question_number}</Text>
-                <Ionicons 
-                  name={isCorrect ? "checkmark-circle" : "close-circle"} 
-                  size={24} 
-                  color={isCorrect ? "#4CAF50" : theme.error} 
-                />
-              </View>
-              
-              <Text style={[styles.qText, { color: theme.text }]}>{q.question}</Text>
-              
-              <View style={styles.optionsContainer}>
-                {Object.entries(q.options).map(([key, val]) => {
-                  const isCorrectOption = key.toLowerCase() === q.correct_option?.toLowerCase();
-                  const isUserSelection = key.toLowerCase() === userAnswer?.toLowerCase();
+              return (
+                <View key={q.question_number} style={[styles.card, { backgroundColor: theme.surface }]}>
+                  <View style={styles.qHeader}>
+                    <Text style={[styles.qNumber, { color: theme.primary }]}>Question {q.question_number}</Text>
+                    <Ionicons 
+                      name={isCorrect ? "checkmark-circle" : "close-circle"} 
+                      size={24} 
+                      color={isCorrect ? "#4CAF50" : theme.error} 
+                    />
+                  </View>
+                  
+                  <Text style={[styles.qText, { color: theme.text }]}>{q.question}</Text>
+                  
+                  <View style={styles.optionsContainer}>
+                    {Object.entries(q.options).map(([key, val]) => {
+                      const isCorrectOption = key.toLowerCase() === q.correct_option?.toLowerCase();
+                      const isUserSelection = key.toLowerCase() === userAnswer?.toLowerCase();
 
-                  let optionStyle = { borderColor: theme.inputBorder };
-                  let textStyle = { color: theme.text };
+                      let optionStyle = { borderColor: theme.inputBorder };
+                      let textStyle = { color: theme.text };
 
-                  if (isCorrectOption) {
-                    optionStyle = { borderColor: "#4CAF50", backgroundColor: "#4CAF5015" };
-                    textStyle = { color: "#2E7D32", fontWeight: 'bold' };
-                  } else if (isUserSelection && !isCorrect) {
-                    optionStyle = { borderColor: theme.error, backgroundColor: theme.error + '15' };
-                    textStyle = { color: theme.error, fontWeight: 'bold' };
-                  }
+                      if (isCorrectOption) {
+                        optionStyle = { borderColor: "#4CAF50", backgroundColor: "#4CAF5015" };
+                        textStyle = { color: "#2E7D32", fontWeight: 'bold' };
+                      } else if (isUserSelection && !isCorrect) {
+                        optionStyle = { borderColor: theme.error, backgroundColor: theme.error + '15' };
+                        textStyle = { color: theme.error, fontWeight: 'bold' };
+                      }
 
-                  return (
-                    <View key={key} style={[styles.option, optionStyle]}>
-                      <Text style={textStyle}>{key.toUpperCase()}. {val}</Text>
-                      {isCorrectOption && <Ionicons name="checkmark" size={16} color="#4CAF50" />}
-                      {isUserSelection && !isCorrect && <Ionicons name="close" size={16} color={theme.error} />}
+                      return (
+                        <View key={key} style={[styles.option, optionStyle]}>
+                          <Text style={textStyle}>{key.toUpperCase()}. {val}</Text>
+                          {isCorrectOption && <Ionicons name="checkmark" size={16} color="#4CAF50" />}
+                          {isUserSelection && !isCorrect && <Ionicons name="close" size={16} color={theme.error} />}
+                        </View>
+                      );
+                    })}
+                  </View>
+
+                  {!isCorrect && (
+                    <View style={[styles.explanation, { backgroundColor: theme.primary + '10' }]}>
+                      <Text style={[styles.explanationText, { color: theme.primary }]}>
+                        <Text style={{ fontWeight: 'bold' }}>Correct Answer:</Text> {q.correct_option?.toUpperCase()}
+                      </Text>
                     </View>
-                  );
-                })}
-              </View>
-
-              {!isCorrect && (
-                <View style={[styles.explanation, { backgroundColor: theme.primary + '10' }]}>
-                  <Text style={[styles.explanationText, { color: theme.primary }]}>
-                    <Text style={{ fontWeight: 'bold' }}>Correct Answer:</Text> {q.correct_option?.toUpperCase()}
-                  </Text>
+                  )}
                 </View>
-              )}
-            </View>
-          );
-        })}
+              );
+            })}
+          </View>
+        )}
+
+        {/* Section B: Short Questions */}
+        {test.short_questions && test.short_questions.length > 0 && (
+          <View style={styles.resultSection}>
+            <Text style={[styles.sectionHeading, { color: theme.primary }]}>Section B: Short Questions</Text>
+            {test.short_questions.map((q) => (
+              <View key={q.question_number} style={[styles.card, { backgroundColor: theme.surface }]}>
+                <Text style={[styles.qNumber, { color: theme.primary, marginBottom: 5 }]}>Question {q.question_number}</Text>
+                <Text style={[styles.qText, { color: theme.text }]}>{q.question}</Text>
+                <View style={styles.marksFooter}>
+                  <Text style={[styles.marksLabel, { color: theme.textSecondary }]}>Standard Marks: 2</Text>
+                </View>
+              </View>
+            ))}
+          </View>
+        )}
+
+        {/* Section C: Long Questions */}
+        {test.long_questions && test.long_questions.length > 0 && (
+          <View style={styles.resultSection}>
+            <Text style={[styles.sectionHeading, { color: theme.primary }]}>Section C: Long Questions</Text>
+            {test.long_questions.map((q) => (
+              <View key={q.question_number} style={[styles.card, { backgroundColor: theme.surface }]}>
+                <Text style={[styles.qNumber, { color: theme.primary, marginBottom: 10 }]}>Question {q.question_number}</Text>
+                
+                <View style={styles.longPart}>
+                  <Text style={[styles.partText, { color: theme.text }]}>(a) {q.part_a.question}</Text>
+                  <Text style={[styles.marksLabel, { color: theme.textSecondary, textAlign: 'right' }]}>[{q.part_a.marks} Marks]</Text>
+                </View>
+
+                <View style={[styles.longPart, { marginTop: 15 }]}>
+                  <Text style={[styles.partText, { color: theme.text }]}>(b) {q.part_b.question}</Text>
+                  <Text style={[styles.marksLabel, { color: theme.textSecondary, textAlign: 'right' }]}>[{q.part_b.marks} Marks]</Text>
+                </View>
+              </View>
+            ))}
+          </View>
+        )}
 
         <TouchableOpacity 
           style={[styles.exitBtn, { backgroundColor: theme.primary }]} 
@@ -131,7 +175,9 @@ const styles = StyleSheet.create({
   scoreLabel: { color: 'rgba(255,255,255,0.8)', fontSize: 14, marginBottom: 5 },
   scoreValue: { color: 'white', fontSize: 22, fontWeight: 'bold' },
   divider: { width: 1, height: 40, backgroundColor: 'rgba(255,255,255,0.3)' },
-  sectionTitle: { fontSize: 18, fontWeight: 'bold', marginBottom: 15 },
+  resultSection: { marginBottom: 30 },
+  sectionTitle: { fontWeight: 'bold', marginBottom: 20 },
+  sectionHeading: { fontSize: 18, fontWeight: 'bold', marginBottom: 15, textDecorationLine: 'underline' },
   card: { padding: 15, borderRadius: 12, marginBottom: 15, elevation: 2 },
   qHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
   qNumber: { fontSize: 14, fontWeight: 'bold' },
@@ -147,6 +193,10 @@ const styles = StyleSheet.create({
   },
   explanation: { marginTop: 15, padding: 10, borderRadius: 8 },
   explanationText: { fontSize: 14 },
+  marksFooter: { borderTopWidth: 1, borderTopColor: '#EEE', marginTop: 10, paddingTop: 5 },
+  marksLabel: { fontSize: 12, fontStyle: 'italic' },
+  longPart: { paddingLeft: 10, borderLeftWidth: 2, borderLeftColor: '#F0F0F0' },
+  partText: { fontSize: 15, lineHeight: 22 },
   exitBtn: { padding: 18, borderRadius: 15, alignItems: 'center', marginTop: 20, marginBottom: 40 },
   exitBtnText: { color: 'white', fontWeight: 'bold', fontSize: 16 },
 });
