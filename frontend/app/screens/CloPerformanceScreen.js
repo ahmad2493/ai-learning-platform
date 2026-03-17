@@ -1,10 +1,10 @@
 /**
  * CLO Performance Screen - Learning Outcomes Tracking
- * Integrated with Progress API
+ * Updated: Fully synchronized PieChart indicators across all components
  * Author: Momna Butt (BCSF22M021)
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -16,296 +16,247 @@ import {
   LayoutAnimation,
   UIManager,
   ActivityIndicator,
-  RefreshControl
+  RefreshControl,
+  Dimensions,
+  Animated
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
+import { PieChart } from 'react-native-gifted-charts';
 import { useTheme } from '../utils/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import { AI_PROGRESS_URL } from '../utils/apiConfig';
 import Sidebar from './SidebarComponent';
-import CustomAlert from '../components/CustomAlert';
 
-// Enable LayoutAnimation for Android
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
 
-const ChapterDetails = ({ chapterId, chapterData, theme }) => {
+const ALL_CHAPTERS = [
+    { id: '1', name: 'Physical Quantities and Measurements', topics: ['1.1 Physical and Non-Physical Quantities', '1.2 Base and Derived Physical Quantities', '1.3 International System of Units', '1.4 Scientific Notation', '1.5 Length Measuring Instruments', '1.6 Mass Measuring Instruments', '1.7 Time Measuring Instruments', '1.8 Volume Measuring Instruments', '1.9 Errors in Measurements', '1.10 Uncertainty in Measurement', '1.11 Significant Figures', '1.12 Precision and Accuracy', '1.13 Rounding off the digits'] },
+    { id: '2', name: 'Kinematics', topics: ['2.1 Scalars and Vectors', '2.2 Rest and Motion', '2.3 Types of Motion', '2.4 Distance and Displacement', '2.5 Speed and Velocity', '2.6 Acceleration', '2.7 Graphical Analysis of Motion', '2.8 Gradient of Distance-Time Graph', '2.9 Speed-Time Graph', '2.10 Gradient of Speed-Time Graph', '2.11 Area under Speed-Time Graph', '2.12 Solving Problems for Motion Under Gravity', '2.13 Free Fall Acceleration'] },
+    { id: '3', name: 'Dynamics', topics: ['3.1 Concept of Force', '3.2 Fundamental Forces', '3.3 Forces in a Free-Body Diagram', '3.4 Newton’s Law of Motion', '3.5 Limitations of Newton’s Law of Motion', '3.6 Mass and Weight', '3.7 Mechanical and Electronic Balances', '3.8 Friction', '3.9 Momentum and Impulse', '3.10 Principle of Conservation of Momentum'] },
+    { id: '4', name: 'Turning Effect of Force', topics: ['4.1 Like and Unlike Parallel Forces', '4.2 Addition of Forces', '4.3 Turning Effect of Force', '4.4 Resolution of Vectors', '4.5 Determination of a Force from its Perpendicular components', '4.6 Principle of Moments', '4.7 Centre of Gravity and Centre of Mass', '4.8 Equilibrium', '4.9 Conditions of Equilibrium', '4.10 States of Equilibrium', '4.11 Improvement of Stability', '4.12 Application of Stability in Real Life', '4.13 Centripetal Force'] },
+    { id: '5', name: 'Work, Energy and Power', topics: ['5.1 Work', '5.2 Energy', '5.3 Conservation of Energy', '5.4 Sources of Energy', '5.5 Renewable and Non-Renewable Sources', '5.6 The Advantages and Disadvantages of Methods of Energy Production', '5.7 Power', '5.8 Efficiency'] },
+    { id: '6', name: 'Mechanical Properties of Matter', topics: ['6.1 Deformation of Solids', '6.2 Hooke’s Law', '6.3 Density', '6.4 Pressure', '6.5 Pressure in Liquids', '6.6 Atmospheric Pressure', '6.7 Measurement of Atmospheric Pressure', '6.8 Measurement of Pressure by Manometer', '6.9 Pascal’s Law'] },
+    { id: '7', name: 'Thermal Properties of Matter', topics: ['7.1 Kinetic Molecular Theory of Matter', '7.2 Temperature and Heat', '7.3 Thermometers', '7.4 Sensitivity, Range and Linearity of Thermometers', '7.5 Structure of Liquid in Glass Thermometer'] },
+    { id: '8', name: 'Magnetism', topics: ['8.1 Magnetic Materials', '8.2 Properties of Magnets', '8.3 Induced Magnetism', '8.4 Temporary and Permanent Magnets', '8.5 Magnetic Fields', '8.6 Uses of Permanent Magnets', '8.7 Electromagnets', '8.8 Domain Theory of Magnetism', '8.9 Magnetisation and Demagematisation', '8.10 Applications of Magnets in Recording Technology', '8.11 Soft Iron as Magnetic Shield'] },
+    { id: '9', name: 'Nature of Science', topics: ['9.1 Scope of Physics', '9.2 Branches of Physics', '9.3 Interdisciplinary Nature of Physics', '9.4 Interdisciplinary Research', '9.5 Scientific Method', '9.6 Scientific Base of Technologies and Engineering'] }
+];
+
+const CHART_COLORS = ['#4F46E5', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899', '#06B6D4', '#F97316', '#6366F1'];
+
+const AnimatedProgressCircle = ({ progress, size = 52, theme, isHero = false }) => {
+    const safeProgress = Math.max(0, Math.min(100, progress || 0));
+    
+    const chartData = [
+        { 
+            value: safeProgress, 
+            color: isHero ? '#FFFFFF' : '#FF9800', 
+            gradientColor: isHero ? '#F0F0F0' : '#FFB74D',
+            showGradient: true 
+        },
+        { 
+            value: 100 - safeProgress, 
+            color: isHero ? 'rgba(255,255,255,0.2)' : theme.inputBorder + '20' 
+        }
+    ];
+
+    return (
+        <View style={{ width: size, height: size, justifyContent: 'center', alignItems: 'center' }}>
+            <PieChart
+                data={chartData}
+                donut
+                radius={size / 2}
+                innerRadius={(size / 2) * 0.72}
+                innerCircleColor={isHero ? theme.primary : theme.surface}
+                isAnimated
+                animationDuration={1000}
+                centerLabelComponent={() => (
+                    <Text style={[
+                        styles.circleText, 
+                        { 
+                            color: isHero ? 'white' : theme.text, 
+                            fontSize: size * 0.25,
+                            fontWeight: 'bold' 
+                        }
+                    ]}>
+                        {Math.round(safeProgress)}%
+                    </Text>
+                )}
+            />
+        </View>
+    );
+};
+
+const TopicRow = ({ topicName, chapterId, progressData, theme }) => {
+    const topicKey = topicName.split(' ')[0].replace(/\./g, '_');
+    const topicStats = progressData?.chapters?.[chapterId]?.topics?.[topicKey] || { progress: 0, mcqs_correct: 0, mcqs_seen: 0 };
+
+    return (
+        <View style={[styles.topicRow, { borderBottomColor: theme.inputBorder + '20' }]}>
+            <View style={{ flex: 1, paddingRight: 10 }}>
+                <Text style={[styles.topicName, { color: theme.text }]}>{topicName}</Text>
+                <Text style={[styles.topicStats, { color: theme.textSecondary }]}>
+                    {topicStats.mcqs_seen > 0 ? `${topicStats.mcqs_correct}/${topicStats.mcqs_seen} Correct` : 'Not Practised Yet'}
+                </Text>
+            </View>
+            <AnimatedProgressCircle progress={topicStats.progress} size={42} theme={theme} />
+        </View>
+    );
+};
+
+const ChapterCard = ({ chapter, progressData, theme }) => {
     const [expanded, setExpanded] = useState(false);
+    const chProgress = progressData?.chapters?.[chapter.id] || { progress: 0, mcqs_seen: 0, mcqs_correct: 0 };
 
     const toggleExpand = () => {
         LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
         setExpanded(!expanded);
-    }
-
-    const topics = Object.entries(chapterData.topics || {});
+    };
 
     return (
-        <View style={styles.chapterContainer}>
+        <View style={[styles.chapterCard, { backgroundColor: theme.surface, borderColor: theme.inputBorder }]}>
             <TouchableOpacity onPress={toggleExpand} style={styles.chapterHeader}>
-                <Ionicons name={expanded ? "chevron-down-outline" : "chevron-forward-outline"} size={20} color={theme.text} />
-                <Text style={[styles.chapterTitle, {color: theme.text}]}>
-                    Chapter {chapterId}: {chapterData.chapter_name}
-                </Text>
-                <Text style={{color: theme.primary, fontWeight: 'bold'}}>{Math.round(chapterData.progress || 0)}%</Text>
+                <View style={[styles.chBadge, { backgroundColor: theme.primary + '10' }]}>
+                    <Text style={{ color: theme.primary, fontWeight: 'bold', fontSize: 12 }}>{chapter.id}</Text>
+                </View>
+                <View style={{ flex: 1 }}>
+                    <Text style={[styles.chapterTitle, { color: theme.text }]} numberOfLines={1}>{chapter.name}</Text>
+                    <Text style={[styles.chapterSub, { color: theme.textSecondary }]}>
+                        {chapter.topics.length} Outcomes • {chProgress.mcqs_seen > 0 ? `${chProgress.mcqs_correct}/${chProgress.mcqs_seen} Answered` : '0 Answered'}
+                    </Text>
+                </View>
+                <AnimatedProgressCircle progress={chProgress.progress} size={52} theme={theme} />
+                <Ionicons name={expanded ? "chevron-up" : "chevron-down"} size={18} color={theme.textSecondary} style={{ marginLeft: 8 }} />
             </TouchableOpacity>
 
             {expanded && (
-                <View style={styles.topicsWrapper}>
-                    {topics.length > 0 ? topics.map(([topicId, topic]) => (
-                        <View key={topicId} style={styles.topicContainer}>
-                            <View style={styles.topicHeader}>
-                                <Text style={[styles.topicName, {color: theme.text}]}>{topic.topic_name}</Text>
-                                <Text style={{color: theme.primary, fontWeight: 'bold'}}>{Math.round(topic.progress || 0)}%</Text>
-                            </View>
-                            <View style={styles.progressBarContainer}>
-                                <View style={[styles.progressBar, { backgroundColor: theme.primary, width: `${Math.min(100, topic.progress || 0)}%` }]} />
-                            </View>
-                            <Text style={[styles.topicStats, {color: theme.textSecondary}]}>
-                                MCQs: {topic.mcqs_correct}/{topic.mcqs_seen} Correct
-                            </Text>
-                        </View>
-                    )) : (
-                        <Text style={[styles.noDataText, {color: theme.textSecondary}]}>No topics attempted yet.</Text>
-                    )}
+                <View style={styles.topicsList}>
+                    {chapter.topics.map((topic, index) => (
+                        <TopicRow key={index} topicName={topic} chapterId={chapter.id} progressData={progressData} theme={theme} />
+                    ))}
                 </View>
             )}
         </View>
-    )
-}
+    );
+};
 
 export default function CloPerformanceScreen({ navigation }) {
-  const { theme } = useTheme();
-  const { user, userToken, isLoading: authLoading } = useAuth();
-  const [sidebarVisible, setSidebarVisible] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [progressData, setProgressData] = useState(null);
-  const [searchQuery, setSearchQuery] = useState('');
+    const { theme } = useTheme();
+    const { user, userToken, isLoading: authLoading } = useAuth();
+    const [sidebarVisible, setSidebarVisible] = useState(false);
+    const [loading, setLoading] = useState(true);
+    const [refreshing, setRefreshing] = useState(false);
+    const [progressData, setProgressData] = useState(null);
+    const [searchQuery, setSearchQuery] = useState('');
 
-  // Determine the ID from the user object
-  const currentUserId = user?._id || user?.id || user?.userId;
+    const currentUserId = user?._id || user?.id || user?.userId;
 
-  // Custom Alert State
-  const [alertConfig, setAlertConfig] = useState({ visible: false, title: '', message: '', type: 'error' });
-
-  const fetchProgress = useCallback(async (isRefreshing = false) => {
-    if (!currentUserId) {
-        setLoading(false);
-        setRefreshing(false);
-        return;
-    }
-
-    if (!isRefreshing) setLoading(true);
-
-    try {
-      console.log(`📊 [CLO] Calling API: ${AI_PROGRESS_URL}/${currentUserId}`);
-      const response = await fetch(`${AI_PROGRESS_URL}/${currentUserId}`, {
-        headers: {
-          'Authorization': `Bearer ${userToken}`,
-          'Accept': 'application/json'
-        }
-      });
-
-      const result = await response.json();
-
-      if (response.ok && result.success) {
-        setProgressData(result.data);
-      } else {
-        if (response.status === 404) {
-            setProgressData({ overall_progress: 0, total_mcqs_seen: 0, total_mcqs_correct: 0, chapters: {} });
-        } else {
-            setAlertConfig({
-                visible: true,
-                title: 'Data Load Failed',
-                message: result.message || 'Could not fetch your performance data.',
-                type: 'error'
+    const fetchProgress = useCallback(async (isRefreshing = false) => {
+        if (!currentUserId) return;
+        if (!isRefreshing) setLoading(true);
+        try {
+            console.log(`📡 [CLO] Fetching progress for UID: ${currentUserId}`);
+            const response = await fetch(`${AI_PROGRESS_URL}/${currentUserId}`, {
+                headers: { 'Authorization': `Bearer ${userToken}`, 'Accept': 'application/json' }
             });
+            const result = await response.json();
+            console.log("✅ [CLO] Backend Result:", JSON.stringify(result).substring(0, 200) + "...");
+            
+            if (response.ok && result.success && result.data) {
+                setProgressData(result.data);
+            } else {
+                setProgressData({ overall_progress: 0, chapters: {}, total_mcqs_seen: 0 });
+            }
+        } catch (error) {
+            console.error("❌ [CLO] Error:", error);
+            setProgressData({ overall_progress: 0, chapters: {}, total_mcqs_seen: 0 });
+        } finally {
+            setLoading(false);
+            setRefreshing(false);
         }
-      }
-    } catch (error) {
-      console.error("❌ [CLO] Network Error:", error);
-      setAlertConfig({
-          visible: true,
-          title: 'Network Error',
-          message: 'Unable to connect to the performance service.',
-          type: 'error'
-      });
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, [currentUserId, userToken]);
+    }, [currentUserId, userToken]);
 
-  useEffect(() => {
-    if (!authLoading && currentUserId) {
-        fetchProgress();
-    } else if (!authLoading && !currentUserId) {
-        setLoading(false);
-    }
-  }, [fetchProgress, authLoading, currentUserId]);
+    useEffect(() => {
+        if (!authLoading && currentUserId) fetchProgress();
+    }, [fetchProgress, authLoading, currentUserId]);
 
-  const onRefresh = () => {
-    setRefreshing(true);
-    fetchProgress(true);
-  };
+    const filteredChapters = ALL_CHAPTERS.filter(ch => ch.name.toLowerCase().includes(searchQuery.toLowerCase()));
 
-  const toggleSidebar = () => setSidebarVisible(!sidebarVisible);
-
-  const chapters = progressData?.chapters ? Object.entries(progressData.chapters) : [];
-  const filteredChapters = chapters.filter(([id, data]) =>
-    data.chapter_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    id.includes(searchQuery)
-  );
-
-  return (
-    <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
-      <View style={styles.contentWrapper}>
-        <View style={[styles.header, {backgroundColor: theme.background}]}>
-            <View style={styles.headerLeft}>
-                <Ionicons name="book" size={30} color={theme.primary} style={styles.logo} />
-                <Text style={[styles.headerTitle, { color: theme.text }]}>DarsGah</Text>
-            </View>
-            <TouchableOpacity onPress={toggleSidebar}>
-                <Ionicons name="menu" size={24} color={theme.primary} />
-            </TouchableOpacity>
-        </View>
-
-        <ScrollView
-            contentContainerStyle={styles.scrollContent}
-            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[theme.primary]} tintColor={theme.primary} />}
-        >
-            {/* LOGGED IN USER DEBUG HEADER */}
-            <View style={[styles.userDebugCard, { backgroundColor: theme.surface, borderColor: theme.inputBorder }]}>
-                <View style={styles.userDebugRow}>
-                    <Ionicons name="person-circle-outline" size={20} color={theme.primary} />
-                    <Text style={[styles.userDebugLabel, { color: theme.text }]}>
-                        Logged in as: <Text style={{fontWeight: 'bold'}}>{user?.name || 'Unknown User'}</Text>
-                    </Text>
-                </View>
-                <Text style={[styles.userDebugId, { color: theme.textSecondary }]}>
-                    User ID: {currentUserId || 'ID NOT FOUND'}
-                </Text>
-            </View>
-
-            <Text style={[styles.mainTitle, { color: theme.text }]}>Performance</Text>
-            <Text style={[styles.subtitle, { color: theme.textSecondary }]}>Track your Course Learning Outcomes Progress</Text>
-
-             <View style={[styles.searchContainer, {backgroundColor: theme.surface}]}>
-                <Ionicons name="search-outline" size={22} color="#888" />
-                <TextInput
-                    style={{flex:1, marginLeft: 10, color: theme.text}}
-                    placeholder="Search chapters..."
-                    placeholderTextColor="#888"
-                    value={searchQuery}
-                    onChangeText={setSearchQuery}
-                />
-            </View>
-
-            {(loading || authLoading) ? (
-                <View style={styles.centerContainer}>
-                    <ActivityIndicator size="large" color={theme.primary} />
-                    <Text style={{marginTop: 15, color: theme.textSecondary}}>Syncing your progress...</Text>
-                </View>
-            ) : progressData ? (
-                <>
-                    <View style={[styles.mainCard, {backgroundColor: theme.primary}]}>
-                        <View style={{flex: 1}}>
-                            <Text style={styles.mainCardTitle}>Overall Progress: {Math.round(progressData.overall_progress || 0)}%</Text>
-                            <Text style={styles.mainCardText}>
-                                Correct: {progressData.total_mcqs_correct || 0} / {progressData.total_mcqs_seen || 0} MCQs
-                            </Text>
-                        </View>
-                        <View style={styles.overallBadge}>
-                             <Ionicons name="trending-up-outline" size={32} color="#FFFFFF"/>
-                        </View>
+    return (
+        <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
+            <View style={styles.contentWrapper}>
+                <View style={[styles.header, {backgroundColor: theme.background, borderBottomWidth: 1, borderBottomColor: theme.inputBorder}]}>
+                    <View style={styles.headerLeft}>
+                        <Ionicons name="book" size={30} color={theme.primary} style={styles.logo} />
+                        <Text style={[styles.headerTitle, { color: theme.text }]}>DarsGah</Text>
                     </View>
-
-                    <Text style={[styles.sectionTitle, { color: theme.text }]}>Learning History</Text>
-                    <View style={[styles.subjectCard, {backgroundColor: theme.surface}]}>
-                        {filteredChapters.length > 0 ? filteredChapters.map(([id, data]) => (
-                            <ChapterDetails key={id} chapterId={id} chapterData={data} theme={theme} />
-                        )) : (
-                            <View style={styles.emptyContainer}>
-                                <Ionicons name="analytics-outline" size={48} color={theme.textSecondary} />
-                                <Text style={[styles.emptyText, {color: theme.textSecondary}]}>
-                                    {searchQuery ? "No matching chapters found." : "Take a test to see your performance breakdown!"}
-                                </Text>
-                            </View>
-                        )}
-                    </View>
-                </>
-            ) : (
-                <View style={styles.emptyContainer}>
-                    <Ionicons name="alert-circle-outline" size={60} color={theme.textSecondary} />
-                    <Text style={[styles.emptyText, {color: theme.textSecondary}]}>
-                        {!currentUserId ? "Authentication error: User ID missing." : "No performance records found."}
-                    </Text>
-                    <TouchableOpacity style={[styles.retryBtn, {backgroundColor: theme.primary}]} onPress={() => fetchProgress()}>
-                        <Text style={{color: 'white', fontWeight: 'bold'}}>Reload Data</Text>
-                    </TouchableOpacity>
+                    <TouchableOpacity onPress={() => setSidebarVisible(true)}><Ionicons name="menu" size={24} color={theme.primary} /></TouchableOpacity>
                 </View>
-            )}
 
-        </ScrollView>
-      </View>
+                <ScrollView contentContainerStyle={styles.scrollContent} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => fetchProgress(true)} colors={[theme.primary]} />}>
+                    <Text style={[styles.mainTitle, { color: theme.text }]}>Course Learning Outcomes</Text>
+                    <Text style={[styles.subtitle, { color: theme.textSecondary }]}>Track your progress across all course learning outcomes including all chapters and topics</Text>
 
-      <CustomAlert
-        visible={alertConfig.visible}
-        title={alertConfig.title}
-        message={alertConfig.message}
-        type={alertConfig.type}
-        onClose={() => setAlertConfig({ ...alertConfig, visible: false })}
-      />
+                    {loading || authLoading ? (
+                        <View style={styles.centerContainer}><ActivityIndicator size="large" color={theme.primary} /></View>
+                    ) : (
+                        <>
+                            <LinearGradient colors={[theme.primary, theme.primary + 'CC']} style={styles.heroCard} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
+                                <View style={{ flex: 1 }}>
+                                    <Text style={styles.heroLabel}>TOTAL MASTERY</Text>
+                                    <Text style={styles.heroValue}>{Math.round(progressData?.overall_progress || 0)}%</Text>
+                                    <Text style={styles.debugStats}>
+                                        {progressData?.total_mcqs_seen || 0} Questions Attempted
+                                    </Text>
+                                </View>
+                                <AnimatedProgressCircle progress={progressData?.overall_progress} size={85} theme={theme} isHero={true} />
+                            </LinearGradient>
 
-      <Sidebar isVisible={sidebarVisible} onClose={toggleSidebar} activeScreen="CloPerformance" />
-    </SafeAreaView>
-  );
+
+
+                            <Text style={[styles.sectionTitle, { color: theme.text }]}>Chapter Wise Analysis</Text>
+                            {filteredChapters.map(chapter => (<ChapterCard key={chapter.id} chapter={chapter} progressData={progressData} theme={theme} />))}
+                        </>
+                    )}
+                </ScrollView>
+            </View>
+            <Sidebar isVisible={sidebarVisible} onClose={() => setSidebarVisible(false)} activeScreen="CloPerformance" />
+        </SafeAreaView>
+    );
 }
 
 const styles = StyleSheet.create({
     container: { flex: 1 },
     contentWrapper: { flex: 1 },
-    header: {
-        flexDirection: "row",
-        justifyContent: "space-between",
-        alignItems: "center",
-        paddingVertical: 10,
-        paddingHorizontal: 20,
-        borderBottomWidth: 1,
-        borderBottomColor: '#E0E0E0'
-    },
+    header: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingVertical: 12, paddingHorizontal: 20 },
     headerLeft: { flexDirection: 'row', alignItems: 'center' },
-    logo: { marginRight: 10 },
     headerTitle: { fontSize: 24, fontWeight: 'bold' },
-    scrollContent: { padding: 20, paddingBottom: 50 },
-    userDebugCard: { padding: 12, borderRadius: 10, marginBottom: 20, borderWidth: 1 },
-    userDebugRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 },
-    userDebugLabel: { fontSize: 14 },
-    userDebugId: { fontSize: 11, marginLeft: 28, fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace' },
+    logo: { marginRight: 10 },
+    scrollContent: { padding: 20 },
     mainTitle: { fontSize: 26, fontWeight: 'bold' },
-    subtitle: { fontSize: 16, marginBottom: 20 },
-    searchContainer: { flexDirection: 'row', alignItems: 'center', borderRadius: 10, padding: 15, marginBottom: 20 },
-    mainCard: { flexDirection: 'row', alignItems: 'center', borderRadius: 15, padding: 20, marginBottom: 25 },
-    mainCardTitle: { fontSize: 18, fontWeight: 'bold', color: 'white', marginBottom: 8 },
-    mainCardText: { fontSize: 14, color: 'white', opacity: 0.9 },
-    overallBadge: { width: 50, height: 50, borderRadius: 25, backgroundColor: 'rgba(255,255,255,0.2)', justifyContent: 'center', alignItems: 'center', marginLeft: 10 },
+    subtitle: { fontSize: 15, marginBottom: 20 },
+    circleWrapper: { justifyContent: 'center', alignItems: 'center' },
+    circleText: { fontWeight: 'bold' },
+    heroCard: { borderRadius: 25, padding: 25, flexDirection: 'row', alignItems: 'center', marginBottom: 25, elevation: 5 },
+    heroLabel: { color: 'rgba(255,255,255,0.7)', fontSize: 11, fontWeight: 'bold', letterSpacing: 1 },
+    heroValue: { color: 'white', fontSize: 48, fontWeight: '900' },
+    debugStats: { color: 'rgba(255,255,255,0.9)', fontSize: 13, marginTop: 5, fontWeight: '500' },
+    searchBox: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 15, height: 50, borderRadius: 15, borderWidth: 1, marginBottom: 25, marginTop: 5 },
+    searchInput: { flex: 1, marginLeft: 10, fontSize: 15 },
     sectionTitle: { fontSize: 18, fontWeight: 'bold', marginBottom: 15, marginLeft: 5 },
-    subjectCard: { borderRadius: 15, padding: 15, elevation: 2 },
-    chapterContainer: { marginBottom: 5, borderBottomWidth: 1, borderBottomColor: '#F0F0F0', paddingVertical: 10 },
+    chapterCard: { borderRadius: 22, marginBottom: 15, padding: 18, borderWidth: 1, elevation: 1 },
     chapterHeader: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-    chapterTitle: { flex: 1, fontSize: 15, fontWeight: 'bold' },
-    topicsWrapper: { marginTop: 15, paddingLeft: 10 },
-    topicContainer: { marginBottom: 15, paddingLeft: 15, borderLeftWidth: 2, borderColor: '#E0E0E0' },
-    topicHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 },
-    topicName: { flex: 1, fontSize: 14, fontWeight: '600', marginRight: 10 },
-    progressBarContainer: { height: 6, backgroundColor: '#E0E0E0', borderRadius: 3, marginVertical: 8, overflow: 'hidden' },
-    progressBar: { height: '100%', borderRadius: 3 },
-    topicStats: { fontSize: 12 },
-    centerContainer: { height: 300, justifyContent: 'center', alignItems: 'center' },
-    emptyContainer: { padding: 40, alignItems: 'center', justifyContent: 'center' },
-    emptyText: { textAlign: 'center', marginTop: 15, fontSize: 16 },
-    noDataText: { fontStyle: 'italic', fontSize: 13, padding: 10 },
-    retryBtn: { marginTop: 20, paddingVertical: 10, paddingHorizontal: 25, borderRadius: 10 }
+    chBadge: { paddingHorizontal: 12, paddingVertical: 5, borderRadius: 8 },
+    chapterTitle: { fontSize: 16, fontWeight: 'bold' },
+    chapterSub: { fontSize: 11, marginTop: 2 },
+    topicsList: { marginTop: 15, borderTopWidth: 1, borderTopColor: '#F0F0F0', paddingTop: 5 },
+    topicRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1 },
+    topicName: { fontSize: 14, fontWeight: '600' },
+    topicStats: { fontSize: 10, marginTop: 2 },
+    centerContainer: { height: 400, justifyContent: 'center', alignItems: 'center' },
 });
