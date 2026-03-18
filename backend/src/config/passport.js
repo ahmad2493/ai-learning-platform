@@ -12,6 +12,7 @@
 
 const passport = require('passport');
 const GoogleStrategy = require('passport-google-oauth20').Strategy;
+const bcrypt = require('bcryptjs');
 const User = require('../models/User');
 
 // Generate unique user_id
@@ -25,7 +26,7 @@ passport.use(
     {
       clientID: process.env.GOOGLE_CLIENT_ID,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-      callbackURL: `${process.env.BASE_URL || 'https://bd8229de9bbf.ngrok-free.app'}/api/auth/google/callback`,
+      callbackURL: `${process.env.BASE_URL}/api/auth/google/callback`,
     },
     async (accessToken, refreshToken, profile, done) => {
       try {
@@ -52,16 +53,17 @@ passport.use(
 
         // Create new user
         const user_id = await generateUserId();
+        const hashedPassword = await bcrypt.hash(`GOOGLE_AUTH_${googleId}`, 10);
 
         user = await User.create({
           user_id,
           role_id: 'ROLE001',
           role_name: 'Student',
-          name: firstName + lastName,
+          name: `${firstName} ${lastName}`,
           cnic: `GOOGLE-${googleId}`, // Placeholder for Google users
           email: email.toLowerCase(),
           contact_no: '0000000000', // Placeholder
-          password: 'GOOGLE_AUTH_USER', // Placeholder - Google users don't use password
+          password: hashedPassword, // Hashed placeholder - Google users use OAuth only
           gender: 'Not Specified',
           dob: new Date('2000-01-01'),
           address: 'Not Provided',

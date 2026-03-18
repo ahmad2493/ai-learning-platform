@@ -17,19 +17,20 @@
       "supportsTablet": true
     },
     "android": {
-      "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false,
-      "icon": "./assets/images/icon.png",
-      "networkSecurityConfig": "./res/xml/network_security_config.xml",
-      "package": "com.mominabutt24.ailearningplatform"
-    },
+  "edgeToEdgeEnabled": true,
+  "predictiveBackGestureEnabled": false,
+  "icon": "./assets/images/icon.png",
+  "networkSecurityConfig": "./res/xml/network_security_config.xml",
+  "package": "com.mominabutt24.ailearningplatform"
+},
     "web": {
       "output": "static",
       "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
       "expo-router",
-      "expo-web-browser"
+      "expo-web-browser",
+      "expo-font"
     ],
     "experiments": {
       "typedRoutes": true,

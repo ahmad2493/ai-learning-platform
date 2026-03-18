@@ -10,7 +10,7 @@
  * - Navigates to login after successful registration
  */
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -23,13 +23,19 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
+import * as WebBrowser from "expo-web-browser";
+import * as Linking from "expo-linking";
 import { useTheme } from "../utils/ThemeContext";
 import { BASE_URL } from "../utils/apiConfig";
 import CustomAlert from "../components/CustomAlert";
 import { termsAndConditionsText } from "../constants/legalText";
+import { useAuth } from '../context/AuthContext';
+
+WebBrowser.maybeCompleteAuthSession();
 
 export default function SignUpScreen({ navigation }) {
   const { theme } = useTheme();
+  const { signIn } = useAuth();
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -139,12 +145,49 @@ export default function SignUpScreen({ navigation }) {
     }
   };
 
+  useEffect(() => {
+    const handleDeepLink = async (event) => {
+      const { path, queryParams } = Linking.parse(event.url);
+      if (path === "auth/callback" && queryParams?.token) {
+        setIsLoading(true);
+        try {
+          await signIn(queryParams.token);
+        } catch (error) {
+          showAlert("Error", `Google Sign-Up failed: ${error.message}`);
+        } finally {
+          setIsLoading(false);
+        }
+      }
+    };
+    const subscription = Linking.addEventListener("url", handleDeepLink);
+    Linking.getInitialURL().then((url) => { if (url) handleDeepLink({ url }); });
+    return () => subscription.remove();
+  }, [signIn]);
+
   const handleSignIn = () => {
     navigation.navigate("SignIn");
   };
 
-  const handleGoogleSignIn = () => {
-    console.log("Google Sign In");
+  const handleGoogleSignIn = async () => {
+    try {
+      const authUrl = `${BASE_URL}/auth/google/signup`;
+      const result = await WebBrowser.openAuthSessionAsync(authUrl, "darsgah://auth/callback");
+      if (result.type === "success" && result.url) {
+        const { queryParams } = Linking.parse(result.url);
+        if (queryParams?.token) {
+          setIsLoading(true);
+          try {
+            await signIn(queryParams.token);
+          } catch (err) {
+            showAlert("Error", `Google Sign-Up failed: ${err.message}`);
+          } finally {
+            setIsLoading(false);
+          }
+        }
+      }
+    } catch (error) {
+      showAlert("Error", "Failed to start Google Sign-Up.");
+    }
   };
 
   const closeModal = () => {
