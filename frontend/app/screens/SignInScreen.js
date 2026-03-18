@@ -92,7 +92,20 @@ export default function SignInScreen({ navigation }) {
   const handleGoogleSignIn = async () => {
     try {
       const authUrl = `${BASE_URL}/auth/google/signin`;
-      await WebBrowser.openAuthSessionAsync(authUrl, "darsgah://auth/callback");
+      const result = await WebBrowser.openAuthSessionAsync(authUrl, "darsgah://auth/callback");
+      if (result.type === "success" && result.url) {
+        const { queryParams } = Linking.parse(result.url);
+        if (queryParams?.token) {
+          setIsLoading(true);
+          try {
+            await signIn(queryParams.token);
+          } catch (err) {
+            showAlert("Error", `Google Sign-In failed: ${err.message}`);
+          } finally {
+            setIsLoading(false);
+          }
+        }
+      }
     } catch (error) {
       showAlert("Error", "Failed to start Google Sign-In.");
     }
