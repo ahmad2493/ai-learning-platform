@@ -303,11 +303,19 @@ exports.loginUser = async (req, res) => {
 
     // Find user by email
     const user = await User.findOne({ email: email.toLowerCase() });
-    
+
     if (!user) {
       return res.status(401).json({
         success: false,
         message: 'Invalid email or password'
+      });
+    }
+
+    // Block Google-only accounts from password login
+    if (user.googleId && user.cnic?.startsWith('GOOGLE-')) {
+      return res.status(401).json({
+        success: false,
+        message: 'This account uses Google Sign-In. Please use "Continue with Google" to log in.'
       });
     }
 
