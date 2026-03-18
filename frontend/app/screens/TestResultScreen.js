@@ -1,7 +1,7 @@
 /**
  * Test Result Screen
  * Displays the final score and detailed feedback for MCQs, Short, and Long questions.
- * Updated: Added Section B and C rendering for comprehensive review.
+ * Updated: Fixed short questions display for Board mode (object structure).
  * Author: Momna Butt (BCSF22M021)
  */
 
@@ -20,6 +20,57 @@ import { useTheme } from '../utils/ThemeContext';
 export default function TestResultScreen({ navigation, route }) {
   const { theme } = useTheme();
   const { test, userAnswers, score } = route.params;
+
+  // Helper to render short questions regardless of structure (array or object)
+  const renderShortQuestionsReview = () => {
+    const sq = test.short_questions;
+    if (!sq) return null;
+
+    // CASE 1: Flat Array (Custom Mode)
+    if (Array.isArray(sq)) {
+      if (sq.length === 0) return null;
+      return (
+        <View style={styles.resultSection}>
+          <Text style={[styles.sectionHeading, { color: theme.primary }]}>Section B: Short Questions</Text>
+          {sq.map((q, index) => (
+            <View key={`sq-${index}`} style={[styles.card, { backgroundColor: theme.surface }]}>
+              <Text style={[styles.qNumber, { color: theme.primary, marginBottom: 5 }]}>Question {index + 1}</Text>
+              <Text style={[styles.qText, { color: theme.text }]}>{q.question}</Text>
+              <View style={styles.marksFooter}>
+                <Text style={[styles.marksLabel, { color: theme.textSecondary }]}>Standard Marks: 2</Text>
+              </View>
+            </View>
+          ))}
+        </View>
+      );
+    }
+
+    // CASE 2: Object with Q2, Q3, Q4 keys (Board Mode)
+    const keys = Object.keys(sq).filter(k => Array.isArray(sq[k]) && sq[k].length > 0).sort();
+    if (keys.length === 0) return null;
+
+    return (
+      <View style={styles.resultSection}>
+        <Text style={[styles.sectionHeading, { color: theme.primary }]}>Section B: Short Questions</Text>
+        {keys.map((groupKey) => (
+          <View key={groupKey} style={{ marginBottom: 20 }}>
+            <Text style={[styles.groupTitleReview, { color: theme.text, backgroundColor: theme.primary + '10' }]}>
+              {groupKey.replace('Q', 'Question ')}
+            </Text>
+            {sq[groupKey].map((q, index) => (
+              <View key={`${groupKey}-${index}`} style={[styles.card, { backgroundColor: theme.surface }]}>
+                <Text style={[styles.qNumber, { color: theme.primary, marginBottom: 5 }]}>({index + 1})</Text>
+                <Text style={[styles.qText, { color: theme.text }]}>{q.question}</Text>
+                <View style={styles.marksFooter}>
+                  <Text style={[styles.marksLabel, { color: theme.textSecondary }]}>Standard Marks: 2</Text>
+                </View>
+              </View>
+            ))}
+          </View>
+        ))}
+      </View>
+    );
+  };
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
@@ -53,14 +104,14 @@ export default function TestResultScreen({ navigation, route }) {
         {test.mcqs.length > 0 && (
           <View style={styles.resultSection}>
             <Text style={[styles.sectionHeading, { color: theme.primary }]}>Section A: MCQs</Text>
-            {test.mcqs.map((q) => {
+            {test.mcqs.map((q, index) => {
               const userAnswer = userAnswers[q.question_number];
               const isCorrect = userAnswer?.toString().toLowerCase() === q.correct_option?.toString().toLowerCase();
 
               return (
                 <View key={q.question_number} style={[styles.card, { backgroundColor: theme.surface }]}>
                   <View style={styles.qHeader}>
-                    <Text style={[styles.qNumber, { color: theme.primary }]}>Question {q.question_number}</Text>
+                    <Text style={[styles.qNumber, { color: theme.primary }]}>Question {index + 1}</Text>
                     <Ionicons 
                       name={isCorrect ? "checkmark-circle" : "close-circle"} 
                       size={24} 
@@ -110,28 +161,15 @@ export default function TestResultScreen({ navigation, route }) {
         )}
 
         {/* Section B: Short Questions */}
-        {test.short_questions && test.short_questions.length > 0 && (
-          <View style={styles.resultSection}>
-            <Text style={[styles.sectionHeading, { color: theme.primary }]}>Section B: Short Questions</Text>
-            {test.short_questions.map((q) => (
-              <View key={q.question_number} style={[styles.card, { backgroundColor: theme.surface }]}>
-                <Text style={[styles.qNumber, { color: theme.primary, marginBottom: 5 }]}>Question {q.question_number}</Text>
-                <Text style={[styles.qText, { color: theme.text }]}>{q.question}</Text>
-                <View style={styles.marksFooter}>
-                  <Text style={[styles.marksLabel, { color: theme.textSecondary }]}>Standard Marks: 2</Text>
-                </View>
-              </View>
-            ))}
-          </View>
-        )}
+        {renderShortQuestionsReview()}
 
         {/* Section C: Long Questions */}
         {test.long_questions && test.long_questions.length > 0 && (
           <View style={styles.resultSection}>
             <Text style={[styles.sectionHeading, { color: theme.primary }]}>Section C: Long Questions</Text>
-            {test.long_questions.map((q) => (
+            {test.long_questions.map((q, index) => (
               <View key={q.question_number} style={[styles.card, { backgroundColor: theme.surface }]}>
-                <Text style={[styles.qNumber, { color: theme.primary, marginBottom: 10 }]}>Question {q.question_number}</Text>
+                <Text style={[styles.qNumber, { color: theme.primary, marginBottom: 10 }]}>Question {index + 1}</Text>
                 
                 <View style={styles.longPart}>
                   <Text style={[styles.partText, { color: theme.text }]}>(a) {q.part_a.question}</Text>
@@ -199,4 +237,5 @@ const styles = StyleSheet.create({
   partText: { fontSize: 15, lineHeight: 22 },
   exitBtn: { padding: 18, borderRadius: 15, alignItems: 'center', marginTop: 20, marginBottom: 40 },
   exitBtnText: { color: 'white', fontWeight: 'bold', fontSize: 16 },
+  groupTitleReview: { fontSize: 16, fontWeight: 'bold', padding: 8, borderRadius: 5, marginBottom: 10 },
 });

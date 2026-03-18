@@ -1,13 +1,7 @@
 /**
  * Profile Screen - User Profile Management
+ * Updated: Fixed authToken variable, PATCH method, and profile_picture field name.
  * Author: Momna Butt (BCSF22M021)
- *
- * Functionality:
- * - Displays and edits user profile information
- * - Handles profile picture upload and display
- * - Updates user details (name, email, etc.)
- * - Integrates with image picker for photo selection
- * - Manages profile data synchronization with backend
  */
 
 import React, { useState, useEffect } from 'react';
@@ -34,7 +28,7 @@ import { useAuth } from '../context/AuthContext';
 
 export default function ProfileScreen({ navigation }) {
   const { theme } = useTheme();
-  const { user, isLoading, refreshUser, authToken } = useAuth();
+  const { user, isLoading, refreshUser, userToken } = useAuth();
   const [sidebarVisible, setSidebarVisible] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -77,7 +71,7 @@ export default function ProfileScreen({ navigation }) {
       }
 
       let result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: ['images'],
         allowsEditing: true,
         aspect: [1, 1],
         quality: 0.8,
@@ -94,7 +88,9 @@ export default function ProfileScreen({ navigation }) {
 
   const getInitials = (name) => {
     if (!name) return '';
-    return name.split(' ').map(n => n[0]).join('').toUpperCase();
+    const names = name.split(' ');
+    if (names.length === 1) return names[0].charAt(0).toUpperCase();
+    return (names[0].charAt(0) + names[names.length - 1].charAt(0)).toUpperCase();
   };
 
   const toggleSidebar = () => {
@@ -110,7 +106,7 @@ export default function ProfileScreen({ navigation }) {
   };
 
   const handleSaveChanges = async () => {
-    if (!authToken) {
+    if (!userToken) {
       showAlert('Error', 'User is not authenticated. Please log in again.');
       return;
     }
@@ -120,30 +116,28 @@ export default function ProfileScreen({ navigation }) {
     try {
       const formData = new FormData();
       formData.append('name', userData.name.trim());
-      formData.append('bio', userData.bio);
+      formData.append('bio', userData.bio || '');
 
       if (userData.profilePicture && userData.profilePicture.startsWith('file://')) {
         const filename = userData.profilePicture.split('/').pop();
         const match = /\.(\w+)$/.exec(filename);
         const type = match ? `image/${match[1]}` : 'image/jpeg';
 
-        formData.append('profile_photo', {
+        formData.append('profile_picture', {
           uri: Platform.OS === 'ios' ? userData.profilePicture.replace('file://', '') : userData.profilePicture,
           name: filename,
           type,
         });
       }
 
-      const headers = {
-        'Content-Type': 'multipart/form-data',
-        'ngrok-skip-browser-warning': 'true',
-        'Authorization': `Bearer ${authToken}`,
-      };
-
       const response = await fetch(`${BASE_URL}/profile/me`, {
-        method: 'PUT',
+        method: 'PATCH',
         body: formData,
-        headers: headers,
+        headers: {
+          'Accept': 'application/json',
+          'Authorization': `Bearer ${userToken}`,
+          'ngrok-skip-browser-warning': 'true',
+        },
       });
 
       const result = await response.json();
@@ -151,12 +145,13 @@ export default function ProfileScreen({ navigation }) {
       if (result.success) {
         showAlert('Success', 'Profile updated successfully!', 'success');
         setIsEditing(false);
-        await refreshUser();
+        if (refreshUser) await refreshUser();
       } else {
         showAlert('Error', result.message || 'Failed to update profile.');
       }
     } catch (error) {
-      showAlert('Error', 'An error occurred while updating profile. Please try again.');
+      console.error('❌ [PROFILE UPDATE] Error:', error);
+      showAlert('Error', 'An error occurred while updating profile.');
     } finally {
       setLoading(false);
     }
@@ -283,75 +278,24 @@ export default function ProfileScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   contentWrapper: { flex: 1 },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingText: {
-    marginTop: 10,
-    fontSize: 16,
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 15,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E0E0E0',
-  },
+  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  loadingText: { marginTop: 10, fontSize: 16 },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 15, borderBottomWidth: 1, borderBottomColor: '#E0E0E0' },
   headerTitle: { fontSize: 22, fontWeight: 'bold', flex: 1, textAlign: 'center' },
   scrollContent: { padding: 20, paddingBottom: 50 },
   profileHeader: { alignItems: 'center', padding: 30, borderRadius: 20, marginBottom: 20 },
   avatarContainer: { position: 'relative', marginBottom: 15 },
-  avatar: { 
-    width: 120, 
-    height: 120, 
-    borderRadius: 60, 
-    overflow: 'hidden', 
-    justifyContent: 'center', 
-    alignItems: 'center' 
-  },
+  avatar: { width: 120, height: 120, borderRadius: 60, overflow: 'hidden', justifyContent: 'center', alignItems: 'center' },
   avatarImage: { width: '100%', height: '100%' },
   avatarInitials: { fontSize: 48, fontWeight: 'bold', color: 'white', textAlign: 'center' },
-  cameraOverlay: {
-    position: 'absolute',
-    width: '100%',
-    height: '100%',
-    backgroundColor: 'rgba(0,0,0,0.4)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
+  cameraOverlay: { position: 'absolute', width: '100%', height: '100%', backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'center', alignItems: 'center' },
   name: { fontSize: 26, fontWeight: 'bold', marginBottom: 4 },
   email: { fontSize: 16 },
-  nameInput: { 
-    fontSize: 24, 
-    fontWeight: 'bold', 
-    borderBottomWidth: 1, 
-    textAlign: 'center', 
-    padding: 8, 
-    width: '110%',
-    marginBottom: 4,
-  },
+  nameInput: { fontSize: 24, fontWeight: 'bold', borderBottomWidth: 1, textAlign: 'center', padding: 8, width: '110%', marginBottom: 4 },
   card: { borderRadius: 15, padding: 20, marginBottom: 20 },
   cardTitle: { fontSize: 18, fontWeight: 'bold', marginBottom: 10 },
   bio: { fontSize: 16, lineHeight: 24 },
-  bioInput: { 
-    fontSize: 16, 
-    lineHeight: 24, 
-    borderWidth: 1, 
-    borderRadius: 10, 
-    padding: 12, 
-    minHeight: 120, 
-    textAlignVertical: 'top' 
-  },
-  editButton: { 
-    flexDirection: 'row', 
-    alignItems: 'center', 
-    justifyContent: 'center', 
-    padding: 16, 
-    borderRadius: 12,
-    marginTop: 10,
-  },
+  bioInput: { fontSize: 16, lineHeight: 24, borderWidth: 1, borderRadius: 10, padding: 12, minHeight: 120, textAlignVertical: 'top' },
+  editButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', padding: 16, borderRadius: 12, marginTop: 10 },
   editButtonText: { color: 'white', fontSize: 18, fontWeight: 'bold', marginLeft: 10 },
 });

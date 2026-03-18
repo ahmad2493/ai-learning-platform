@@ -9,14 +9,13 @@ export const AuthProvider = ({ children }) => {
   const [userToken, setUserToken] = useState(null);
   const [user, setUser] = useState(null);
 
-  // Robust helper to decode JWT token in React Native
+  // Helper to decode JWT token
   const getUserIdFromToken = (token) => {
     try {
       if (!token) return null;
       const payload = token.split('.')[1];
       if (!payload) return null;
 
-      // Manual Base64 decoding (Base64Url to Base64)
       const base64 = payload.replace(/-/g, '+').replace(/_/g, '/');
       const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=';
       let str = String(base64).replace(/[=]+$/, '');
@@ -33,13 +32,35 @@ export const AuthProvider = ({ children }) => {
       }
 
       const decodedPayload = JSON.parse(output);
-      console.log('🗝️ [AuthContext] Decoded ID from Token:', decodedPayload.userId || decodedPayload.id || decodedPayload.sub);
-      
-      // Look for common ID fields in JWT payloads
       return decodedPayload.userId || decodedPayload.id || decodedPayload.sub || decodedPayload._id;
     } catch (e) {
       console.error('[AuthContext] Token decode error:', e);
       return null;
+    }
+  };
+
+  const refreshUser = async () => {
+    if (!userToken) return;
+    try {
+      const response = await fetch(`${BASE_URL}/profile/me`, {
+        headers: {
+          Authorization: `Bearer ${userToken}`,
+          'ngrok-skip-browser-warning': 'true',
+        },
+      });
+      const result = await response.json();
+      
+      if (response.ok && result.success) {
+        const idFromToken = getUserIdFromToken(userToken);
+        const updatedUser = {
+          ...result.data,
+          userId: result.data.userId || result.data._id || idFromToken
+        };
+        setUser(updatedUser);
+        await AsyncStorage.setItem('user', JSON.stringify(updatedUser));
+      }
+    } catch (error) {
+      console.error('[AuthContext] Refresh user error:', error);
     }
   };
 
@@ -48,11 +69,27 @@ export const AuthProvider = ({ children }) => {
       try {
         const token = await AsyncStorage.getItem('userToken');
         if (token) {
-          await signIn(token);
+          // Instead of calling signIn (which fetches profile), 
+          // we can just set token and refresh to avoid redundant code
+          setUserToken(token);
+          const savedUser = await AsyncStorage.getItem('user');
+          if (savedUser) {
+            setUser(JSON.parse(savedUser));
+          }
+          // Sync with server
+          const response = await fetch(`${BASE_URL}/profile/me`, {
+            headers: { Authorization: `Bearer ${token}`, 'ngrok-skip-browser-warning': 'true' },
+          });
+          const result = await response.json();
+          if (response.ok && result.success) {
+            const idFromToken = getUserIdFromToken(token);
+            const userWithId = { ...result.data, userId: result.data.userId || result.data._id || idFromToken };
+            setUser(userWithId);
+            await AsyncStorage.setItem('user', JSON.stringify(userWithId));
+          }
         }
       } catch (e) {
         console.error('[AuthContext] Bootstrap error:', e);
-        await signOut();
       } finally {
         setIsLoading(false);
       }
@@ -74,42 +111,29 @@ export const AuthProvider = ({ children }) => {
         throw new Error(result.message || 'Failed to fetch profile on sign-in');
       }
 
-      // Profile API data
-      let userData = result.data;
-      
-      // EXTRACT ID FROM TOKEN if not present in profile data
       const idFromToken = getUserIdFromToken(token);
-      
-      // Merge profile data with the extracted ID
       const userWithId = {
-        ...userData,
-        userId: userData.userId || userData._id || userData.id || idFromToken
+        ...result.data,
+        userId: result.data.userId || result.data._id || idFromToken
       };
-
-      console.log('👤 [AuthContext] User Session Ready:', userWithId.name, 'ID:', userWithId.userId);
 
       setUser(userWithId);
       setUserToken(token);
 
       await AsyncStorage.setItem('userToken', token);
       await AsyncStorage.setItem('user', JSON.stringify(userWithId));
-
     } catch (error) {
       console.error('[AuthContext] Sign-in error:', error);
-      await signOut();
       throw error;
     }
   };
 
   const signOut = async () => {
     try {
-      const keysToRemove = [
-          'userToken', 'user', 'authToken', 'mongo_user_id', 
-          'userName', 'userEmail', 'darsgah_user_chats'
-      ];
+      const keysToRemove = ['userToken', 'user', 'authToken', 'mongo_user_id', 'userName', 'userEmail'];
       await AsyncStorage.multiRemove(keysToRemove);
     } catch (e) {
-      console.error('[AuthContext] Failed to clear storage', e);
+      console.error('[AuthContext] Sign-out error:', e);
     } finally {
       setUser(null);
       setUserToken(null);
@@ -117,15 +141,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   return (
-    <AuthContext.Provider
-      value={{
-        user,
-        userToken,
-        isLoading,
-        signIn,
-        signOut,
-      }}
-    >
+    <AuthContext.Provider value={{ user, userToken, isLoading, signIn, signOut, refreshUser }}>
       {children}
     </AuthContext.Provider>
   );

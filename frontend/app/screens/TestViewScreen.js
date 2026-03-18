@@ -1,6 +1,6 @@
 /**
  * Test View Screen - Interactive Test Interface
- * Fixed: Added rendering for Short and Long Questions sections.
+ * Fixed: Submit button logic to require all MCQs to be attempted.
  * Author: Momna Butt (BCSF22M021)
  */
 
@@ -44,7 +44,7 @@ export default function TestViewScreen({ navigation, route }) {
   const [loading, setLoading] = useState(false);
   const [timeLeft, setTimeLeft] = useState(0); 
   const [finalScore, setFinalScore] = useState(null);
-  const [alertConfig, setAlertConfig] = useState({ visible: false, title: '', message: '', type: 'info' });
+  const [alertConfig, setAlertConfig] = useState({ visible: false, title: '', message: '', type: 'info', onConfirm: null });
 
   const isSubmittingRef = useRef(false);
 
@@ -86,7 +86,11 @@ export default function TestViewScreen({ navigation, route }) {
 
       const response = await fetch(`${AI_SUBMIT_TEST_URL}/${test._id}/submit`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${userToken}` },
+        headers: { 
+          'Content-Type': 'application/json', 
+          'Authorization': `Bearer ${userToken}`,
+          'ngrok-skip-browser-warning': 'true'
+        },
         body: JSON.stringify({ mcq_answers: userAnswers })
       });
 
@@ -113,6 +117,15 @@ export default function TestViewScreen({ navigation, route }) {
     }
   }, [isSubmitted, loading, isReadMode, test, userAnswers, userToken, calculateLocalScore, navigation]);
 
+  const handleConfirmSubmit = () => {
+    showAlert(
+      "Confirm Submission",
+      "Are you sure you want to submit your test? You won't be able to change your answers after this.",
+      "confirm",
+      () => handleSubmit(false)
+    );
+  };
+
   useEffect(() => {
     if (isSubmitted || isReadMode) return;
     const interval = setInterval(() => {
@@ -122,14 +135,59 @@ export default function TestViewScreen({ navigation, route }) {
       setTimeLeft(diff);
       if (diff === 0 && !isSubmitted && !loading && !isSubmittingRef.current) {
         clearInterval(interval);
-        handleSubmit(true);
+        handleSubmit(true); // Auto-submit on timer expiry
       }
     }, 1000);
     return () => clearInterval(interval);
   }, [test.test_details.expires_at, isSubmitted, loading, isReadMode, handleSubmit]);
 
   const allAttempted = hasMcqs && test.mcqs.every(q => userAnswers[q.question_number] !== undefined);
-  const canSubmit = hasMcqs && !isSubmitted && !loading;
+  const canSubmit = hasMcqs && !isSubmitted && !loading && allAttempted;
+
+  // Helper to render short questions regardless of structure (array or object)
+  const renderShortQuestions = () => {
+    const sq = test.short_questions;
+    if (!sq) return null;
+
+    // CASE 1: Flat Array (Custom Mode)
+    if (Array.isArray(sq)) {
+      if (sq.length === 0) return null;
+      return (
+        <View style={styles.section}>
+          <Text style={[styles.sectionHeading, { color: theme.primary }]}>Section B: Short Questions</Text>
+          {sq.map((q, index) => (
+            <View key={`sq-${index}`} style={[styles.card, { backgroundColor: theme.surface }]}>
+              <Text style={[styles.qText, { color: theme.text }]}>Q{index + 1}. {q.question}</Text>
+              <Text style={[styles.marksLabel, { color: theme.textSecondary }]}>[Marks: 2]</Text>
+            </View>
+          ))}
+        </View>
+      );
+    }
+
+    // CASE 2: Object with Q2, Q3, Q4 keys (Board Mode)
+    const keys = Object.keys(sq).filter(k => Array.isArray(sq[k]) && sq[k].length > 0).sort();
+    if (keys.length === 0) return null;
+
+    return (
+      <View style={styles.section}>
+        <Text style={[styles.sectionHeading, { color: theme.primary }]}>Section B: Short Questions</Text>
+        {keys.map((groupKey) => (
+          <View key={groupKey} style={{ marginBottom: 20 }}>
+            <Text style={[styles.groupTitle, { color: theme.text, backgroundColor: theme.primary + '10' }]}>
+              {groupKey.replace('Q', 'Question ')}
+            </Text>
+            {sq[groupKey].map((q, index) => (
+              <View key={`${groupKey}-${index}`} style={[styles.card, { backgroundColor: theme.surface }]}>
+                <Text style={[styles.qText, { color: theme.text }]}>({index + 1}) {q.question}</Text>
+                <Text style={[styles.marksLabel, { color: theme.textSecondary }]}>[Marks: 2]</Text>
+              </View>
+            ))}
+          </View>
+        ))}
+      </View>
+    );
+  };
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
@@ -144,12 +202,14 @@ export default function TestViewScreen({ navigation, route }) {
 
       <View style={[styles.header, { borderBottomColor: theme.inputBorder, backgroundColor: theme.background }]}>
         <View style={styles.headerRow}>
-          <TouchableOpacity onPress={() => navigation.goBack()}><Ionicons name="arrow-back" size={24} color={theme.text} /></TouchableOpacity>
+          <TouchableOpacity onPress={() => navigation.goBack()}>
+            <Ionicons name="arrow-back" size={24} color={theme.text} />
+          </TouchableOpacity>
           <Text style={[styles.headerTitle, { color: theme.text }]}>DarsGah Exam</Text>
           <View style={[styles.timerBadge, { backgroundColor: timeLeft <= 0 ? theme.error + '20' : theme.primary + '20' }]}>
             <Ionicons name="time-outline" size={18} color={timeLeft <= 0 ? theme.error : theme.primary} />
             <Text style={[styles.timerText, { color: timeLeft <= 0 ? theme.error : theme.primary }]}>
-                {isSubmitted ? "FINISHED" : (timeLeft <= 0 ? "00:00" : `${Math.floor(timeLeft/60)}:${(timeLeft%60).toString().padStart(2,'0')}`)}
+                {isSubmitted ? "DONE" : (timeLeft <= 0 ? "00:00" : `${Math.floor(timeLeft/60)}:${(timeLeft%60).toString().padStart(2,'0')}`)}
             </Text>
           </View>
         </View>
@@ -178,9 +238,9 @@ export default function TestViewScreen({ navigation, route }) {
         {test.mcqs.length > 0 && (
           <View style={styles.section}>
             <Text style={[styles.sectionHeading, { color: theme.primary }]}>Section A: MCQs</Text>
-            {test.mcqs.map((q) => (
+            {test.mcqs.map((q, index) => (
               <View key={q.question_number} style={[styles.card, { backgroundColor: theme.surface }]}>
-                <Text style={[styles.qText, { color: theme.text }]}>{q.question_number}. {q.question}</Text>
+                <Text style={[styles.qText, { color: theme.text }]}>{index + 1}. {q.question}</Text>
                 {Object.entries(q.options).map(([key, val]) => {
                   const isSelected = userAnswers[q.question_number] === key;
                   const isCorrect = q.correct_option?.toLowerCase() === key.toLowerCase();
@@ -206,25 +266,15 @@ export default function TestViewScreen({ navigation, route }) {
         )}
 
         {/* Short Questions Section */}
-        {test.short_questions && test.short_questions.length > 0 && (
-          <View style={styles.section}>
-            <Text style={[styles.sectionHeading, { color: theme.primary }]}>Section B: Short Questions</Text>
-            {test.short_questions.map((q) => (
-              <View key={q.question_number} style={[styles.card, { backgroundColor: theme.surface }]}>
-                <Text style={[styles.qText, { color: theme.text }]}>Q{q.question_number}. {q.question}</Text>
-                <Text style={[styles.marksLabel, { color: theme.textSecondary }]}>[Marks: 2]</Text>
-              </View>
-            ))}
-          </View>
-        )}
+        {renderShortQuestions()}
 
         {/* Long Questions Section */}
         {test.long_questions && test.long_questions.length > 0 && (
           <View style={styles.section}>
             <Text style={[styles.sectionHeading, { color: theme.primary }]}>Section C: Long Questions</Text>
-            {test.long_questions.map((q) => (
+            {test.long_questions.map((q, index) => (
               <View key={q.question_number} style={[styles.card, { backgroundColor: theme.surface }]}>
-                <Text style={[styles.qText, { color: theme.text, marginBottom: 10 }]}>Q{q.question_number}.</Text>
+                <Text style={[styles.qText, { color: theme.text, marginBottom: 10 }]}>Q{test.test_details.mode === 'board' ? index + 5 : index + 1}.</Text>
                 <View style={styles.longPart}>
                   <Text style={[styles.partText, { color: theme.text }]}> (a) {q.part_a.question}</Text>
                   <Text style={[styles.marksLabel, { color: theme.textSecondary }]}>[Marks: {q.part_a.marks}]</Text>
@@ -239,8 +289,12 @@ export default function TestViewScreen({ navigation, route }) {
         )}
 
         {!isSubmitted && hasMcqs && (
-          <TouchableOpacity disabled={!canSubmit} style={[styles.submitBtn, { backgroundColor: canSubmit ? theme.primary : theme.textSecondary }]} onPress={() => handleSubmit(false)}>
-            {loading ? <ActivityIndicator color="white" /> : <Text style={styles.btnText}>{allAttempted ? "Finish & Submit" : "Complete MCQs to Submit"}</Text>}
+          <TouchableOpacity 
+            disabled={!canSubmit} 
+            style={[styles.submitBtn, { backgroundColor: canSubmit ? theme.primary : theme.textSecondary }]} 
+            onPress={handleConfirmSubmit}
+          >
+            {loading ? <ActivityIndicator color="white" /> : <Text style={styles.btnText}>Submit</Text>}
           </TouchableOpacity>
         )}
 
@@ -265,8 +319,8 @@ const styles = StyleSheet.create({
   header: { padding: 16, borderBottomWidth: 1 },
   headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   headerTitle: { fontSize: 18, fontWeight: 'bold' },
-  timerBadge: { flexDirection: 'row', alignItems: 'center', padding: 8, borderRadius: 12, gap: 5 },
-  timerText: { fontSize: 13, fontWeight: 'bold' },
+  timerBadge: { flexDirection: 'row', alignItems: 'center', paddingVertical: 6, paddingHorizontal: 10, borderRadius: 12, gap: 5 },
+  timerText: { fontSize: 14, fontWeight: 'bold' },
   scrollContent: { padding: 20 },
   testTitle: { fontSize: 20, fontWeight: 'bold', textAlign: 'center', marginBottom: 20 },
   section: { marginBottom: 30 },
@@ -285,4 +339,5 @@ const styles = StyleSheet.create({
   scoreItem: { alignItems: 'center' },
   scoreLabel: { fontSize: 12 },
   scoreValue: { fontSize: 22, fontWeight: 'bold' },
+  groupTitle: { fontSize: 16, fontWeight: 'bold', padding: 8, borderRadius: 5, marginBottom: 10 },
 });
