@@ -127,6 +127,9 @@ async function updateProgress(user_id, mcqs) {
 
     if (diff_days === 0) {
       // already submitted today — keep streak
+      if ((doc.streak || 0) === 0) {
+        doc.streak = 1;
+      }
     } else if (diff_days === 1) {
       // submitted yesterday — continue streak
       doc.streak = (doc.streak || 0) + 1;
