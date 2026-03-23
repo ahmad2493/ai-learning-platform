@@ -2,6 +2,18 @@ const mongoose = require('mongoose');
 const Test = require('../models/Test');
 const { updateProgress, getEffectiveStreak } = require('./ProgressController');
 
+// ── Shared helper — expires all overdue unattempted tests for a user ──────────
+async function expireOverdueTests(user_id) {
+  const now = new Date();
+  const unattempted = await Test.find({ user_id, status: 'unattempted' });
+  const toExpire = unattempted.filter(t => new Date(t.test_details.expires_at) < now);
+  if (toExpire.length > 0) {
+    const ids = toExpire.map(t => t._id);
+    await Test.updateMany({ _id: { $in: ids } }, { $set: { status: 'expired' } });
+    console.log(`[EXPIRED] ${toExpire.length} overdue test(s) for user_id=${user_id}`);
+  }
+}
+
 async function submitTest(req, res) {
   try {
     const { test_id } = req.params;
@@ -120,6 +132,9 @@ async function getTestHistory(req, res) {
     const { user_id } = req.params;
     if (!mongoose.Types.ObjectId.isValid(user_id)) return res.status(400).json({ success: false, message: 'Invalid user_id format.' });
 
+    // Expire any overdue unattempted tests before returning history
+    await expireOverdueTests(user_id);
+
     const tests = await Test.find({ user_id })
       .select('_id status submitted_at created_at test_details')
       .sort({ created_at: -1 });
@@ -138,6 +153,9 @@ async function getDashboard(req, res) {
       return res.status(400).json({ success: false, message: 'Invalid user_id format.' });
     }
 
+    // Expire any overdue unattempted tests before calculating stats
+    await expireOverdueTests(user_id);
+
     const Progress = require('../models/Progress');
     const progressDoc = await Progress.findOne({ user_id });
 
@@ -149,6 +167,7 @@ async function getDashboard(req, res) {
       : 0;
     const streak = getEffectiveStreak(progressDoc);
 
+    // These counts are now accurate since overdue tests are already expired above
     const total_tests_generated = await Test.countDocuments({ user_id });
     const total_tests_attempted = await Test.countDocuments({ user_id, status: 'attempted' });
     const total_tests_expired   = await Test.countDocuments({ user_id, status: 'expired' });
@@ -181,7 +200,7 @@ async function getDashboard(req, res) {
         total_tests_generated,
         total_tests_attempted,
         total_tests_expired,
-        average_score
+        average_score,
       },
     });
   } catch (error) {
