@@ -9,9 +9,9 @@ const CHAPTER_TOPIC_COUNTS = {
 
 function calcTopicProgress(mcqs_seen, mcqs_correct) {
   if (mcqs_seen === 0) return 0;
-  const raw_score  = mcqs_correct / mcqs_seen;
-  const confidence = mcqs_seen / (mcqs_seen + K);
-  return raw_score * confidence * 100;
+  const accuracy    = mcqs_correct / mcqs_seen;
+  const data_weight = mcqs_seen / (mcqs_seen + K);
+  return accuracy * accuracy * data_weight * 100;
 }
 
 function getEffectiveStreak(doc) {
@@ -25,8 +25,8 @@ function getEffectiveStreak(doc) {
 
   const diff_days = Math.round((today - last) / (1000 * 60 * 60 * 24));
 
-  if (diff_days <= 1) return doc.streak || 0;  // today or yesterday — streak intact
-  return 0;                                     // missed a day — streak broken
+  if (diff_days <= 1) return doc.streak || 0;
+  return 0;
 }
 
 async function updateProgress(user_id, mcqs) {
@@ -52,7 +52,10 @@ async function updateProgress(user_id, mcqs) {
       chapter.total_topics = CHAPTER_TOPIC_COUNTS[ch_key] || 0;
 
       if (!chapter.topics.has(top_key)) {
-        chapter.topics.set(top_key, { topic_name: topic_name || top_key, mcqs_seen: 0, mcqs_correct: 0, progress: 0 });
+        chapter.topics.set(top_key, {
+          topic_name: topic_name || top_key,
+          mcqs_seen: 0, mcqs_correct: 0, progress: 0,
+        });
       }
       const topic = chapter.topics.get(top_key);
       topic.mcqs_seen    += 1;
@@ -64,26 +67,45 @@ async function updateProgress(user_id, mcqs) {
 
     // ── Recalculate chapter and overall progress ─────────────────
     let total_seen = 0, total_correct = 0;
+
     for (const [ch_key, chapter] of doc.chapters) {
-      let ch_seen = 0, ch_correct = 0, weighted_performance_sum = 0, weight_sum = 0;
+      let ch_seen = 0, ch_correct = 0;
+
       for (const [, topic] of chapter.topics) {
         ch_seen    += topic.mcqs_seen;
         ch_correct += topic.mcqs_correct;
-        weighted_performance_sum += topic.progress * topic.mcqs_seen;
-        weight_sum               += topic.mcqs_seen;
       }
+
       chapter.mcqs_seen    = ch_seen;
       chapter.mcqs_correct = ch_correct;
+
+      // Step 1 — accuracy of touched topics squared
+      const touched_accuracy = ch_seen > 0 ? ch_correct / ch_seen : 0;
+
+      // Step 2 — coverage penalty
       const touched_topics = chapter.topics.size;
       const total_topics   = CHAPTER_TOPIC_COUNTS[ch_key] || touched_topics;
       const coverage       = total_topics > 0 ? touched_topics / total_topics : 0;
-      const weighted_perf  = weight_sum > 0 ? weighted_performance_sum / weight_sum : 0;
-      chapter.progress = weighted_perf * coverage;
+
+      // Step 3 — reliability factor
+      const MIN_RELIABLE = 10;
+      let reliable_weight = 0;
+      let total_weight    = 0;
+      for (const [, topic] of chapter.topics) {
+        const reliability = Math.min(topic.mcqs_seen / MIN_RELIABLE, 1);
+        reliable_weight  += reliability * topic.mcqs_seen;
+        total_weight     += topic.mcqs_seen;
+      }
+      const reliability_factor = total_weight > 0 ? reliable_weight / total_weight : 0;
+
+      chapter.progress = touched_accuracy * touched_accuracy * coverage * reliability_factor * 100;
       doc.chapters.set(ch_key, chapter);
+
       total_seen    += ch_seen;
       total_correct += ch_correct;
     }
 
+    // ── Overall progress ─────────────────────────────────────────
     let overall_sum = 0, overall_weight = 0;
     for (const [, chapter] of doc.chapters) {
       overall_sum    += chapter.progress * chapter.mcqs_seen;
@@ -94,7 +116,7 @@ async function updateProgress(user_id, mcqs) {
     doc.total_mcqs_correct = total_correct;
     doc.overall_progress   = overall_weight > 0 ? overall_sum / overall_weight : 0;
 
-    // ── Streak calculation (before updating last_updated) ────────
+    // ── Streak calculation ────────────────────────────────────────
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
@@ -104,12 +126,12 @@ async function updateProgress(user_id, mcqs) {
     const diff_days = Math.round((today - last) / (1000 * 60 * 60 * 24));
 
     if (diff_days === 0) {
-      // Already submitted today — keep streak as is
+      // already submitted today — keep streak
     } else if (diff_days === 1) {
-      // Submitted yesterday — continue streak
+      // submitted yesterday — continue streak
       doc.streak = (doc.streak || 0) + 1;
     } else {
-      // Missed one or more days — reset to 1 (today counts)
+      // missed a day — reset to 1
       doc.streak = 1;
     }
 
@@ -133,7 +155,6 @@ async function getProgress(req, res) {
       return res.status(200).json({ success: true, message: 'No tests submitted yet.', data: null });
     }
 
-    // Return effective streak — may differ from stored value if student missed a day
     const response = JSON.parse(JSON.stringify(doc));
     response.streak = getEffectiveStreak(doc);
 
