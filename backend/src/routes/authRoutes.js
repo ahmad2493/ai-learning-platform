@@ -48,21 +48,23 @@ router.post('/logout', authenticateToken, (req, res) => {
 });
 
 // ==================== GOOGLE OAUTH ROUTES ====================
-router.get(
-  '/google/signin',
+router.get('/google/signin', (req, res, next) => {
+  const redirectUri = req.query.redirectUri || 'darsgah://auth/callback';
   passport.authenticate('google', {
     scope: ['profile', 'email'],
     session: false,
-  })
-); 
+    state: redirectUri,
+  })(req, res, next);
+});
 
-router.get(
-  '/google/signup',
+router.get('/google/signup', (req, res, next) => {
+  const redirectUri = req.query.redirectUri || 'darsgah://auth/callback';
   passport.authenticate('google', {
     scope: ['profile', 'email'],
     session: false,
-  })
-);
+    state: redirectUri,
+  })(req, res, next);
+});
 
 router.get(
   '/google/callback',
@@ -76,11 +78,11 @@ router.get(
         return res.redirect(`darsgah://auth/error?error=auth_failed`);
       }
 
+      const redirectUri = req.query.state || 'darsgah://auth/callback';
       const token = generateToken(req.user);
-      const mobileRedirect = `darsgah://auth/callback?token=${token}&user_id=${req.user.user_id}`;
 
       console.log('✅ [GOOGLE AUTH] Redirecting to app with token for user:', req.user.email);
-      return res.redirect(mobileRedirect);
+      return res.redirect(`${redirectUri}?token=${token}&user_id=${req.user.user_id}`);
     } catch (error) {
       console.error('OAuth callback error:', error);
       res.redirect(`darsgah://auth/error?error=callback_failed`);
