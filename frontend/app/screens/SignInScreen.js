@@ -91,9 +91,11 @@ export default function SignInScreen({ navigation }) {
 
   const handleGoogleSignIn = async () => {
     try {
-      const authUrl = `${BASE_URL}/auth/google/signin`;
-      const result = await WebBrowser.openAuthSessionAsync(authUrl, "darsgah://auth/callback");
-      if (result.type === "success" && result.url) {
+      const redirectUri = Linking.createURL('auth/callback');
+      const authUrl = `${BASE_URL}/auth/google/signin?redirectUri=${encodeURIComponent(redirectUri)}`;
+      const result = await WebBrowser.openAuthSessionAsync(authUrl, redirectUri);
+      console.log('🔐 [GOOGLE] WebBrowser result:', JSON.stringify(result));
+      if (result.url) {
         const { queryParams } = Linking.parse(result.url);
         if (queryParams?.token) {
           setIsLoading(true);
@@ -107,6 +109,7 @@ export default function SignInScreen({ navigation }) {
         }
       }
     } catch (error) {
+      console.error('🔐 [GOOGLE] Error:', error);
       showAlert("Error", "Failed to start Google Sign-In.");
     }
   };
