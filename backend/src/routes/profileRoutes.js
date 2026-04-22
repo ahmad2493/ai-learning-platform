@@ -12,7 +12,10 @@ const express = require('express');
 const router = express.Router();
 const upload = require('../middleware/uploadProfile');
 const { updateProfile, getProfile } = require('../controllers/ProfileController');
+const { getCurrentUser } = require('../controllers/authController');
 const { authenticateToken } = require('../middleware/auth');
+
+router.get('/me', authenticateToken, getCurrentUser);
 
 // GET profile data
 router.get('/:id', authenticateToken, getProfile);
