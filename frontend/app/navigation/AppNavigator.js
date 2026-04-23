@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { View, ActivityIndicator } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, ActivityIndicator, Animated, Dimensions } from 'react-native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useAuth } from '../context/AuthContext';
 
@@ -26,11 +26,12 @@ import OtpVerificationScreen from "../screens/OtpVerificationScreen";
 import ResetPasswordScreen from "../screens/ResetPasswordScreen";
 import SplashScreen from '../screens/SplashScreen';
 
+const { width } = Dimensions.get('window');
 const Stack = createNativeStackNavigator();
 
 // --- Main App Navigator ---
 const AppStack = () => (
-  <Stack.Navigator initialRouteName="StudentDashboard">
+  <Stack.Navigator initialRouteName="StudentDashboard" screenOptions={{ animation: 'fade' }}>
     <Stack.Screen name="StudentDashboard" component={StudentDashboardScreen} options={{ headerShown: false }} />
     <Stack.Screen name="Profile" component={ProfileScreen} options={{ headerShown: false }} />
     <Stack.Screen name="AiAssistant" component={AiAssistantScreen} options={{ headerShown: false }} />
@@ -50,7 +51,7 @@ const AppStack = () => (
 
 // --- Auth Flow Navigator ---
 const AuthStack = () => (
-  <Stack.Navigator initialRouteName="SignIn">
+  <Stack.Navigator initialRouteName="SignIn" screenOptions={{ animation: 'fade' }}>
     <Stack.Screen name="SignIn" component={SignInScreen} options={{ headerShown: false }} />
     <Stack.Screen name="SignUp" component={SignUpScreen} options={{ headerShown: false }} />
     <Stack.Screen name="AuthCallback" component={AuthCallbackScreen} options={{ headerShown: false }} />
@@ -63,14 +64,34 @@ const AuthStack = () => (
 const RootNavigator = () => {
   const { userToken, isLoading } = useAuth() || {};
   const [showSplash, setShowSplash] = useState(true);
+  
+  // Animation values for the smooth entrance
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(width)).current;
 
   useEffect(() => {
+    // 1. Wait for splash duration
     const timer = setTimeout(() => {
       setShowSplash(false);
-    }, 2500); // 2.5 sec splash
+      
+      // 2. Once splash is hidden, trigger the smooth entrance animation
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 800,
+          useNativeDriver: true,
+        }),
+        Animated.spring(slideAnim, {
+          toValue: 0,
+          tension: 20,
+          friction: 7,
+          useNativeDriver: true,
+        })
+      ]).start();
+    }, 6500); // Set to match your splash duration (12s total, triggers 1s early for smooth transition)
 
     return () => clearTimeout(timer);
-  }, []);
+  }, [fadeAnim, slideAnim]);
 
   if (showSplash) {
     return <SplashScreen />;
@@ -84,7 +105,15 @@ const RootNavigator = () => {
     );
   }
 
-  return userToken ? <AppStack /> : <AuthStack />;
+  return (
+    <Animated.View style={{ 
+      flex: 1, 
+      opacity: fadeAnim, 
+      transform: [{ translateX: slideAnim }] 
+    }}>
+      {userToken ? <AppStack /> : <AuthStack />}
+    </Animated.View>
+  );
 };
 
 export default RootNavigator;
