@@ -39,25 +39,50 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  /**
+   * NORMALIZER: Handles nested 'user' objects or split name fields
+   */
+  const normalizeUserData = (apiResponse, token) => {
+    if (!apiResponse) return null;
+
+    const rawData = apiResponse.user || apiResponse.data?.user || apiResponse.data || apiResponse;
+    
+    const idFromToken = getUserIdFromToken(token);
+    
+    // Construct name
+    let displayName = rawData.name || rawData.displayName;
+    
+    if (!displayName && (rawData.first_name || rawData.firstName)) {
+      const first = rawData.first_name || rawData.firstName || '';
+      const last = rawData.last_name || rawData.lastName || '';
+      displayName = `${first} ${last}`.trim();
+    }
+
+    return {
+      ...rawData,
+      name: displayName || 'User',
+      userId: rawData.userId || rawData._id || rawData.id || idFromToken
+    };
+  };
+
   const refreshUser = async () => {
-    if (!userToken) return;
+    const token = userToken || await AsyncStorage.getItem('userToken');
+    if (!token) return;
+
     try {
       const response = await fetch(`${BASE_URL}/profile/me`, {
         headers: {
-          Authorization: `Bearer ${userToken}`,
+          Authorization: `Bearer ${token}`,
           'ngrok-skip-browser-warning': 'true',
         },
       });
       const result = await response.json();
       
       if (response.ok && result.success) {
-        const idFromToken = getUserIdFromToken(userToken);
-        const updatedUser = {
-          ...result.data,
-          userId: result.data.userId || result.data._id || idFromToken
-        };
-        setUser(updatedUser);
-        await AsyncStorage.setItem('user', JSON.stringify(updatedUser));
+        // Pass the WHOLE result to normalizer so it can find the nested 'user'
+        const normalizedUser = normalizeUserData(result, token);
+        setUser(normalizedUser);
+        await AsyncStorage.setItem('user', JSON.stringify(normalizedUser));
       }
     } catch (error) {
       console.error('[AuthContext] Refresh user error:', error);
@@ -69,23 +94,21 @@ export const AuthProvider = ({ children }) => {
       try {
         const token = await AsyncStorage.getItem('userToken');
         if (token) {
-          // Instead of calling signIn (which fetches profile), 
-          // we can just set token and refresh to avoid redundant code
           setUserToken(token);
           const savedUser = await AsyncStorage.getItem('user');
           if (savedUser) {
             setUser(JSON.parse(savedUser));
           }
-          // Sync with server
+          
           const response = await fetch(`${BASE_URL}/profile/me`, {
             headers: { Authorization: `Bearer ${token}`, 'ngrok-skip-browser-warning': 'true' },
           });
           const result = await response.json();
+          
           if (response.ok && result.success) {
-            const idFromToken = getUserIdFromToken(token);
-            const userWithId = { ...result.data, userId: result.data.userId || result.data._id || idFromToken };
-            setUser(userWithId);
-            await AsyncStorage.setItem('user', JSON.stringify(userWithId));
+            const normalizedUser = normalizeUserData(result, token);
+            setUser(normalizedUser);
+            await AsyncStorage.setItem('user', JSON.stringify(normalizedUser));
           }
         }
       } catch (e) {
@@ -111,17 +134,13 @@ export const AuthProvider = ({ children }) => {
         throw new Error(result.message || 'Failed to fetch profile on sign-in');
       }
 
-      const idFromToken = getUserIdFromToken(token);
-      const userWithId = {
-        ...result.data,
-        userId: result.data.userId || result.data._id || idFromToken
-      };
+      const normalizedUser = normalizeUserData(result, token);
 
-      setUser(userWithId);
+      setUser(normalizedUser);
       setUserToken(token);
 
       await AsyncStorage.setItem('userToken', token);
-      await AsyncStorage.setItem('user', JSON.stringify(userWithId));
+      await AsyncStorage.setItem('user', JSON.stringify(normalizedUser));
     } catch (error) {
       console.error('[AuthContext] Sign-in error:', error);
       throw error;
