@@ -1,3 +1,8 @@
+"""
+Book RAG - Book RAG AI SERVICE
+Authors:
+  - Sajeela Safdar (BCSF22M001) - AI Development
+"""
 import os
 import re
 from typing import List, Dict, Optional, Tuple
@@ -355,7 +360,8 @@ class MetadataRetriever:
                     h = hash(doc.page_content)
                     if h not in seen:
                         seen.add(h)
-                        candidates.append((doc, 1.0 / (1.0 + dist)))
+                        doc.metadata['_retrieval_score'] = round(1.0 / (1.0 + dist), 4)
+                        candidates.append((doc, doc.metadata['_retrieval_score']))
             except Exception as e:
                 print(f"[ERROR] Semantic search: {e}")
 
@@ -594,26 +600,64 @@ class BookRAG:
         self.retriever = MetadataRetriever(
             self.math_vectorstore, self.text_vectorstore, json_index
         )
-        # Figure asset lookup (separate from content retrieval)
+        # Figure asset lookup
         if os.path.exists("/mnt/chroma/Book_Final.json"):
             with open("/mnt/chroma/Book_Final.json", "r", encoding="utf-8") as f:
                 chunks = json.load(f)
+
+            # Pass 1: track which URLs are claimed, AND which topic they belong to
+            # so we only strip cross-topic bleed, not same-topic figures
+            claimed_all: set = set()
+            claimed_by_topic: Dict[str, set] = {}  # topic_number -> set of URLs
+
+            for chunk in chunks:
+                meta = chunk.get("metadata", {})
+                if meta.get("example_number") or meta.get("table_number") or meta.get("exercise_question_number"):
+                    topic_owner = str(meta.get("topic_number", ""))
+                    for fig in meta.get("figure_assets", []):
+                        for url in fig.get("urls", []):
+                            claimed_all.add(url)
+                            claimed_by_topic.setdefault(topic_owner, set()).add(url)
+
+            # Pass 2: build lookup
             for chunk in chunks:
                 meta = chunk.get("metadata", {})
                 fig_assets = meta.get("figure_assets", [])
                 if not fig_assets: continue
-                ch = meta.get("chapter_number")
+                ch = str(meta.get("chapter_number", ""))  # normalize to str
                 ex = meta.get("example_number")
                 tbl = meta.get("table_number")
                 ex_q = meta.get("exercise_question_number")
                 topic = meta.get("topic_number")
-                page = meta.get("page_start")
-                if ex:    self._figure_lookup[("example", ch, ex)] = fig_assets
-                if tbl:   self._figure_lookup[("table", ch, tbl)] = fig_assets
-                if ex_q:  self._figure_lookup[("exercise", ch, ex_q)] = fig_assets
+
+                if ex:   self._figure_lookup[("example", ch, ex)] = fig_assets
+                if tbl:  self._figure_lookup[("table", ch, tbl)] = fig_assets
+                if ex_q: self._figure_lookup[("exercise", ch, ex_q)] = fig_assets
 
                 if not ex and not tbl and not ex_q and topic:
-                    self._figure_lookup[("theory", ch, topic, page)] = fig_assets
+                    topic_str = str(topic)
+                    clean = []
+                    for fig in fig_assets:
+                        # Keep URL if:
+                        # (a) not claimed at all, OR
+                        # (b) claimed but by an example inside THIS same topic (e.g. Ex 4.1 inside topic 4.2)
+                        clean_urls = [
+                            u for u in fig.get("urls", [])
+                            if u not in claimed_all
+                               or u in claimed_by_topic.get(topic_str, set())
+                        ]
+                        if clean_urls:
+                            clean.append({**fig, "urls": clean_urls})
+                    if clean:
+                        key = ("theory", ch, topic_str)
+                        existing = self._figure_lookup.get(key, [])
+                        existing_urls = {u for f in existing for u in f.get("urls", [])}
+                        for fig in clean:
+                            deduped = [u for u in fig["urls"] if u not in existing_urls]
+                            if deduped:
+                                existing.append({**fig, "urls": deduped})
+                                existing_urls.update(deduped)
+                        self._figure_lookup[("theory", ch, topic_str)] = existing
         else:
             print("Book_Final.json not found, figures unavailable")
 
@@ -635,6 +679,7 @@ class BookRAG:
 
         # Rebuild last_docs from stored content + metadata
         last_docs = []
+        last_figures = retrieval.get("last_figures", [])
         if retrieval.get("last_docs_content"):
             last_docs = [
                 Document(page_content=c, metadata=m)
@@ -643,6 +688,13 @@ class BookRAG:
                     retrieval.get("last_docs_metadata", [])
                 )
             ]
+
+
+        greetings = {"hi", "hello", "hey", "salam", "assalam"}
+        if question.strip().lower() in greetings:
+            answer = "Hello! Feel free to ask me anything about your physics textbook."
+            self.store.save(session_id, history, retrieval)
+            return {"answer": answer, "figures": []}
 
         # Condense
         if history:
@@ -719,7 +771,25 @@ class BookRAG:
         }
         self.store.save(session_id, history, updated_retrieval)
 
-        figures = self.print_figures(docs)
+        if answer.strip().lower().startswith("i don't know"):
+            figures = []
+        elif is_followup:
+            # Reuse figures from the previous turn — they belong to the topic being followed up on
+            figures = last_figures
+        else:
+            figures = self.print_figures(docs)
+
+        updated_retrieval = {
+            "last_docs_content": [d.page_content for d in docs],
+            "last_docs_metadata": [d.metadata for d in docs],
+            "last_figures": figures,  # <-- persist so followup can reuse
+            "last_chapter": docs[0].metadata.get("chapter_number") if docs else None,
+            "last_topic": docs[0].metadata.get("topic_number") if docs else None,
+            "last_example": docs[0].metadata.get("example_number") if docs else None,
+            "last_exercise": docs[0].metadata.get("exercise_question_number") if docs else None,
+            "last_section_kind": docs[0].metadata.get("section_kind") if docs else None,
+        }
+        self.store.save(session_id, history, updated_retrieval)
         return {"answer": answer, "figures": figures}
 
     def clear_history(self, session_id: str):
@@ -733,7 +803,7 @@ class BookRAG:
 
     def print_figures(self, docs: List[Document]):
         if not docs:
-            return
+            return []
 
         seen_urls: set = set()
         figures: list = []
@@ -742,31 +812,33 @@ class BookRAG:
         anchor_example = primary.get("example_number")
         anchor_exercise = primary.get("exercise_question_number")
         anchor_table = primary.get("table_number")
-        anchor_ch = primary.get("chapter_number")
+        anchor_ch = str(primary.get("chapter_number", ""))  # normalize
+        is_conceptual = not anchor_example and not anchor_exercise and not anchor_table
 
         def is_on_topic(m: dict) -> bool:
+            ch = str(m.get("chapter_number", ""))
             if anchor_example and m.get("example_number") == anchor_example \
-                    and m.get("chapter_number") == anchor_ch:
+                    and ch == anchor_ch:
                 return True
             if anchor_exercise and m.get("exercise_question_number") == anchor_exercise \
-                    and m.get("chapter_number") == anchor_ch:
+                    and ch == anchor_ch:
                 return True
             if anchor_table and m.get("table_number") == anchor_table \
-                    and m.get("chapter_number") == anchor_ch:
+                    and ch == anchor_ch:
                 return True
-            # No specific reference on primary doc → allow all (conceptual query)
-            if not anchor_example and not anchor_exercise and not anchor_table:
+            if is_conceptual:
                 return True
             return False
 
-        for doc in docs:
+        max_docs = 3 if is_conceptual else len(docs)
+
+        for doc in docs[:max_docs]:
             m = doc.metadata
             if not is_on_topic(m):
                 continue
+            ch = str(m.get("chapter_number", ""))  # normalize to str
 
-            ch = m.get("chapter_number")
-
-            # Path 1: lookup via figure_lookup dict (examples, exercises, tables)
+            # Path 1: examples, tables, exercises
             for key in [
                 ("example", ch, m.get("example_number")),
                 ("table", ch, m.get("table_number")),
@@ -777,32 +849,61 @@ class BookRAG:
                     new_urls = [u for u in fig.get("urls", []) if u not in seen_urls]
                     if new_urls:
                         seen_urls.update(new_urls)
-                        figures.append({
-                            "figure_number": fig.get("figure_number"),
-                            "caption": fig.get("caption", ""),
-                            "urls": new_urls,
-                        })
+                        figures.append({"figure_number": fig.get("figure_number"),
+                                        "caption": fig.get("caption", ""), "urls": new_urls})
 
-            # Path 2: theory chunks, look up by (chapter, topic, page_start)
+            # Path 2: theory — keyed by (ch_str, topic_str)
             if not m.get("example_number") and not m.get("exercise_question_number") \
                     and not m.get("table_number"):
-                theory_key = ("theory", ch, m.get("topic_number"), m.get("page_start"))
+                topic_str = str(m.get("topic_number", ""))
+                theory_key = ("theory", ch, topic_str)
                 for fig in self._figure_lookup.get(theory_key, []):
                     new_urls = [u for u in fig.get("urls", []) if u not in seen_urls]
                     if new_urls:
                         seen_urls.update(new_urls)
-                        figures.append({
-                            "figure_number": fig.get("figure_number"),
-                            "caption": fig.get("caption", ""),
-                            "urls": new_urls,
-                        })
+                        figures.append({"figure_number": fig.get("figure_number"),
+                                        "caption": fig.get("caption", ""), "urls": new_urls})
 
-            # Path 3: inline URLs in page_content (fallback)
+            # Path 3: inline URLs fallback
             for url in re.findall(r'https://cdn\.mathpix\.com/\S+', doc.page_content):
                 url = url.rstrip('.,)')
                 if url not in seen_urls:
                     seen_urls.add(url)
                     figures.append({"figure_number": None, "caption": "", "urls": [url]})
 
-        if not figures: return []
-        return figures
+        return figures if figures else []
+
+if __name__ == "__main__":
+    import uuid
+
+    rag = BookRAG()
+    rag.prepare_rag()
+
+    session_id = str(uuid.uuid4())
+    print(f"Session ID: {session_id}")
+    print("Physics Textbook Assistant ready. Type 'quit' to exit, 'clear' to reset history.\n")
+
+    while True:
+        question = input("You: ").strip()
+        if not question:
+            continue
+        if question.lower() == "quit":
+            break
+        if question.lower() == "clear":
+            rag.clear_history(session_id)
+            continue
+
+        result = rag.ask(question, session_id)
+
+        print(f"\nAssistant: {result['answer']}")
+
+        if result.get("figures"):
+            print(f"\n[Figures ({len(result['figures'])}):]")
+            for fig in result["figures"]:
+                label = f"Figure {fig['figure_number']}" if fig["figure_number"] else "Figure"
+                caption = f" — {fig['caption']}" if fig["caption"] else ""
+                print(f"  {label}{caption}")
+                for url in fig["urls"]:
+                    print(f"    {url}")
+
+        print()
