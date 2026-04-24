@@ -20,7 +20,7 @@ from typing import List, Optional
 from BookRAG import BookRAG
 from PastPapersRag import (
     retrieve_past_paper_questions,
-    filter_and_correct_chunks_with_llm,
+    cleanup_questions_with_llm,
     detect_board_and_year_from_query,
 )
 from test_engine import TestGenerationEngine
@@ -120,7 +120,7 @@ async def ask_pastpaper_question(req: QuestionRequest):
             base_dir="/mnt/chroma",
         )
 
-        questions = filter_and_correct_chunks_with_llm(questions)
+        questions = cleanup_questions_with_llm(questions)
 
         return {
             "question": req.question,

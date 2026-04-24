@@ -358,45 +358,31 @@ def normalize_mcqs_batch_with_llm(
         return default_result
 
 
-def filter_and_correct_chunks_with_llm(questions: List[PastPaperQuestion]) -> List[PastPaperQuestion]:
+def cleanup_questions_with_llm(questions: List[PastPaperQuestion]) -> List[PastPaperQuestion]:
     """
-    Pass retrieved chunks through GPT-4o-mini to:
-    - Keep only chunks that are valid 9th grade Physics past paper questions.
-    - Correct any incorrect wording, grammar issues, or incomplete statements
-      while preserving original meaning.
-    - Return the exact text unchanged if the chunk is already correct.
-    - Exclude chunks that are not actual past paper questions (headings, metadata, etc.).
-
-    Falls back to returning questions as-is if OPENAI_API_KEY is not set or
-    if the LLM call fails.
+    Single LLM call after retrieval to fix incomplete statements, garbled options,
+    and wrong text. Does NOT filter out questions — every input question is returned.
+    Falls back to returning questions as-is if OPENAI_API_KEY is not set or call fails.
     """
     if not questions:
         return []
 
-    api_key = os.getenv("OPENAI_API_KEY")
-    if not api_key:
+    if not os.getenv("OPENAI_API_KEY"):
         return questions
 
     system_prompt = (
-        "You are a 9th grade Physics teacher verifying past paper questions from Pakistan boards. "
-        "You will receive a JSON object with an 'items' array. Each item is a retrieved chunk "
-        "that may or may not be an actual past paper question.\n\n"
-        "For each item:\n"
-        "1. Decide if it is a valid question from a 9th grade Physics past paper "
-        "(MCQ, short question, or long question).\n"
-        "2. If it IS a valid past paper question:\n"
-        "   - Return the text EXACTLY as-is if the wording is already correct and complete.\n"
-        "   - If there are incorrect wordings, grammar mistakes, or incomplete statements, "
-        "correct them without changing the scientific meaning.\n"
-        "   - Set 'include' to true.\n"
-        "3. If it is NOT a valid past paper question (e.g. it is a heading, table of contents, "
-        "metadata, or irrelevant content), set 'include' to false.\n\n"
+        "You are a 9th grade Physics teacher cleaning up past paper questions from Pakistan boards. "
+        "You will receive a JSON object with an 'items' array. For each item:\n"
+        "- Fix incomplete question statements, garbled wording, or grammar errors.\n"
+        "- Fix incomplete or garbled MCQ options.\n"
+        "- Fix incomplete answer text for short/long questions.\n"
+        "- If the text is already correct, return it EXACTLY as-is.\n"
+        "- Do NOT remove, reorder, or invent questions or options.\n\n"
         "Return JSON with a single field 'items'. Each element must have:\n"
         "  'id'           : the original id (string)\n"
-        "  'include'      : true or false\n"
-        "  'question_text': corrected or exact question stem (string, required when include=true)\n"
-        "  'options'      : corrected options array for MCQs, empty array otherwise\n"
-        "  'answer_text'  : corrected answer text for short/long questions, null for MCQs\n"
+        "  'question_text': fixed question stem\n"
+        "  'options'      : fixed options array (empty array for non-MCQs)\n"
+        "  'answer_text'  : fixed answer text, null for MCQs\n"
     )
 
     payload_items = [
@@ -426,25 +412,24 @@ def filter_and_correct_chunks_with_llm(questions: List[PastPaperQuestion]) -> Li
             if isinstance(item, dict)
         }
 
-        filtered: List[PastPaperQuestion] = []
+        cleaned: List[PastPaperQuestion] = []
         for q in questions:
             result = id_to_result.get(str(q.id))
-            if result is None or result.get("include", True):
-                if result is not None:
-                    q = PastPaperQuestion(
-                        id=q.id,
-                        chapter_no=q.chapter_no,
-                        chapter_name=q.chapter_name,
-                        section=q.section,
-                        topics=q.topics,
-                        question_text=result.get("question_text") or q.question_text,
-                        options=result.get("options") or q.options,
-                        correct_option=q.correct_option,
-                        answer_text=result.get("answer_text") or q.answer_text,
-                        appearances=q.appearances,
-                    )
-                filtered.append(q)
-        return filtered
+            if result:
+                q = PastPaperQuestion(
+                    id=q.id,
+                    chapter_no=q.chapter_no,
+                    chapter_name=q.chapter_name,
+                    section=q.section,
+                    topics=q.topics,
+                    question_text=result.get("question_text") or q.question_text,
+                    options=result.get("options") or q.options,
+                    correct_option=q.correct_option,
+                    answer_text=result.get("answer_text") or q.answer_text,
+                    appearances=q.appearances,
+                )
+            cleaned.append(q)
+        return cleaned
     except Exception:
         return questions
 
@@ -572,7 +557,6 @@ def retrieve_past_paper_questions(
     year_range: Optional[Tuple[int, int]] = None,
     natural_query: Optional[str] = None,
     n_questions: int = 10,
-    use_llm: bool = False,
     base_dir: str = ".",
 ) -> List[PastPaperQuestion]:
     """
@@ -644,46 +628,9 @@ def retrieve_past_paper_questions(
         # Trim to requested number (preserve original order)
         filtered_chunks = filtered_chunks[:n_questions]
 
-        # Optional batched LLM normalization using the JSON fields.
-
-        mcq_indices: List[int] = []
-        mcq_payload: List[Tuple[str, Sequence[str]]] = []
-        short_indices: List[int] = []
-        short_payload: List[str] = []
-
-        if use_llm:
-            for idx, c in enumerate(filtered_chunks):
-                section = c.get("section", "")
-                q_text = c.get("question_text", "")
-                options_list: List[str] = c.get("options", []) or []
-                if section in ("mcq", "exercise_mcq") and options_list:
-                    mcq_indices.append(idx)
-                    mcq_payload.append((q_text, options_list))
-                else:
-                    short_indices.append(idx)
-                    short_payload.append(q_text)
-
-            if mcq_payload:
-                mcq_results = normalize_mcqs_batch_with_llm(mcq_payload)
-                for local_idx, global_idx in enumerate(mcq_indices):
-                    clean_q, clean_opts, correct = mcq_results[local_idx]
-                    c = filtered_chunks[global_idx]
-                    c["question_text"] = clean_q
-                    c["options"] = clean_opts
-                    c["correct_option"] = correct
-
-            if short_payload:
-                short_results = normalize_shorts_batch_with_llm(short_payload)
-                for local_idx, global_idx in enumerate(short_indices):
-                    cleaned = short_results[local_idx]
-                    c = filtered_chunks[global_idx]
-                    c["answer_text"] = cleaned
-        else:
-            for c in filtered_chunks:
-                section = c.get("section", "")
-                if section not in ("mcq", "exercise_mcq"):
-                    # For short/long questions we just keep the raw question_text.
-                    c["answer_text"] = c.get("question_text", "")
+        for c in filtered_chunks:
+            if c.get("section", "") not in ("mcq", "exercise_mcq"):
+                c["answer_text"] = c.get("question_text", "")
 
         results_from_json: List[PastPaperQuestion] = []
         for c in filtered_chunks:
@@ -817,43 +764,9 @@ def retrieve_past_paper_questions(
             }
         )
 
-    # Batch LLM normalization for MCQs
-    if use_llm:
-        mcq_indices: List[int] = []
-        mcq_payload: List[Tuple[str, Sequence[str]]] = []
-
-        short_indices: List[int] = []
-        short_payload: List[str] = []
-
-        for idx, item in enumerate(intermediate):
-            section = item["section"]
-            if section in ("mcq", "exercise_mcq") and item["base_opts"]:
-                mcq_indices.append(idx)
-                mcq_payload.append((item["question_text"], item["base_opts"]))
-            elif section not in ("mcq", "exercise_mcq"):
-                short_indices.append(idx)
-                short_payload.append(item["raw_doc"])
-
-        if mcq_payload:
-            mcq_results = normalize_mcqs_batch_with_llm(mcq_payload)
-            for local_idx, global_idx in enumerate(mcq_indices):
-                clean_q, clean_opts, correct = mcq_results[local_idx]
-                item = intermediate[global_idx]
-                item["question_text"] = clean_q
-                item["options"] = clean_opts
-                item["correct_option"] = correct
-
-        if short_payload:
-            short_results = normalize_shorts_batch_with_llm(short_payload)
-            for local_idx, global_idx in enumerate(short_indices):
-                cleaned = short_results[local_idx]
-                item = intermediate[global_idx]
-                item["answer_text"] = cleaned
-    else:
-        # No LLM – for short questions, just treat full doc as answer_text.
-        for item in intermediate:
-            if item["section"] not in ("mcq", "exercise_mcq"):
-                item["answer_text"] = item["raw_doc"]
+    for item in intermediate:
+        if item["section"] not in ("mcq", "exercise_mcq"):
+            item["answer_text"] = item["raw_doc"]
 
     # Convert intermediates to dataclass instances.
     results: List[PastPaperQuestion] = []
