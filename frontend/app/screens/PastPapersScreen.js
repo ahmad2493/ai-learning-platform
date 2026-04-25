@@ -390,28 +390,15 @@ export default function PastPapersScreen({ navigation }) {
                   {results.map((item, index) => {
                     const rawQuestion = item.question || item.question_text || "";
                     const rawAnswer   = item.answer   || item.answer_text   || "";
-                    const options     = item.options  || [];
-                    const sectionName = item.section  || 'Question';
-                    const boardsYears = item.boards_years || [];
+                    const options = item.options || [];
 
                     const hasMeaningfulAnswer = rawAnswer.trim().length > 1 &&
-                                               rawAnswer.trim() !== "...";
+                                               rawAnswer.trim() !== "..." &&
+                                               rawAnswer.trim() !== rawQuestion.trim();
 
                     return (
                       <View key={index} style={{ borderBottomColor: theme.background, borderBottomWidth: index === results.length - 1 ? 0 : 2, paddingBottom: 20, marginBottom: 20 }}>
 
-                         <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginBottom: 8, alignItems: 'center' }}>
-                            <View style={{ backgroundColor: theme.primary + '20', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 4, marginRight: 8 }}>
-                              <Text style={{ fontSize: 10, color: theme.primary, fontWeight: 'bold', textTransform: 'uppercase' }}>
-                                {sectionName.replace('_', ' ')}
-                              </Text>
-                            </View>
-                            {boardsYears.length > 0 && (
-                              <Text style={{ fontSize: 11, color: theme.textSecondary, flexShrink: 1 }}>
-                                {boardsYears.join(', ')}
-                              </Text>
-                            )}
-                         </View>
 
                          <View style={{ marginBottom: 10 }}>
                             {renderContentWithImages(`**Q${index + 1}:** ${rawQuestion}`, [styles.resultsText, {color: theme.text, fontWeight: 'bold', fontSize: 17}])}
@@ -449,17 +436,12 @@ export default function PastPapersScreen({ navigation }) {
                         <ActivityIndicator size="small" color={theme.primary} />
                       ) : (
                         <Text style={{ color: theme.primary, fontWeight: '600', fontSize: 15 }}>
-                          Load More ({total - offset} remaining)
+                          Load More
                         </Text>
                       )}
                     </TouchableOpacity>
                   )}
 
-                  {offset >= total && total > 0 && (
-                    <View style={{ alignItems: 'center', paddingVertical: 16 }}>
-                      <Text style={{ color: theme.textSecondary, fontSize: 13 }}>All {total} questions loaded</Text>
-                    </View>
-                  )}
                 </View>
               ) : results && Array.isArray(results) && results.length === 0 ? (
                 <View style={styles.centered}>
