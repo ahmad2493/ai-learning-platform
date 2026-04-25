@@ -179,6 +179,8 @@ async function updateProgress(user_id, mcqs) {
       const topic        = chapter.topics.get(top_key);
       topic.mcqs_seen    += 1;
       topic.mcqs_correct += is_correct ? 1 : 0;
+      // Keep legacy and new naming in sync for frontend compatibility.
+      topic.progress = topic.score || 0;
 
       chapter.topics.set(top_key, topic);
       doc.chapters.set(ch_key, chapter);
@@ -196,6 +198,7 @@ async function updateProgress(user_id, mcqs) {
       // Recalculate every topic score
       for (const [top_key, topic] of chapter.topics) {
         topic.score = calcTopicScore(topic.mcqs_seen, topic.mcqs_correct);
+        topic.progress = topic.score;
         chapter.topics.set(top_key, topic);
 
         ch_seen    += topic.mcqs_seen;
@@ -209,6 +212,8 @@ async function updateProgress(user_id, mcqs) {
       const { performance, preparation } = calcChapterScores(chapter.topics, ch_key);
       chapter.performance = performance;
       chapter.preparation = preparation;
+      // Legacy field used by current frontend screens.
+      chapter.progress = performance;
 
       doc.chapters.set(ch_key, chapter);
 
@@ -223,6 +228,8 @@ async function updateProgress(user_id, mcqs) {
     const { performance, preparation } = calcOverallScores(doc.chapters);
     doc.overall_performance = performance;
     doc.overall_preparation = preparation;
+    // Legacy field used by dashboard/CLO UI.
+    doc.overall_progress = performance;
 
     // ── Step 3: Streak ───────────────────────────────────────────────────────
 
