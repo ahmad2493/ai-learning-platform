@@ -686,6 +686,39 @@ class TestGenerationEngine:
                     topic_map[tnum] = t_name
         return topic_map
 
+    # ── MCQ topic assignment helper ──────────────────────────────────
+
+    def _assign_mcq_topics_uniformly(self, slots: List[QuestionSlot]) -> Dict[int, Optional[str]]:
+        """
+        Deterministically spread MCQ slots across preferred topics per chapter.
+        Returns: {slot_index: assigned_topic_number_or_none}
+        """
+        assignments: Dict[int, Optional[str]] = {}
+        chapter_slot_indices: Dict[int, List[int]] = defaultdict(list)
+
+        for idx, slot in enumerate(slots):
+            ch = slot.chapters[0] if slot.chapters else None
+            if ch is None:
+                assignments[idx] = None
+                continue
+            chapter_slot_indices[ch].append(idx)
+
+        for ch, indices in chapter_slot_indices.items():
+            if not indices:
+                continue
+
+            first_slot = slots[indices[0]]
+            topics = list(dict.fromkeys(first_slot.preferred_topics or []))
+            if not topics:
+                for idx in indices:
+                    assignments[idx] = None
+                continue
+
+            for offset, idx in enumerate(indices):
+                assignments[idx] = topics[offset % len(topics)]
+
+        return assignments
+
     # ── Single classification call for ALL MCQs ──────────────────────
 
     def _classify_all_mcqs(
@@ -798,14 +831,14 @@ class TestGenerationEngine:
                 full_ch_cache[ch] = self._get_full_chapter_context(ch)
             return full_ch_cache[ch]
 
+        mcq_topic_assignments = self._assign_mcq_topics_uniformly(slots)
+
         context_blocks: List[str] = []
         for i, slot in enumerate(slots, start=1):
+            slot_idx = i - 1
             ch = slot.chapters[0]
             ch_name = self.chapters_meta.get(ch, {}).get("chapter_name", f"Chapter {ch}")
-            topics = slot.preferred_topics or []
-
-            # Use first preferred topic for this slot's context
-            assigned_topic = topics[0] if topics else None
+            assigned_topic = mcq_topic_assignments.get(slot_idx)
 
             if assigned_topic:
                 chunks = self._get_mcq_context_for_topic(ch, assigned_topic)
