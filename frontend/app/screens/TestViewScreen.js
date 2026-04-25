@@ -1,6 +1,7 @@
 /**
  * Test View Screen - Interactive Test Interface
  * Fixed: Submit button logic to require all MCQs to be attempted.
+ * Updated: Integrated MathView for professional LaTeX rendering.
  * Author: Momna Butt (BCSF22M021)
  */
 
@@ -19,6 +20,7 @@ import { useTheme } from '../utils/ThemeContext';
 import { AI_SUBMIT_TEST_URL } from '../utils/apiConfig';
 import { useAuth } from '../context/AuthContext';
 import CustomAlert from '../components/CustomAlert';
+import MathView from '../components/MathView';
 
 export default function TestViewScreen({ navigation, route }) {
   const { theme } = useTheme();
@@ -157,8 +159,12 @@ export default function TestViewScreen({ navigation, route }) {
           <Text style={[styles.sectionHeading, { color: theme.primary }]}>Section B: Short Questions</Text>
           {sq.map((q, index) => (
             <View key={`sq-${index}`} style={[styles.card, { backgroundColor: theme.surface }]}>
-              <Text style={[styles.qText, { color: theme.text }]}>Q{index + 1}. {q.question}</Text>
-              <Text style={[styles.marksLabel, { color: theme.textSecondary }]}>[Marks: 2]</Text>
+              <MathView 
+                content={`**Q${index + 1}.** ${q.question}`} 
+                color={theme.text} 
+                fontSize={16} 
+              />
+              <Text style={[styles.marksLabel, { color: theme.textSecondary, marginTop: 10 }]}>[Marks: 2]</Text>
             </View>
           ))}
         </View>
@@ -179,8 +185,12 @@ export default function TestViewScreen({ navigation, route }) {
             </Text>
             {sq[groupKey].map((q, index) => (
               <View key={`${groupKey}-${index}`} style={[styles.card, { backgroundColor: theme.surface }]}>
-                <Text style={[styles.qText, { color: theme.text }]}>({index + 1}) {q.question}</Text>
-                <Text style={[styles.marksLabel, { color: theme.textSecondary }]}>[Marks: 2]</Text>
+                <MathView 
+                  content={`**(${index + 1})** ${q.question}`} 
+                  color={theme.text} 
+                  fontSize={16} 
+                />
+                <Text style={[styles.marksLabel, { color: theme.textSecondary, marginTop: 10 }]}>[Marks: 2]</Text>
               </View>
             ))}
           </View>
@@ -240,26 +250,43 @@ export default function TestViewScreen({ navigation, route }) {
             <Text style={[styles.sectionHeading, { color: theme.primary }]}>Section A: MCQs</Text>
             {test.mcqs.map((q, index) => (
               <View key={q.question_number} style={[styles.card, { backgroundColor: theme.surface }]}>
-                <Text style={[styles.qText, { color: theme.text }]}>{index + 1}. {q.question}</Text>
-                {Object.entries(q.options).map(([key, val]) => {
-                  const isSelected = userAnswers[q.question_number] === key;
-                  const isCorrect = q.correct_option?.toLowerCase() === key.toLowerCase();
-                  
-                  let optionStyle = { borderColor: theme.inputBorder };
-                  if (isSubmitted) {
-                    if (isCorrect) optionStyle = { borderColor: '#4CAF50', backgroundColor: '#4CAF5015' };
-                    else if (isSelected) optionStyle = { borderColor: theme.error, backgroundColor: theme.error + '15' };
-                  } else if (isSelected) {
-                    optionStyle = { borderColor: theme.primary, backgroundColor: theme.primary + '10' };
-                  }
+                <MathView 
+                  content={`**${index + 1}.** ${q.question}`} 
+                  color={theme.text} 
+                  fontSize={16} 
+                />
+                <View style={{ marginTop: 15 }}>
+                  {Object.entries(q.options).map(([key, val]) => {
+                    const isSelected = userAnswers[q.question_number] === key;
+                    const isCorrect = q.correct_option?.toLowerCase() === key.toLowerCase();
+                    
+                    let optionStyle = { borderColor: theme.inputBorder };
+                    if (isSubmitted) {
+                      if (isCorrect) optionStyle = { borderColor: '#4CAF50', backgroundColor: '#4CAF5015' };
+                      else if (isSelected) optionStyle = { borderColor: theme.error, backgroundColor: theme.error + '15' };
+                    } else if (isSelected) {
+                      optionStyle = { borderColor: theme.primary, backgroundColor: theme.primary + '10' };
+                    }
 
-                  return (
-                    <TouchableOpacity key={key} onPress={() => !isSubmitted && setUserAnswers({...userAnswers, [q.question_number]: key})} disabled={isSubmitted} style={[styles.option, optionStyle]}>
-                        <Text style={{ color: theme.text }}>{key.toUpperCase()}. {val}</Text>
-                        {isSubmitted && isCorrect && <Ionicons name="checkmark-circle" size={16} color="#4CAF50" />}
-                    </TouchableOpacity>
-                  );
-                })}
+                    return (
+                      <TouchableOpacity 
+                        key={key} 
+                        onPress={() => !isSubmitted && setUserAnswers({...userAnswers, [q.question_number]: key})} 
+                        disabled={isSubmitted} 
+                        style={[styles.option, optionStyle]}
+                      >
+                          <View style={{ flex: 1 }}>
+                            <MathView 
+                              content={`**${key.toUpperCase()}.** ${val}`} 
+                              color={theme.text} 
+                              fontSize={15} 
+                            />
+                          </View>
+                          {isSubmitted && isCorrect && <Ionicons name="checkmark-circle" size={16} color="#4CAF50" style={{ marginLeft: 5 }} />}
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
               </View>
             ))}
           </View>
@@ -274,14 +301,24 @@ export default function TestViewScreen({ navigation, route }) {
             <Text style={[styles.sectionHeading, { color: theme.primary }]}>Section C: Long Questions</Text>
             {test.long_questions.map((q, index) => (
               <View key={q.question_number} style={[styles.card, { backgroundColor: theme.surface }]}>
-                <Text style={[styles.qText, { color: theme.text, marginBottom: 10 }]}>Q{test.test_details.mode === 'board' ? index + 5 : index + 1}.</Text>
+                <Text style={[styles.qText, { color: theme.text, marginBottom: 10 }]}>
+                  Q{test.test_details.mode === 'board' ? index + 5 : index + 1}.
+                </Text>
                 <View style={styles.longPart}>
-                  <Text style={[styles.partText, { color: theme.text }]}> (a) {q.part_a.question}</Text>
-                  <Text style={[styles.marksLabel, { color: theme.textSecondary }]}>[Marks: {q.part_a.marks}]</Text>
+                  <MathView 
+                    content={`**(a)** ${q.part_a.question}`} 
+                    color={theme.text} 
+                    fontSize={15} 
+                  />
+                  <Text style={[styles.marksLabel, { color: theme.textSecondary, marginTop: 5 }]}>[Marks: {q.part_a.marks}]</Text>
                 </View>
-                <View style={[styles.longPart, { marginTop: 10 }]}>
-                  <Text style={[styles.partText, { color: theme.text }]}> (b) {q.part_b.question}</Text>
-                  <Text style={[styles.marksLabel, { color: theme.textSecondary }]}>[Marks: {q.part_b.marks}]</Text>
+                <View style={[styles.longPart, { marginTop: 15 }]}>
+                  <MathView 
+                    content={`**(b)** ${q.part_b.question}`} 
+                    color={theme.text} 
+                    fontSize={15} 
+                  />
+                  <Text style={[styles.marksLabel, { color: theme.textSecondary, marginTop: 5 }]}>[Marks: {q.part_b.marks}]</Text>
                 </View>
               </View>
             ))}
@@ -327,10 +364,9 @@ const styles = StyleSheet.create({
   sectionHeading: { fontSize: 18, fontWeight: 'bold', marginBottom: 15, textDecorationLine: 'underline' },
   card: { padding: 15, borderRadius: 12, marginBottom: 15, elevation: 2 },
   qText: { fontSize: 16, fontWeight: '600', marginBottom: 15 },
-  option: { padding: 12, borderWidth: 1, borderRadius: 8, marginBottom: 8, flexDirection: 'row', justifyContent: 'space-between' },
+  option: { padding: 12, borderWidth: 1, borderRadius: 8, marginBottom: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   longPart: { borderLeftWidth: 2, borderLeftColor: '#EEE', paddingLeft: 10 },
-  partText: { fontSize: 15, flex: 1 },
-  marksLabel: { fontSize: 12, fontWeight: 'bold', marginTop: 4, textAlign: 'right' },
+  marksLabel: { fontSize: 12, fontWeight: 'bold', textAlign: 'right' },
   submitBtn: { padding: 18, borderRadius: 15, alignItems: 'center', marginTop: 10, minHeight: 60, justifyContent: 'center', marginBottom: 30 },
   btnText: { color: 'white', fontWeight: 'bold', fontSize: 16 },
   scoreCard: { padding: 20, borderRadius: 15, borderWidth: 1, marginBottom: 25 },

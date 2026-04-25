@@ -24,6 +24,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../utils/ThemeContext';
 import Sidebar from './SidebarComponent';
 import Dropdown from '../components/Dropdown';
+import MathView from '../components/MathView';
 import { AI_BASE_URL } from '../utils/apiConfig';
 
 // --- Data for Dropdowns ---
@@ -160,50 +161,23 @@ export default function PastPapersScreen({ navigation }) {
 
   // --- Helper Functions ---
 
-  // 1. Core LaTeX Formatter (returns clean string)
-  const formatLatex = (text) => {
-    if (!text) return "";
-
-    const superscripts = {
-      '0':'⁰','1':'¹','2':'²','3':'³','4':'⁴','5':'⁵','6':'⁶','7':'⁷','8':'⁸','9':'⁹',
-      '-':'⁻','+':'⁺','n':'ⁿ','x':'ˣ','i':'ⁱ'
-    };
-
-    return text
-      // Robust fraction handling: \frac{num}{den} -> (num / den)
-      .replace(/\\frac\s*\{([^\}]+)\}\s*\{([^\}]+)\}/g, '($1 / $2)')
-
-      // Strip math bold/text styling commands (handles optional double slashes)
-      .replace(/\\+math(bf|bb|it|cal|frak|rm|sf)\{([^\}]+)\}/g, '$2')
-      .replace(/\\+text(bf|it|sl|sc|sf|rm)\{([^\}]+)\}/g, '$2')
-
-      // Strip symbols/math tags
-      .replace(/\$([^\$]+)\$/g, '$1')
-      .replace(/\\\(|\\\)|\\\[|\\\]/g, '')
-      .replace(/\\+\s*\(/g, '(').replace(/\\+\s*\)/g, ')')
-
-      // Superscripts
-      .replace(/\^\{([^\}]+)\}/g, (m, p) => p.split('').map(c => superscripts[c] || c).join(''))
-      .replace(/\^([\d\-+nxi])/g, (m, p) => superscripts[p] || p)
-
-      // Scientific constants and symbols
-      .replace(/\\+mathrm\{([^\}]+)\}/g, '$1')
-      .replace(/\\+times/g, '×')
-      .replace(/\\+cdot/g, '·')
-      .replace(/\\+mu/g, 'µ')
-      .replace(/\\+ell/g, 'ℓ')
-      .replace(/~/g, ' ')
-      .replace(/\\(?!https?|[\w\d])/g, '') // Clean stray slashes
-      .trim();
-  };
-
-  // 2. Component helper to render segments, bold text, and images
+  /**
+   * Renders content that may contain images (markdown format) or math expressions.
+   * Uses MathView (KaTeX) for text and equations, and Expo Image for images.
+   */
   const renderContentWithImages = (text, textStyle) => {
     if (!text) return null;
 
-    // Split logic for: Images, Bold LaTeX, and bold markdown
-    // Updated regex to be more resilient to slashes and whitespace
-    const parts = text.split(/(!\[\]\(.*?\)|\\+math[a-z]+\{.*?\}|\*\*.*?\*\*)/g);
+    // Flatten style to get color and fontSize
+    const flattenedStyle = Array.isArray(textStyle) ? Object.assign({}, ...textStyle) : textStyle;
+    const color = flattenedStyle?.color || theme.text;
+    const fontSize = flattenedStyle?.fontSize || 16;
+
+    // Pre-process: convert markdown bold to HTML bold for the MathView WebView
+    let processedText = text.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>');
+
+    // Split logic for: Images markdown ![]()
+    const parts = processedText.split(/(!\[\]\(.*?\))/g);
 
     return parts.map((part, i) => {
       // 1. Handle Images
@@ -219,39 +193,21 @@ export default function PastPapersScreen({ navigation }) {
         );
       }
 
-      // 2. Handle Bold LaTeX: \mathbf{...} or \\mathbf{...}
-      const boldLatexMatch = part.match(/\\+math(bf|bb|it|cal|frak|rm|sf)\{(.*?)\}/);
-      if (boldLatexMatch) {
-        return (
-          <Text key={i} style={[textStyle, { fontWeight: 'bold' }]}>
-            {formatLatex(boldLatexMatch[2])}
-          </Text>
-        );
-      }
-
-      // 3. Handle Regular Markdown Bold: **...**
-      const boldMdMatch = part.match(/\*\*(.*?)\*\*/);
-      if (boldMdMatch) {
-        return (
-          <Text key={i} style={[textStyle, { fontWeight: 'bold' }]}>
-            {formatLatex(boldMdMatch[1])}
-          </Text>
-        );
-      }
-
-      // 4. Regular segments
-      const cleaned = formatLatex(part);
-      if (!cleaned || cleaned === "!" || cleaned === "...") return null;
+      // 2. Handle Text and Math (using MathView)
+      if (!part.trim()) return null;
 
       return (
-        <Text key={i} style={textStyle}>
-          {cleaned}
-        </Text>
+        <MathView
+          key={i}
+          content={part}
+          color={color}
+          fontSize={fontSize}
+        />
       );
     });
   };
 
-  // 3. Clean raw inputs (splitter)
+  // Clean raw inputs (splitter for question/answer separation)
   const getCleanedInput = (text, isQuestion = false) => {
     if (!text) return "";
     let clean = text;
@@ -444,17 +400,14 @@ export default function PastPapersScreen({ navigation }) {
                             )}
                          </View>
 
-                         <View style={{ marginBottom: 10, flexDirection: 'row', flexWrap: 'wrap' }}>
-                            <Text style={[styles.resultsText, {color: theme.text, fontWeight: 'bold', fontSize: 17}]}>
-                                Q{index + 1}:{" "}
-                            </Text>
-                            {renderContentWithImages(rawQuestion, [styles.resultsText, {color: theme.text, fontWeight: 'bold', fontSize: 17}])}
+                         <View style={{ marginBottom: 10 }}>
+                            {renderContentWithImages(`**Q${index + 1}:** ${rawQuestion}`, [styles.resultsText, {color: theme.text, fontWeight: 'bold', fontSize: 17}])}
                          </View>
 
                          {options && options.length > 0 && (
                            <View style={{ marginTop: 10, marginLeft: 10 }}>
                              {options.map((opt, i) => (
-                               <View key={i} style={{ marginBottom: 6, flexDirection: 'row', flexWrap: 'wrap' }}>
+                               <View key={i} style={{ marginBottom: 6 }}>
                                  {renderContentWithImages(opt, [styles.resultsText, {color: theme.text, fontSize: 15}])}
                                </View>
                              ))}
@@ -464,7 +417,7 @@ export default function PastPapersScreen({ navigation }) {
                          {hasMeaningfulAnswer ? (
                            <View style={{ marginTop: 12, backgroundColor: theme.background, padding: 12, borderRadius: 10, borderLeftWidth: 4, borderLeftColor: theme.primary }}>
                               <Text style={[styles.resultsText, {color: theme.primary, fontWeight: 'bold', fontSize: 14, marginBottom: 6}]}>EXPLANATION / ANSWER:</Text>
-                              <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
+                              <View>
                                 {renderContentWithImages(rawAnswer, [styles.resultsText, {color: theme.text, lineHeight: 22}])}
                               </View>
                            </View>

@@ -1,7 +1,8 @@
 /**
  * Test Result Screen
  * Displays the final score and detailed feedback for MCQs, Short, and Long questions.
- * Updated: Fixed short questions display for Board mode (object structure).
+ * Updated: Integrated MathView for professional LaTeX rendering in review.
+ * Fixed: Replaced illegal <div> with <View> to resolve Invariant Violation.
  * Author: Momna Butt (BCSF22M021)
  */
 
@@ -16,6 +17,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../utils/ThemeContext';
+import MathView from '../components/MathView';
 
 export default function TestResultScreen({ navigation, route }) {
   const { theme } = useTheme();
@@ -34,8 +36,11 @@ export default function TestResultScreen({ navigation, route }) {
           <Text style={[styles.sectionHeading, { color: theme.primary }]}>Section B: Short Questions</Text>
           {sq.map((q, index) => (
             <View key={`sq-${index}`} style={[styles.card, { backgroundColor: theme.surface }]}>
-              <Text style={[styles.qNumber, { color: theme.primary, marginBottom: 5 }]}>Question {index + 1}</Text>
-              <Text style={[styles.qText, { color: theme.text }]}>{q.question}</Text>
+              <MathView 
+                content={`**Q${index + 1}.** ${q.question}`} 
+                color={theme.text} 
+                fontSize={16} 
+              />
               <View style={styles.marksFooter}>
                 <Text style={[styles.marksLabel, { color: theme.textSecondary }]}>Standard Marks: 2</Text>
               </View>
@@ -59,8 +64,11 @@ export default function TestResultScreen({ navigation, route }) {
             </Text>
             {sq[groupKey].map((q, index) => (
               <View key={`${groupKey}-${index}`} style={[styles.card, { backgroundColor: theme.surface }]}>
-                <Text style={[styles.qNumber, { color: theme.primary, marginBottom: 5 }]}>({index + 1})</Text>
-                <Text style={[styles.qText, { color: theme.text }]}>{q.question}</Text>
+                <MathView 
+                  content={`**(${index + 1})** ${q.question}`} 
+                  color={theme.text} 
+                  fontSize={16} 
+                />
                 <View style={styles.marksFooter}>
                   <Text style={[styles.marksLabel, { color: theme.textSecondary }]}>Standard Marks: 2</Text>
                 </View>
@@ -119,7 +127,11 @@ export default function TestResultScreen({ navigation, route }) {
                     />
                   </View>
                   
-                  <Text style={[styles.qText, { color: theme.text }]}>{q.question}</Text>
+                  <MathView 
+                    content={q.question} 
+                    color={theme.text} 
+                    fontSize={16} 
+                  />
                   
                   <View style={styles.optionsContainer}>
                     {Object.entries(q.options).map(([key, val]) => {
@@ -127,21 +139,27 @@ export default function TestResultScreen({ navigation, route }) {
                       const isUserSelection = key.toLowerCase() === userAnswer?.toLowerCase();
 
                       let optionStyle = { borderColor: theme.inputBorder };
-                      let textStyle = { color: theme.text };
+                      let textColor = theme.text;
 
                       if (isCorrectOption) {
                         optionStyle = { borderColor: "#4CAF50", backgroundColor: "#4CAF5015" };
-                        textStyle = { color: "#2E7D32", fontWeight: 'bold' };
+                        textColor = "#2E7D32";
                       } else if (isUserSelection && !isCorrect) {
                         optionStyle = { borderColor: theme.error, backgroundColor: theme.error + '15' };
-                        textStyle = { color: theme.error, fontWeight: 'bold' };
+                        textColor = theme.error;
                       }
 
                       return (
                         <View key={key} style={[styles.option, optionStyle]}>
-                          <Text style={textStyle}>{key.toUpperCase()}. {val}</Text>
-                          {isCorrectOption && <Ionicons name="checkmark" size={16} color="#4CAF50" />}
-                          {isUserSelection && !isCorrect && <Ionicons name="close" size={16} color={theme.error} />}
+                          <View style={{ flex: 1 }}>
+                            <MathView 
+                              content={`**${key.toUpperCase()}.** ${val}`} 
+                              color={textColor} 
+                              fontSize={15} 
+                            />
+                          </View>
+                          {isCorrectOption && <Ionicons name="checkmark" size={16} color="#4CAF50" style={{ marginLeft: 5 }} />}
+                          {isUserSelection && !isCorrect && <Ionicons name="close" size={16} color={theme.error} style={{ marginLeft: 5 }} />}
                         </View>
                       );
                     })}
@@ -149,9 +167,11 @@ export default function TestResultScreen({ navigation, route }) {
 
                   {!isCorrect && (
                     <View style={[styles.explanation, { backgroundColor: theme.primary + '10' }]}>
-                      <Text style={[styles.explanationText, { color: theme.primary }]}>
-                        <Text style={{ fontWeight: 'bold' }}>Correct Answer:</Text> {q.correct_option?.toUpperCase()}
-                      </Text>
+                      <MathView 
+                        content={`**Correct Answer:** ${q.correct_option?.toUpperCase()}`} 
+                        color={theme.primary} 
+                        fontSize={14} 
+                      />
                     </View>
                   )}
                 </View>
@@ -172,13 +192,21 @@ export default function TestResultScreen({ navigation, route }) {
                 <Text style={[styles.qNumber, { color: theme.primary, marginBottom: 10 }]}>Question {index + 1}</Text>
                 
                 <View style={styles.longPart}>
-                  <Text style={[styles.partText, { color: theme.text }]}>(a) {q.part_a.question}</Text>
-                  <Text style={[styles.marksLabel, { color: theme.textSecondary, textAlign: 'right' }]}>[{q.part_a.marks} Marks]</Text>
+                  <MathView 
+                    content={`**(a)** ${q.part_a.question}`} 
+                    color={theme.text} 
+                    fontSize={15} 
+                  />
+                  <Text style={[styles.marksLabel, { color: theme.textSecondary, textAlign: 'right', marginTop: 5 }]}>[{q.part_a.marks} Marks]</Text>
                 </View>
 
                 <View style={[styles.longPart, { marginTop: 15 }]}>
-                  <Text style={[styles.partText, { color: theme.text }]}>(b) {q.part_b.question}</Text>
-                  <Text style={[styles.marksLabel, { color: theme.textSecondary, textAlign: 'right' }]}>[{q.part_b.marks} Marks]</Text>
+                  <MathView 
+                    content={`**(b)** ${q.part_b.question}`} 
+                    color={theme.text} 
+                    fontSize={15} 
+                  />
+                  <Text style={[styles.marksLabel, { color: theme.textSecondary, textAlign: 'right', marginTop: 5 }]}>[{q.part_b.marks} Marks]</Text>
                 </View>
               </View>
             ))}
@@ -219,8 +247,7 @@ const styles = StyleSheet.create({
   card: { padding: 15, borderRadius: 12, marginBottom: 15, elevation: 2 },
   qHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
   qNumber: { fontSize: 14, fontWeight: 'bold' },
-  qText: { fontSize: 16, fontWeight: '600', marginBottom: 15 },
-  optionsContainer: { gap: 8 },
+  optionsContainer: { gap: 8, marginTop: 10 },
   option: { 
     padding: 12, 
     borderWidth: 1, 
@@ -230,11 +257,9 @@ const styles = StyleSheet.create({
     alignItems: 'center' 
   },
   explanation: { marginTop: 15, padding: 10, borderRadius: 8 },
-  explanationText: { fontSize: 14 },
   marksFooter: { borderTopWidth: 1, borderTopColor: '#EEE', marginTop: 10, paddingTop: 5 },
   marksLabel: { fontSize: 12, fontStyle: 'italic' },
   longPart: { paddingLeft: 10, borderLeftWidth: 2, borderLeftColor: '#F0F0F0' },
-  partText: { fontSize: 15, lineHeight: 22 },
   exitBtn: { padding: 18, borderRadius: 15, alignItems: 'center', marginTop: 20, marginBottom: 40 },
   exitBtnText: { color: 'white', fontWeight: 'bold', fontSize: 16 },
   groupTitleReview: { fontSize: 16, fontWeight: 'bold', padding: 8, borderRadius: 5, marginBottom: 10 },
