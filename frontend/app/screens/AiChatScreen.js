@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import {
   View, Text, StyleSheet, TextInput, TouchableOpacity, FlatList, 
-  KeyboardAvoidingView, Platform, ActivityIndicator, Animated
+  KeyboardAvoidingView, Platform, ActivityIndicator, Animated, ScrollView
 } from "react-native";
 import { Image } from 'expo-image';
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -147,6 +147,119 @@ export default function AiChatScreen({ navigation, route }) {
     }).start();
   };
 
+  const renderTable = (tableData) => {
+    const lines = tableData.trim().split("\n");
+    // Filter out separator lines like |---|---|
+    const rowsData = lines
+      .filter(line => !line.trim().match(/^\|[\s-]*\|[\s-|]*$/))
+      .map(row => row.split("|").slice(1, -1));
+
+    if (rowsData.length === 0) return null;
+
+    // Determine the number of columns
+    const numCols = Math.max(...rowsData.map(row => row.length));
+    
+    // Calculate required width for each column
+    // Base width of 100, capped at 200, but adjusted for content
+    const colWidths = Array(numCols).fill(100);
+    rowsData.forEach(row => {
+      row.forEach((cell, i) => {
+        const contentLen = cell.trim().length;
+        // Estimate 9 pixels per character + padding
+        const estimatedWidth = Math.min(Math.max(contentLen * 9 + 25, 80), 200);
+        if (estimatedWidth > colWidths[i]) {
+          colWidths[i] = estimatedWidth;
+        }
+      });
+    });
+
+    return (
+      <View key={`table-${Math.random()}`} style={[styles.tableOuterContainer, { borderColor: theme.inputBorder }]}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+          <View style={styles.tableInnerContainer}>
+            {rowsData.map((actualCells, rowIndex) => {
+              return (
+                <View 
+                  key={rowIndex} 
+                  style={[
+                    styles.tableRow, 
+                    { 
+                      backgroundColor: rowIndex === 0 ? theme.primary + "15" : "transparent",
+                      borderBottomWidth: rowIndex === rowsData.length - 1 ? 0 : 1,
+                      borderBottomColor: theme.inputBorder 
+                    }
+                  ]}
+                >
+                  {actualCells.map((cell, cellIndex) => (
+                    <View 
+                      key={cellIndex} 
+                      style={[
+                        styles.tableCell, 
+                        { 
+                          width: colWidths[cellIndex], // Ensure fixed width for alignment
+                          borderRightWidth: cellIndex === actualCells.length - 1 ? 0 : 1,
+                          borderRightColor: theme.inputBorder,
+                        }
+                      ]}
+                    >
+                      <Text style={[styles.cellText, { color: theme.text, fontWeight: rowIndex === 0 ? "bold" : "normal" }]}>
+                        {cell.trim()}
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+              );
+            })}
+          </View>
+        </ScrollView>
+      </View>
+    );
+  };
+
+  const renderFormattedText = (text) => {
+    if (!text) return null;
+    
+    const lines = text.split("\n");
+    const blocks = [];
+    let currentTable = [];
+    let currentText = [];
+
+    lines.forEach((line) => {
+      const isTableRow = line.trim().startsWith("|") && line.trim().includes("|", 1);
+      
+      if (isTableRow) {
+        if (currentText.length > 0) {
+          blocks.push({ type: 'text', content: currentText.join("\n") });
+          currentText = [];
+        }
+        currentTable.push(line);
+      } else {
+        if (currentTable.length > 0) {
+          blocks.push({ type: 'table', content: currentTable.join("\n") });
+          currentTable = [];
+        }
+        currentText.push(line);
+      }
+    });
+
+    if (currentText.length > 0) blocks.push({ type: 'text', content: currentText.join("\n") });
+    if (currentTable.length > 0) blocks.push({ type: 'table', content: currentTable.join("\n") });
+
+    return blocks.map((block, index) => {
+      if (block.type === 'text') {
+        const textContent = block.content.trim();
+        if (!textContent) return null;
+        return (
+          <Text key={index} style={[styles.messageText, { color: theme.text }]}>
+            {textContent}
+          </Text>
+        );
+      } else {
+        return renderTable(block.content);
+      }
+    });
+  };
+
   const renderMessage = ({ item }) => {
     const isUser = item.sender === "user";
     return (
@@ -163,9 +276,13 @@ export default function AiChatScreen({ navigation, route }) {
           </View>
         )}
         <View style={styles.textAndImageContainer}>
-          <Text style={[styles.messageText, { color: isUser ? "#FFFFFF" : theme.text }]}>
-            {item.text}
-          </Text>
+          {isUser ? (
+            <Text style={[styles.messageText, { color: "#FFFFFF" }]}>
+              {item.text}
+            </Text>
+          ) : (
+            renderFormattedText(item.text)
+          )}
 
           {!isUser && item.figures && item.figures.length > 0 && (
             <View style={styles.figuresContainer}>
@@ -306,4 +423,29 @@ const styles = StyleSheet.create({
   suggestionContainer: { flexDirection: "row", flexWrap: "wrap", justifyContent: "center", paddingHorizontal: 10, paddingBottom: 10, borderTopWidth: 1, borderTopColor: '#E0E0E0' },
   suggestionChip: { borderRadius: 20, paddingVertical: 8, paddingHorizontal: 15, margin: 5 },
   suggestionText: { fontSize: 14 },
+  
+  // Table Styles
+  tableOuterContainer: {
+    marginVertical: 12,
+    borderRadius: 12,
+    overflow: "hidden",
+    borderWidth: 1,
+    backgroundColor: "transparent",
+  },
+  tableInnerContainer: {
+    flexDirection: "column",
+  },
+  tableRow: {
+    flexDirection: "row",
+    alignItems: "stretch", // Changed from center to stretch for uniform row height
+  },
+  tableCell: {
+    padding: 10,
+    justifyContent: "center",
+    alignItems: "flex-start",
+  },
+  cellText: {
+    fontSize: 13,
+    lineHeight: 18,
+  },
 });
