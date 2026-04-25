@@ -159,18 +159,18 @@ async function getDashboard(req, res) {
     const Progress = require('../models/Progress');
     const progressDoc = await Progress.findOne({ user_id });
 
-    const overall_progress    = progressDoc ? Number(progressDoc.overall_progress.toFixed(1)) : 0;
-    const total_mcqs_seen     = progressDoc?.total_mcqs_seen || 0;
-    const total_mcqs_correct  = progressDoc?.total_mcqs_correct || 0;
+    const overall_progress = progressDoc?.overall_progress != null ? Number(progressDoc.overall_progress.toFixed(1)) : 0;
+    const total_mcqs_seen = progressDoc?.total_mcqs_seen ?? 0;
+    const total_mcqs_correct = progressDoc?.total_mcqs_correct ?? 0;
     const accuracy_percentage = total_mcqs_seen > 0
       ? Number(((total_mcqs_correct / total_mcqs_seen) * 100).toFixed(1))
       : 0;
-    const streak = getEffectiveStreak(progressDoc);
-
+    //const streak = getEffectiveStreak(progressDoc);
+    const streak = progressDoc ? getEffectiveStreak(progressDoc) : 0;
     // These counts are now accurate since overdue tests are already expired above
     const total_tests_generated = await Test.countDocuments({ user_id });
     const total_tests_attempted = await Test.countDocuments({ user_id, status: 'attempted' });
-    const total_tests_expired   = await Test.countDocuments({ user_id, status: 'expired' });
+    const total_tests_expired = await Test.countDocuments({ user_id, status: 'expired' });
 
     const submittedTests = await Test.find({ user_id, status: 'attempted' }, { mcqs: 1 });
 
