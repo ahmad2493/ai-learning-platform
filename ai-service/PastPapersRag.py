@@ -67,7 +67,6 @@ class PastPaperQuestion:
     correct_option: Optional[str]  # "A" / "B" / "C" / "D" for MCQs
     answer_text: Optional[str]  # For short questions, cleaned full answer
     appearances: List[Dict[str, Any]]
-    figure_url: Optional[str] = None  # Image URL if question had a figure, else null
 
 
 # In-memory cache of the JSON chunk index (id, question_text, topics, appearances, etc.).
@@ -388,9 +387,6 @@ def cleanup_questions_with_llm(questions: List[PastPaperQuestion]) -> List[PastP
         "   - Put ONLY the answer in 'answer_text' — null for MCQs.\n"
         "   - Put option strings in 'options' for MCQs, empty array otherwise.\n"
         "   - Fix garbled or incomplete wording. Do NOT invent content that is missing.\n"
-        "   - If this question has an associated figure/image URL (e.g. ![...](url) or a cdn.mathpix.com URL), "
-        "extract that URL into 'figure_url'. If multiple images exist for one question, use the first. "
-        "If no image, set 'figure_url' to null.\n"
         "   - Set 'section': 'mcq' if it has options, 'short' for brief answers, "
         "'long' for derivations/lengthy answers.\n\n"
         "Return JSON with a single field 'items'. Each element must have:\n"
@@ -399,19 +395,22 @@ def cleanup_questions_with_llm(questions: List[PastPaperQuestion]) -> List[PastP
         "    'question_text' : question stem only, no image markdown\n"
         "    'options'       : list of option strings (empty list for non-MCQ)\n"
         "    'answer_text'   : answer only, or null for MCQ\n"
-        "    'figure_url'    : image URL string if question had a figure, else null\n"
         "    'section'       : 'mcq' | 'short' | 'long'\n"
         "If a chunk contains only one question, 'questions' must still be an array of length 1.\n"
         "Do NOT filter out any question. Every input item must appear in the output."
     )
 
+    _img_re = re.compile(r'!\[.*?\]\(https?://\S+\)|https?://cdn\.mathpix\.com/\S+', re.IGNORECASE)
+    def _strip(text: Optional[str]) -> Optional[str]:
+        return _img_re.sub('', text).strip() if text else text
+
     payload_items = [
         {
             "id": q.id,
             "section": q.section,
-            "question_text": q.question_text,
-            "options": q.options or [],
-            "answer_text": q.answer_text,
+            "question_text": _strip(q.question_text),
+            "options": [_strip(o) for o in (q.options or [])],
+            "answer_text": _strip(q.answer_text),
         }
         for q in questions
     ]
@@ -452,7 +451,6 @@ def cleanup_questions_with_llm(questions: List[PastPaperQuestion]) -> List[PastP
                     correct_option=q.correct_option,
                     answer_text=sub.get("answer_text"),
                     appearances=q.appearances,
-                    figure_url=sub.get("figure_url"),
                 ))
         return result
     except Exception:

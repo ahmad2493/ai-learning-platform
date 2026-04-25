@@ -181,7 +181,6 @@ async def query_past_papers(req: PastPaperQueryRequest):
                 "question": q.question_text,
                 "options": q.options or [],
                 "answer": q.answer_text,
-                "figure_url": q.figure_url,
                 "boards_years": appearances,
             }
             result.append(entry)
