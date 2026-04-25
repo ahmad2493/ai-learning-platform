@@ -461,10 +461,24 @@ class TestGenerationEngine:
                 and self._effective_topic(c.get("metadata", {})) == topic_number
             ]
 
-        return [
+        # Strictly keep chunks that belong to the assigned topic to reduce
+        # cross-topic bleed inside chapter/topic range boundaries.
+        topic_strict = [
+            c for c in chunks
+            if self._effective_topic(c.get("metadata", {})) == topic_number
+        ]
+        if topic_strict:
+            chunks = topic_strict
+
+        selected = [
             c for c in chunks
             if c.get("metadata", {}).get("section_kind") in MCQ_SHORT_KINDS
         ]
+        self._debug(
+            f"TOPIC_CTX ch={ch}, topic={topic_number}, "
+            f"range_chunks={len(chunks)}, selected={len(selected)}"
+        )
+        return selected
 
     def _get_full_chapter_context(self, ch: int) -> List[Dict]:
         ch_info = self.chunk_ranges.get("chapters", {}).get(str(ch), {})
@@ -912,6 +926,7 @@ class TestGenerationEngine:
         mcq_topic_assignments = self._assign_mcq_topics_uniformly(slots)
 
         context_blocks: List[str] = []
+        mcq_requirements: List[str] = []
         for i, slot in enumerate(slots, start=1):
             slot_idx = i - 1
             ch = slot.chapters[0]
@@ -925,18 +940,13 @@ class TestGenerationEngine:
                         c for c in get_full_ch(ch)
                         if self._effective_topic(c.get("metadata", {})) == assigned_topic
                     ]
-                # Pad sparse topics with full chapter context
-                if len(chunks) < 2:
-                    full_chunks = get_full_ch(ch)
-                    existing_ids = {id(c) for c in chunks}
-                    padding = [c for c in full_chunks if id(c) not in existing_ids]
-                    chunks = chunks + padding[:2]
                 t_name = self.chapters_meta.get(ch, {}).get("topics", {}).get(
                     assigned_topic, {}
                 ).get("topic_name", assigned_topic)
                 label = f"Chapter {ch} ({ch_name}) | Topic: {t_name}"
             else:
                 chunks = get_full_ch(ch)
+                t_name = "N/A"
                 label = f"Chapter {ch} ({ch_name})"
 
             random.shuffle(chunks)
@@ -948,13 +958,20 @@ class TestGenerationEngine:
             )
             ctx = self._build_context_block(docs, max_docs=MCQ_CONTEXT_DOCS)
             context_blocks.append(f"--- CONTEXT FOR Q{i} ({label}) ---\n{ctx}")
+            mcq_requirements.append(
+                f"Q{i}: chapter={ch}, topic={assigned_topic or 'N/A'}, topic_name={t_name}"
+            )
 
         all_contexts = "\n\n".join(context_blocks)
+        requirements_text = "\n".join(mcq_requirements)
 
         gen_task = (
             f"Generate exactly {n} MCQs for 9th grade Punjab Board physics.\n"
             "Each question has its own context block labelled with chapter and topic.\n"
-            "Write question N using ONLY the content in its own context block.\n\n"
+            "Write question N using ONLY the content in its own context block.\n"
+            "Each question MUST match its required chapter/topic mapping exactly.\n"
+            "If context is sparse, still keep the stem strictly about the required topic.\n\n"
+            f"REQUIRED MAPPING:\n{requirements_text}\n\n"
             "Do NOT include chapter/topic labels or markdown in output.\n"
             "Output format for each MCQ:\n"
             "N. [question stem]\n"
