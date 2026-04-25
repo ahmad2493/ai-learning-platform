@@ -334,19 +334,35 @@ class TestGenerationEngine:
 
     # ── Blueprint builders ───────────────────────────────────────────
 
+    def _topic_sort_key(self, topic_number: str) -> Tuple[int, ...]:
+        parts = re.findall(r"\d+", str(topic_number))
+        if not parts:
+            return (10**9,)
+        return tuple(int(p) for p in parts)
+
+    def _sorted_topics(self, topics: List[str]) -> List[str]:
+        return sorted(list(dict.fromkeys(topics)), key=self._topic_sort_key)
+
+    def _randomized_cycle(self, items: List[int]) -> List[int]:
+        if not items:
+            return []
+        arr = list(items)
+        random.shuffle(arr)
+        return arr
+
     def _topics_for_chapter(self, ch: int, selections: Dict[int, ChapterSelection]) -> Optional[List[str]]:
         sel = selections.get(ch)
         if sel is None or sel.selection_mode == "none":
             return None
         if sel.selection_mode == "partial":
-            return sel.selected_topics
-        return sorted(self.chapters_meta.get(ch, {}).get("topics", {}).keys())
+            return self._sorted_topics(sel.selected_topics)
+        return self._sorted_topics(list(self.chapters_meta.get(ch, {}).get("topics", {}).keys()))
 
     def _build_board_blueprint(self, selections: Dict[int, ChapterSelection]) -> List[QuestionSlot]:
         involved = self._compute_involved_chapters(selections)
         full_book = set(involved) == set(range(1, 10))
         slots: List[QuestionSlot] = []
-        cycle = involved or [1]
+        cycle = self._randomized_cycle(involved) or [1]
 
         for i in range(12):
             ch = cycle[i % len(cycle)]
@@ -363,6 +379,7 @@ class TestGenerationEngine:
 
         for q in [2, 3, 4]:
             b = [c for c in bucket(q) if c in involved] or cycle
+            random.shuffle(b)
             for i in range(8):
                 ch = b[i % len(b)]
                 slots.append(QuestionSlot(
@@ -380,29 +397,31 @@ class TestGenerationEngine:
     def _build_custom_blueprint(self, config: TestConfig, selections: Dict[int, ChapterSelection]) -> List[QuestionSlot]:
         involved = self._compute_involved_chapters(selections) or [1]
         slots: List[QuestionSlot] = []
+        chapter_cycle = self._randomized_cycle(involved)
 
         num_capable = [ch for ch in involved if ch in NUMERICAL_CAPABLE_CHAPTERS]
         if not num_capable:
             num_capable = involved
             print(f"[WARN] No numerical chapters in {involved}.")
+        num_cycle = self._randomized_cycle(num_capable)
 
         for i in range(config.mcq_count):
-            ch = involved[i % len(involved)]
+            ch = chapter_cycle[i % len(chapter_cycle)]
             slots.append(QuestionSlot(
                 qid=f"MCQ_{i+1}", kind="mcq",
                 chapters=[ch],
                 preferred_topics=self._topics_for_chapter(ch, selections),
             ))
         for i in range(config.short_count):
-            ch = involved[i % len(involved)]
+            ch = chapter_cycle[i % len(chapter_cycle)]
             slots.append(QuestionSlot(
                 qid=f"SQ_{i+1}", kind="short",
                 chapters=[ch],
                 preferred_topics=self._topics_for_chapter(ch, selections),
             ))
         for i in range(config.long_count):
-            a_ch = involved[i % len(involved)]
-            b_ch = num_capable[i % len(num_capable)]
+            a_ch = chapter_cycle[i % len(chapter_cycle)]
+            b_ch = num_cycle[i % len(num_cycle)]
             slots.append(QuestionSlot(qid=f"LQ_{i+1}a", kind="long_theory",    chapters=[a_ch]))
             slots.append(QuestionSlot(qid=f"LQ_{i+1}b", kind="long_numerical", chapters=[b_ch]))
 
@@ -477,17 +496,6 @@ class TestGenerationEngine:
         candidates = []
         for ch in slot.chapters:
             candidates.extend(self._get_chunks_for_chapter(ch, kind_filter))
-
-        if not candidates and self.vectorstore is not None:
-            query = f"9th grade physics chapter {slot.chapters[0]} question"
-            try:
-                docs = self.vectorstore.similarity_search(
-                    query, k=top_k,
-                    filter={"chapter_number": {"$in": slot.chapters}},
-                )
-                return docs
-            except Exception as e:
-                print(f"[WARN] Chroma fallback failed for {slot.qid}: {e}")
 
         random.shuffle(candidates)
         return [SimpleDoc(c.get("content", ""), c.get("metadata", {})) for c in candidates[:top_k]]
@@ -618,11 +626,49 @@ class TestGenerationEngine:
     ) -> List[Dict]:
         ch_pools: Dict[int, List[Dict]] = {}
 
+        def pick_chapter(pool: List[int], used: set, avoid: Optional[int] = None) -> Optional[int]:
+            if not pool:
+                return None
+            for ch in pool:
+                if ch != avoid and ch not in used:
+                    return ch
+            for ch in pool:
+                if ch != avoid:
+                    return ch
+            return pool[0]
+
         def get_pool(ch: int, topics: List[str]) -> List[Dict]:
             if ch not in ch_pools:
                 all_ch = [c for c in self.book_chunks if c.get("metadata", {}).get("chapter_number") == ch]
                 ch_pools[ch] = self._get_numerical_pool_for_chapter(ch, topics, all_ch)
             return ch_pools[ch]
+
+        if chapter_assignments is None and long_pairs:
+            involved = [ch for ch, sel in selections.items() if sel.selection_mode != "none"]
+            if not involved:
+                involved = [1]
+
+            theory_pool = self._randomized_cycle(involved)
+            numerical_pool = self._randomized_cycle([ch for ch in involved if ch in NUMERICAL_CAPABLE_CHAPTERS])
+            if not numerical_pool:
+                numerical_pool = list(theory_pool)
+
+            used_chapters: set = set()
+            chapter_assignments = {}
+            for i in range(len(long_pairs)):
+                q_num = q_start_number + i
+                a_ch = pick_chapter(theory_pool, used_chapters)
+                if a_ch is None:
+                    a_ch = theory_pool[0]
+                used_chapters.add(a_ch)
+
+                b_ch = pick_chapter(numerical_pool, used_chapters, avoid=a_ch)
+                if b_ch is None:
+                    b_ch = numerical_pool[0]
+                used_chapters.add(b_ch)
+
+                chapter_assignments[f"Q{q_num}a"] = a_ch
+                chapter_assignments[f"Q{q_num}b"] = b_ch
 
         plans = []
         for i, (a_slot, b_slot) in enumerate(long_pairs):
@@ -688,9 +734,9 @@ class TestGenerationEngine:
 
     # ── MCQ topic assignment helper ──────────────────────────────────
 
-    def _assign_mcq_topics_uniformly(self, slots: List[QuestionSlot]) -> Dict[int, Optional[str]]:
+    def _assign_topics_uniformly(self, slots: List[QuestionSlot]) -> Dict[int, Optional[str]]:
         """
-        Deterministically spread MCQ slots across preferred topics per chapter.
+        Spread slots across preferred topics per chapter with balanced randomness.
         Returns: {slot_index: assigned_topic_number_or_none}
         """
         assignments: Dict[int, Optional[str]] = {}
@@ -708,16 +754,21 @@ class TestGenerationEngine:
                 continue
 
             first_slot = slots[indices[0]]
-            topics = list(dict.fromkeys(first_slot.preferred_topics or []))
+            topics = self._sorted_topics(first_slot.preferred_topics or [])
             if not topics:
                 for idx in indices:
                     assignments[idx] = None
                 continue
 
+            start = random.randint(0, len(topics) - 1)
+            rotated_topics = topics[start:] + topics[:start]
             for offset, idx in enumerate(indices):
-                assignments[idx] = topics[offset % len(topics)]
+                assignments[idx] = rotated_topics[offset % len(rotated_topics)]
 
         return assignments
+
+    def _assign_mcq_topics_uniformly(self, slots: List[QuestionSlot]) -> Dict[int, Optional[str]]:
+        return self._assign_topics_uniformly(slots)
 
     # ── Single classification call for ALL MCQs ──────────────────────
 
@@ -897,11 +948,27 @@ class TestGenerationEngine:
         if self.llm is None:
             return [f"Explain a key concept from chapter {s.chapters[0]}." for s in slots]
 
+        class SimpleDoc:
+            def __init__(self, content: str, metadata: Dict):
+                self.page_content = content
+                self.metadata = metadata
+
+        short_topic_assignments = self._assign_topics_uniformly(slots)
+
         context_parts = []
         for i, slot in enumerate(slots, start=1):
-            docs = self._retrieve_for_slot(slot, MCQ_SHORT_KINDS, top_k=6)
+            slot_idx = i - 1
             ch = slot.chapters[0]
             ch_name = self.chapters_meta.get(ch, {}).get("chapter_name", f"Chapter {ch}")
+            assigned_topic = short_topic_assignments.get(slot_idx)
+
+            if assigned_topic:
+                chunks = self._get_mcq_context_for_topic(ch, assigned_topic)
+                random.shuffle(chunks)
+                docs = [SimpleDoc(c.get("content", ""), c.get("metadata", {})) for c in chunks[:6]]
+            else:
+                docs = self._retrieve_for_slot(slot, MCQ_SHORT_KINDS, top_k=6)
+
             ctx = self._build_context_block(docs)
             context_parts.append(f"=== Context for Q{i} (Chapter {ch}: {ch_name}) ===\n{ctx}")
 
