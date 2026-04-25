@@ -40,6 +40,9 @@ MCQ_SHORT_KINDS = {"theory", "example", "exercise_mcq", "exercise_short"}
 MAX_MCQ = 20
 MAX_SHORT = 20
 MAX_LONG = 4
+MCQ_CONTEXT_DOCS = int(os.getenv("MCQ_CONTEXT_DOCS", "4"))
+SHORT_CONTEXT_DOCS = int(os.getenv("SHORT_CONTEXT_DOCS", "3"))
+LONG_CONTEXT_DOCS = int(os.getenv("LONG_CONTEXT_DOCS", "2"))
 
 BOARD_DURATION_MINUTES = 120
 
@@ -99,6 +102,8 @@ class TestGenerationEngine:
         self.vectorstore: Optional[Chroma] = None
         self.chroma_dir = chroma_dir
         self._llm_calls = 0
+        self.debug_logs = os.getenv("TEST_ENGINE_DEBUG", "0") == "1"
+        self.log_llm_body = os.getenv("TEST_ENGINE_LOG_LLM_BODY", "0") == "1"
         self._load()
 
     # ── Startup ──────────────────────────────────────────────────────
@@ -161,6 +166,8 @@ class TestGenerationEngine:
     # ── Public API ───────────────────────────────────────────────────
 
     def generate(self, config_dict: Dict) -> Dict:
+        # Per-request counter (prevents cumulative carry-over in server process).
+        self._llm_calls = 0
         config = self._parse_config_dict(config_dict)
         selections = self._build_chapter_selections(config)
         involved = self._compute_involved_chapters(selections)
@@ -520,14 +527,34 @@ class TestGenerationEngine:
             blocks.append(f"[ch{ch} | topic {topic} | {kind}]\n{text}")
         return "\n---\n".join(blocks)
 
+    def _debug(self, msg: str):
+        if self.debug_logs:
+            print(f"[DEBUG] {msg}")
+
     # ── LLM call ─────────────────────────────────────────────────────
 
     def _call_llm(self, messages) -> str:
         if self.llm is None:
             return ""
         self._llm_calls += 1
+        prompt_chars = sum(len(str(m[1])) for m in messages if isinstance(m, tuple) and len(m) > 1)
+        approx_prompt_tokens = prompt_chars // 4
+        self._debug(
+            f"LLM call #{self._llm_calls}: prompt_chars={prompt_chars}, "
+            f"approx_prompt_tokens={approx_prompt_tokens}"
+        )
+        if self.log_llm_body:
+            for i, m in enumerate(messages, start=1):
+                role = m[0] if isinstance(m, tuple) and m else "unknown"
+                body = m[1] if isinstance(m, tuple) and len(m) > 1 else str(m)
+                self._debug(f"LLM call #{self._llm_calls} message {i} role={role}\n{body}")
         resp = self.llm.invoke(messages)
-        return resp.content if hasattr(resp, "content") else str(resp)
+        content = resp.content if hasattr(resp, "content") else str(resp)
+        self._debug(
+            f"LLM call #{self._llm_calls}: response_chars={len(content)}, "
+            f"approx_response_tokens={len(content) // 4}"
+        )
+        return content
 
     # ── Output parsing ───────────────────────────────────────────────
 
@@ -689,11 +716,11 @@ class TestGenerationEngine:
             if pool:
                 b_chunk = pool.pop(0)
                 b_type = "numerical"
-                print(f"[INFO] Q{q_num}(b): numerical ex={b_chunk.get('metadata',{}).get('example_number','?')}")
+                self._debug(f"Q{q_num}(b): numerical ex={b_chunk.get('metadata',{}).get('example_number','?')}")
             else:
                 b_chunk = None
                 b_type = "theory"
-                print(f"[INFO] Q{q_num}(b): no numericals for ch{b_ch} -> theory fallback")
+                self._debug(f"Q{q_num}(b): no numericals for ch{b_ch} -> theory fallback")
 
             plans.append({
                 "q_num":    q_num,
@@ -899,11 +926,11 @@ class TestGenerationEngine:
                         if self._effective_topic(c.get("metadata", {})) == assigned_topic
                     ]
                 # Pad sparse topics with full chapter context
-                if len(chunks) < 3:
+                if len(chunks) < 2:
                     full_chunks = get_full_ch(ch)
                     existing_ids = {id(c) for c in chunks}
                     padding = [c for c in full_chunks if id(c) not in existing_ids]
-                    chunks = chunks + padding[:6]
+                    chunks = chunks + padding[:2]
                 t_name = self.chapters_meta.get(ch, {}).get("topics", {}).get(
                     assigned_topic, {}
                 ).get("topic_name", assigned_topic)
@@ -914,8 +941,12 @@ class TestGenerationEngine:
 
             random.shuffle(chunks)
             docs = [SimpleDoc(c.get("content", ""), c.get("metadata", {}))
-                    for c in chunks[:6]]
-            ctx = self._build_context_block(docs, max_docs=6)
+                    for c in chunks[:MCQ_CONTEXT_DOCS]]
+            self._debug(
+                f"MCQ {slot.qid}: ch={ch}, topic={assigned_topic}, chunks={len(chunks)}, "
+                f"used_docs={len(docs)}"
+            )
+            ctx = self._build_context_block(docs, max_docs=MCQ_CONTEXT_DOCS)
             context_blocks.append(f"--- CONTEXT FOR Q{i} ({label}) ---\n{ctx}")
 
         all_contexts = "\n\n".join(context_blocks)
@@ -924,6 +955,7 @@ class TestGenerationEngine:
             f"Generate exactly {n} MCQs for 9th grade Punjab Board physics.\n"
             "Each question has its own context block labelled with chapter and topic.\n"
             "Write question N using ONLY the content in its own context block.\n\n"
+            "Do NOT include chapter/topic labels or markdown in output.\n"
             "Output format for each MCQ:\n"
             "N. [question stem]\n"
             "a) ...\nb) ...\nc) ...\nd) ...\n"
@@ -965,11 +997,14 @@ class TestGenerationEngine:
             if assigned_topic:
                 chunks = self._get_mcq_context_for_topic(ch, assigned_topic)
                 random.shuffle(chunks)
-                docs = [SimpleDoc(c.get("content", ""), c.get("metadata", {})) for c in chunks[:6]]
+                docs = [SimpleDoc(c.get("content", ""), c.get("metadata", {})) for c in chunks[:SHORT_CONTEXT_DOCS]]
             else:
-                docs = self._retrieve_for_slot(slot, MCQ_SHORT_KINDS, top_k=6)
+                docs = self._retrieve_for_slot(slot, MCQ_SHORT_KINDS, top_k=SHORT_CONTEXT_DOCS)
 
-            ctx = self._build_context_block(docs)
+            self._debug(
+                f"SHORT {slot.qid}: ch={ch}, topic={assigned_topic}, used_docs={len(docs)}"
+            )
+            ctx = self._build_context_block(docs, max_docs=SHORT_CONTEXT_DOCS)
             context_parts.append(f"=== Context for Q{i} (Chapter {ch}: {ch_name}) ===\n{ctx}")
 
         combined = "\n\n".join(context_parts)
@@ -1027,14 +1062,17 @@ class TestGenerationEngine:
             a_name = self.chapters_meta.get(a_ch, {}).get("chapter_name", f"Chapter {a_ch}")
             b_name = self.chapters_meta.get(b_ch, {}).get("chapter_name", f"Chapter {b_ch}")
 
-            theory_docs = self._retrieve_for_slot(a_slot, THEORY_KINDS, top_k=6)
+            theory_docs = self._retrieve_for_slot(a_slot, THEORY_KINDS, top_k=LONG_CONTEXT_DOCS)
             sec_d_docs = [
                 c for c in self.book_chunks
                 if c.get("metadata", {}).get("chapter_number") == a_ch
                 and c.get("metadata", {}).get("section_kind") == "exercise_comprehensive"
             ]
             random.shuffle(sec_d_docs)
-            theory_ctx = self._build_context_block(theory_docs, max_docs=3)
+            self._debug(
+                f"LONG Q{q_num}(a): ch={a_ch}, docs={len(theory_docs)}"
+            )
+            theory_ctx = self._build_context_block(theory_docs, max_docs=LONG_CONTEXT_DOCS)
             sec_d_ctx  = "\n".join(f"- {c.get('content','').strip()[:200]}" for c in sec_d_docs[:4])
 
             part_list_lines.append(f"  Q{q_num}(a) [4 marks — THEORY]")
@@ -1058,9 +1096,12 @@ class TestGenerationEngine:
             else:
                 b_theory_docs = self._retrieve_for_slot(
                     QuestionSlot(qid=b_slot.qid, kind="long_theory", chapters=[b_ch]),
-                    THEORY_KINDS, top_k=6,
+                    THEORY_KINDS, top_k=LONG_CONTEXT_DOCS,
                 )
-                b_theory_ctx = self._build_context_block(b_theory_docs, max_docs=3)
+                self._debug(
+                    f"LONG Q{q_num}(b-fallback): ch={b_ch}, docs={len(b_theory_docs)}"
+                )
+                b_theory_ctx = self._build_context_block(b_theory_docs, max_docs=LONG_CONTEXT_DOCS)
 
                 context_parts.append(
                     f"=== Q{q_num}(a) — Chapter {a_ch}: {a_name} [THEORY] ===\n"
@@ -1106,6 +1147,20 @@ class TestGenerationEngine:
         if text.startswith("[") and "]" in text:
             text = text[text.find("]") + 1:].lstrip(" :")
         text = re.sub(r"^\s*\d{1,2}[.)]\s+", "", text.strip())
+        # Strip leaked context labels like:
+        # **(Chapter 3 (Dynamics) | Topic: Mass and Weight)** Question...
+        text = re.sub(
+            r"^\s*\*{1,2}\s*\(?\s*Chapter\s+\d+[^*|)]*(?:\|[^*]+)?\)?\s*\*{1,2}\s*",
+            "",
+            text,
+            flags=re.IGNORECASE,
+        )
+        text = re.sub(
+            r"^\s*\(?\s*Chapter\s+\d+[^|)]*(?:\|[^)]+)?\)?\s*[:\-]\s*",
+            "",
+            text,
+            flags=re.IGNORECASE,
+        )
         return text.strip()
 
     # ── Structured assembly ──────────────────────────────────────────
@@ -1150,13 +1205,29 @@ class TestGenerationEngine:
             resolved_ch = ch
             resolved_ch_name = ch_name
 
-            # Step 1: use planned per-slot topic to preserve near-uniform coverage.
             planned_topic = planned_mcq_topics.get(idx)
-            if planned_topic and planned_topic in all_topic_map:
+            classified = mcq_topic_assignments.get(idx) if mcq_topic_assignments is not None else None
+
+            # Step 1: prefer dedicated classification result (same chapter only).
+            if classified and classified in all_topic_map:
+                t_ch, t_ch_name, t_name = all_topic_map[classified]
+                if t_ch == ch:
+                    topic_number = classified
+                    resolved_ch = t_ch
+                    resolved_ch_name = t_ch_name
+                    topic_name = t_name
+                else:
+                    self._debug(
+                        f"MCQ {idx+1}: classifier topic {classified} in ch{t_ch} "
+                        f"rejected for slot chapter ch{ch}"
+                    )
+
+            # Step 2: use planned per-slot topic for balanced fallback.
+            if topic_number is None and planned_topic and planned_topic in all_topic_map:
                 resolved_ch, resolved_ch_name, topic_name = all_topic_map[planned_topic]
                 topic_number = planned_topic
 
-            # Step 2: use dedicated classification result only when no planned topic.
+            # Step 3: fallback — guarantees no nulls.
             if topic_number is None and mcq_topic_assignments is not None:
                 classified = mcq_topic_assignments.get(idx)
                 if classified and classified in all_topic_map:
@@ -1169,14 +1240,19 @@ class TestGenerationEngine:
                     else:
                         print(f"[WARN] MCQ {idx+1}: classifier returned {classified} (ch{t_ch}) but slot is ch{ch}. Rejecting.")
 
-            # Step 3: fallback — guarantees no nulls
+            # Step 4: fallback — guarantees no nulls
             if topic_number is None and slot.preferred_topics:
                 for candidate in slot.preferred_topics:
                     if candidate in all_topic_map:
                         topic_number = candidate
                         resolved_ch, resolved_ch_name, topic_name = all_topic_map[topic_number]
-                        print(f"[FALLBACK] MCQ {idx+1}: assigned {topic_number} from preferred_topics")
+                        self._debug(f"[FALLBACK] MCQ {idx+1}: assigned {topic_number} from preferred_topics")
                         break
+
+            self._debug(
+                f"MCQ {idx+1}: slot_ch={ch}, planned={planned_topic}, "
+                f"classified={classified}, final={topic_number}"
+            )
 
             mcqs.append({
                 "question_number": idx + 1,
