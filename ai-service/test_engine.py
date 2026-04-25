@@ -1068,6 +1068,9 @@ class TestGenerationEngine:
 
         # ── MCQs ─────────────────────────────────────────────────────
         mcqs = []
+        # Keep topic spread stable by using the same deterministic slot->topic
+        # assignment that MCQ context generation uses.
+        planned_mcq_topics = self._assign_mcq_topics_uniformly(mcq_slots)
         for idx, (slot, raw_text) in enumerate(zip(mcq_slots, mcq_texts)):
             parsed = self._parse_mcq_block(self._clean(raw_text))
 
@@ -1080,8 +1083,14 @@ class TestGenerationEngine:
             resolved_ch = ch
             resolved_ch_name = ch_name
 
-            # Step 1: use dedicated classification result
-            if mcq_topic_assignments is not None:
+            # Step 1: use planned per-slot topic to preserve near-uniform coverage.
+            planned_topic = planned_mcq_topics.get(idx)
+            if planned_topic and planned_topic in all_topic_map:
+                resolved_ch, resolved_ch_name, topic_name = all_topic_map[planned_topic]
+                topic_number = planned_topic
+
+            # Step 2: use dedicated classification result only when no planned topic.
+            if topic_number is None and mcq_topic_assignments is not None:
                 classified = mcq_topic_assignments.get(idx)
                 if classified and classified in all_topic_map:
                     t_ch, t_ch_name, t_name = all_topic_map[classified]
@@ -1093,7 +1102,7 @@ class TestGenerationEngine:
                     else:
                         print(f"[WARN] MCQ {idx+1}: classifier returned {classified} (ch{t_ch}) but slot is ch{ch}. Rejecting.")
 
-            # Step 2: fallback — guarantees no nulls
+            # Step 3: fallback — guarantees no nulls
             if topic_number is None and slot.preferred_topics:
                 for candidate in slot.preferred_topics:
                     if candidate in all_topic_map:
