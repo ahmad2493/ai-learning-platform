@@ -285,6 +285,46 @@ async function getProgress(req, res) {
     const response  = JSON.parse(JSON.stringify(doc));
     response.streak = getEffectiveStreak(doc);
 
+    // Backward/forward compatibility for different frontend payload expectations.
+    if (typeof response.overall_progress !== 'number') {
+      response.overall_progress = typeof response.overall_performance === 'number'
+        ? response.overall_performance
+        : 0;
+    }
+    if (typeof response.overall_performance !== 'number') {
+      response.overall_performance = typeof response.overall_progress === 'number'
+        ? response.overall_progress
+        : 0;
+    }
+
+    if (response.chapters && typeof response.chapters === 'object') {
+      for (const chKey of Object.keys(response.chapters)) {
+        const chapter = response.chapters[chKey] || {};
+
+        if (typeof chapter.progress !== 'number') {
+          chapter.progress = typeof chapter.performance === 'number' ? chapter.performance : 0;
+        }
+        if (typeof chapter.performance !== 'number') {
+          chapter.performance = typeof chapter.progress === 'number' ? chapter.progress : 0;
+        }
+
+        if (chapter.topics && typeof chapter.topics === 'object') {
+          for (const topKey of Object.keys(chapter.topics)) {
+            const topic = chapter.topics[topKey] || {};
+            if (typeof topic.progress !== 'number') {
+              topic.progress = typeof topic.score === 'number' ? topic.score : 0;
+            }
+            if (typeof topic.score !== 'number') {
+              topic.score = typeof topic.progress === 'number' ? topic.progress : 0;
+            }
+            chapter.topics[topKey] = topic;
+          }
+        }
+
+        response.chapters[chKey] = chapter;
+      }
+    }
+
     return res.status(200).json({ success: true, data: response });
 
   } catch (err) {

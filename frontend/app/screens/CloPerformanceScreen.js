@@ -49,6 +49,13 @@ const ALL_CHAPTERS = [
 
 const CHART_COLORS = ['#4F46E5', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899', '#06B6D4', '#F97316', '#6366F1'];
 
+const pickMetric = (...values) => {
+    for (const value of values) {
+        if (typeof value === 'number' && Number.isFinite(value)) return value;
+    }
+    return 0;
+};
+
 const AnimatedProgressCircle = ({ progress, size = 52, theme, isHero = false }) => {
     const safeProgress = Math.max(0, Math.min(100, progress || 0));
     
@@ -94,7 +101,8 @@ const AnimatedProgressCircle = ({ progress, size = 52, theme, isHero = false }) 
 
 const TopicRow = ({ topicName, chapterId, progressData, theme }) => {
     const topicKey = topicName.split(' ')[0].replace(/\./g, '_');
-    const topicStats = progressData?.chapters?.[chapterId]?.topics?.[topicKey] || { progress: 0, mcqs_correct: 0, mcqs_seen: 0 };
+    const topicStats = progressData?.chapters?.[chapterId]?.topics?.[topicKey] || { progress: 0, score: 0, mcqs_correct: 0, mcqs_seen: 0 };
+    const topicProgress = pickMetric(topicStats.progress, topicStats.score);
 
     return (
         <View style={[styles.topicRow, { borderBottomColor: theme.inputBorder + '20' }]}>
@@ -104,14 +112,15 @@ const TopicRow = ({ topicName, chapterId, progressData, theme }) => {
                     {topicStats.mcqs_seen > 0 ? `${topicStats.mcqs_correct}/${topicStats.mcqs_seen} Correct` : 'Not Practised Yet'}
                 </Text>
             </View>
-            <AnimatedProgressCircle progress={topicStats.progress} size={42} theme={theme} />
+            <AnimatedProgressCircle progress={topicProgress} size={42} theme={theme} />
         </View>
     );
 };
 
 const ChapterCard = ({ chapter, progressData, theme }) => {
     const [expanded, setExpanded] = useState(false);
-    const chProgress = progressData?.chapters?.[chapter.id] || { progress: 0, mcqs_seen: 0, mcqs_correct: 0 };
+    const chProgress = progressData?.chapters?.[chapter.id] || { progress: 0, performance: 0, mcqs_seen: 0, mcqs_correct: 0 };
+    const chapterProgress = pickMetric(chProgress.progress, chProgress.performance);
 
     const toggleExpand = () => {
         LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
@@ -130,7 +139,7 @@ const ChapterCard = ({ chapter, progressData, theme }) => {
                         {chapter.topics.length} Outcomes • {chProgress.mcqs_seen > 0 ? `${chProgress.mcqs_correct}/${chProgress.mcqs_seen} Answered` : '0 Answered'}
                     </Text>
                 </View>
-                <AnimatedProgressCircle progress={chProgress.progress} size={52} theme={theme} />
+                <AnimatedProgressCircle progress={chapterProgress} size={52} theme={theme} />
                 <Ionicons name={expanded ? "chevron-up" : "chevron-down"} size={18} color={theme.textSecondary} style={{ marginLeft: 8 }} />
             </TouchableOpacity>
 
@@ -186,6 +195,7 @@ export default function CloPerformanceScreen({ navigation }) {
     }, [fetchProgress, authLoading, currentUserId]);
 
     const filteredChapters = ALL_CHAPTERS.filter(ch => ch.name.toLowerCase().includes(searchQuery.toLowerCase()));
+    const overallProgress = pickMetric(progressData?.overall_progress, progressData?.overall_performance);
 
     return (
         <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
@@ -209,12 +219,12 @@ export default function CloPerformanceScreen({ navigation }) {
                             <LinearGradient colors={[theme.primary, theme.primary + 'CC']} style={styles.heroCard} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
                                 <View style={{ flex: 1 }}>
                                     <Text style={styles.heroLabel}>TOTAL MASTERY</Text>
-                                    <Text style={styles.heroValue}>{Math.round(progressData?.overall_progress || 0)}%</Text>
+                                    <Text style={styles.heroValue}>{Math.round(overallProgress)}%</Text>
                                     <Text style={styles.debugStats}>
                                         {progressData?.total_mcqs_seen || 0} Questions Attempted
                                     </Text>
                                 </View>
-                                <AnimatedProgressCircle progress={progressData?.overall_progress} size={85} theme={theme} isHero={true} />
+                                <AnimatedProgressCircle progress={overallProgress} size={85} theme={theme} isHero={true} />
                             </LinearGradient>
 
 

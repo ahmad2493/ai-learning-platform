@@ -12,6 +12,13 @@ import Sidebar from './SidebarComponent';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
+const pickMetric = (...values) => {
+  for (const value of values) {
+    if (typeof value === 'number' && Number.isFinite(value)) return value;
+  }
+  return 0;
+};
+
 /**
  * AccuracySpeedometer - Custom semi-circular gauge for Accuracy Score
  */
@@ -161,10 +168,11 @@ export default function StudentDashboardScreen({ navigation }) {
   const testsAttempted = data?.total_tests_attempted || 0;
   const testsExpired = data?.total_tests_expired || 0;
   const testsPending = Math.max(0, testsGenerated - testsAttempted - testsExpired);
+  const overallProgress = pickMetric(data?.overall_progress, data?.overall_performance);
 
   const progressCircleData = [
-    { value: data?.overall_progress || 0, color: theme.primary, gradientColor: theme.primary + 'AA', showGradient: true },
-    { value: 100 - (data?.overall_progress || 0), color: theme.inputBorder + '40' }
+    { value: overallProgress, color: theme.primary, gradientColor: theme.primary + 'AA', showGradient: true },
+    { value: 100 - overallProgress, color: theme.inputBorder + '40' }
   ];
 
   return (
@@ -211,7 +219,7 @@ export default function StudentDashboardScreen({ navigation }) {
                 innerCircleColor={theme.surface}
                 data={progressCircleData}
                 centerLabelComponent={() => (
-                  <Text style={[styles.pulsePercentSmall, { color: theme.text }]}>{Math.round(data?.overall_progress || 0)}%</Text>
+                  <Text style={[styles.pulsePercentSmall, { color: theme.text }]}>{Math.round(overallProgress)}%</Text>
                 )}
               />
               <View style={styles.statCardText}>
