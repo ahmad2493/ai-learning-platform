@@ -67,6 +67,7 @@ class PastPaperQuestion:
     correct_option: Optional[str]  # "A" / "B" / "C" / "D" for MCQs
     answer_text: Optional[str]  # For short questions, cleaned full answer
     appearances: List[Dict[str, Any]]
+    figure_url: Optional[str] = None  # Image URL if question had a figure, else null
 
 
 # In-memory cache of the JSON chunk index (id, question_text, topics, appearances, etc.).
@@ -360,8 +361,13 @@ def normalize_mcqs_batch_with_llm(
 
 def cleanup_questions_with_llm(questions: List[PastPaperQuestion]) -> List[PastPaperQuestion]:
     """
-    Single LLM call after retrieval to fix incomplete statements, garbled options,
-    and wrong text. Does NOT filter out questions — every input question is returned.
+    Single LLM call that:
+    1. Splits multi-question chunks into individual questions.
+    2. Separates question text from embedded answer text.
+    3. Fixes garbled/incomplete wording — does NOT invent missing content.
+
+    Returns potentially MORE questions than input (1:N for bundled chunks).
+    Appearances are inherited from the parent chunk for all splits.
     Falls back to returning questions as-is if OPENAI_API_KEY is not set or call fails.
     """
     if not questions:
@@ -371,18 +377,32 @@ def cleanup_questions_with_llm(questions: List[PastPaperQuestion]) -> List[PastP
         return questions
 
     system_prompt = (
-        "You are a 9th grade Physics teacher cleaning up past paper questions from Pakistan boards. "
-        "You will receive a JSON object with an 'items' array. For each item:\n"
-        "- Fix incomplete question statements, garbled wording, or grammar errors.\n"
-        "- Fix incomplete or garbled MCQ options.\n"
-        "- Fix incomplete answer text for short/long questions.\n"
-        "- If the text is already correct, return it EXACTLY as-is.\n"
-        "- Do NOT remove, reorder, or invent questions or options.\n\n"
+        "You are processing 9th class Physics past paper questions from Pakistan boards.\n"
+        "Some chunks may contain MULTIPLE questions bundled together in one block of text.\n\n"
+        "For each item in the input:\n"
+        "1. Detect if it contains multiple questions "
+        "(look for numbered lists like '1.', '2.', 'Q.1', or multiple 'Ans.' / 'Sol.' markers).\n"
+        "2. Split into individual questions if needed.\n"
+        "3. For each extracted question:\n"
+        "   - Put ONLY the question stem in 'question_text' — remove any embedded answer and image markdown.\n"
+        "   - Put ONLY the answer in 'answer_text' — null for MCQs.\n"
+        "   - Put option strings in 'options' for MCQs, empty array otherwise.\n"
+        "   - Fix garbled or incomplete wording. Do NOT invent content that is missing.\n"
+        "   - If this question has an associated figure/image URL (e.g. ![...](url) or a cdn.mathpix.com URL), "
+        "extract that URL into 'figure_url'. If multiple images exist for one question, use the first. "
+        "If no image, set 'figure_url' to null.\n"
+        "   - Set 'section': 'mcq' if it has options, 'short' for brief answers, "
+        "'long' for derivations/lengthy answers.\n\n"
         "Return JSON with a single field 'items'. Each element must have:\n"
-        "  'id'           : the original id (string)\n"
-        "  'question_text': fixed question stem\n"
-        "  'options'      : fixed options array (empty array for non-MCQs)\n"
-        "  'answer_text'  : fixed answer text, null for MCQs\n"
+        "  'source_id' : the original item id (string)\n"
+        "  'questions' : array of one or more objects, each with:\n"
+        "    'question_text' : question stem only, no image markdown\n"
+        "    'options'       : list of option strings (empty list for non-MCQ)\n"
+        "    'answer_text'   : answer only, or null for MCQ\n"
+        "    'figure_url'    : image URL string if question had a figure, else null\n"
+        "    'section'       : 'mcq' | 'short' | 'long'\n"
+        "If a chunk contains only one question, 'questions' must still be an array of length 1.\n"
+        "Do NOT filter out any question. Every input item must appear in the output."
     )
 
     payload_items = [
@@ -406,30 +426,35 @@ def cleanup_questions_with_llm(questions: List[PastPaperQuestion]) -> List[PastP
     try:
         parsed = json.loads(raw)
         out_items = parsed.get("items", [])
-        id_to_result: Dict[str, Any] = {
-            str(item.get("id")): item
+        id_to_splits: Dict[str, List[Dict[str, Any]]] = {
+            str(item.get("source_id")): item.get("questions", [])
             for item in out_items
-            if isinstance(item, dict)
+            if isinstance(item, dict) and isinstance(item.get("questions"), list)
         }
 
-        cleaned: List[PastPaperQuestion] = []
+        result: List[PastPaperQuestion] = []
         for q in questions:
-            result = id_to_result.get(str(q.id))
-            if result:
-                q = PastPaperQuestion(
-                    id=q.id,
+            splits = id_to_splits.get(str(q.id))
+            if not splits:
+                result.append(q)
+                continue
+            for i, sub in enumerate(splits):
+                if not isinstance(sub, dict):
+                    continue
+                result.append(PastPaperQuestion(
+                    id=f"{q.id}_{i}" if len(splits) > 1 else q.id,
                     chapter_no=q.chapter_no,
                     chapter_name=q.chapter_name,
-                    section=q.section,
+                    section=sub.get("section") or q.section,
                     topics=q.topics,
-                    question_text=result.get("question_text") or q.question_text,
-                    options=result.get("options") or q.options,
+                    question_text=sub.get("question_text") or q.question_text,
+                    options=sub.get("options") or [],
                     correct_option=q.correct_option,
-                    answer_text=result.get("answer_text") or q.answer_text,
+                    answer_text=sub.get("answer_text"),
                     appearances=q.appearances,
-                )
-            cleaned.append(q)
-        return cleaned
+                    figure_url=sub.get("figure_url"),
+                ))
+        return result
     except Exception:
         return questions
 

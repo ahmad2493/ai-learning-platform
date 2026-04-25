@@ -136,8 +136,7 @@ async def ask_pastpaper_question(req: QuestionRequest):
 async def query_past_papers(req: PastPaperQueryRequest):
     """
     Retrieve 9th grade Physics past paper questions by chapter/topic/board/year.
-    Returns question text, options, answer, boards and years directly from the
-    JSON index — no LLM call needed for structured queries.
+    Applies LLM cleanup to split bundled chunks and separate question from answer text.
     """
     try:
         # Parse board/year hints from natural_query if not explicitly provided.
@@ -173,6 +172,8 @@ async def query_past_papers(req: PastPaperQueryRequest):
             base_dir="/mnt/chroma",
         )
 
+        questions = cleanup_questions_with_llm(questions)
+
         result = []
         for q in questions:
             appearances = sorted({f'{a["board"]} {a["year"]}' for a in q.appearances}) if q.appearances else []
@@ -180,6 +181,7 @@ async def query_past_papers(req: PastPaperQueryRequest):
                 "question": q.question_text,
                 "options": q.options or [],
                 "answer": q.answer_text,
+                "figure_url": q.figure_url,
                 "boards_years": appearances,
             }
             result.append(entry)
