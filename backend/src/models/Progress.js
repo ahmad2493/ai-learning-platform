@@ -38,6 +38,7 @@ const ProgressSchema = new mongoose.Schema({
   // overall_preparation = weighted avg of chapter preparation scores
   // "how ready is the student for the full exam?"
   // chapters with poor coverage pull this down
+  overall_progress:    { type: Number, default: 0 },
   streak:              { type: Number, default: 0 },
   chapters:            { type: Map, of: ChapterProgressSchema, default: {} },
   last_updated:        { type: Date, default: Date.now },
