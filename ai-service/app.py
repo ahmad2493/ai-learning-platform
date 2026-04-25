@@ -58,7 +58,9 @@ class PastPaperQueryRequest(BaseModel):
     before_year: Optional[int] = None
     year_range: Optional[List[int]] = None  # [start_year, end_year]
     natural_query: Optional[str] = None
-    n_questions: int = 10
+    n_questions: int = 100  # total cap fetched from JSON
+    offset: int = 0         # pagination offset
+    page_size: int = 10     # questions per page
 
 # ── Startup ───────────────────────────────────────────────────────────────────
 
@@ -159,7 +161,7 @@ async def query_past_papers(req: PastPaperQueryRequest):
             if year_range is None and "year_range" in detected:
                 year_range = detected["year_range"]
 
-        questions = retrieve_past_paper_questions(
+        all_questions = retrieve_past_paper_questions(
             chapter_no=req.chapter_no,
             topic_numbers=req.topic_numbers,
             boards=boards,
@@ -172,13 +174,16 @@ async def query_past_papers(req: PastPaperQueryRequest):
             base_dir="/mnt/chroma",
         )
 
-        questions = cleanup_questions_with_llm(questions)
+        total = len(all_questions)
+        page = all_questions[req.offset : req.offset + req.page_size]
+        page = cleanup_questions_with_llm(page)
 
         result = []
-        for q in questions:
+        for q in page:
             appearances = sorted({f'{a["board"]} {a["year"]}' for a in q.appearances}) if q.appearances else []
             entry = {
                 "question": q.question_text,
+                "section": q.section,
                 "options": q.options or [],
                 "answer": q.answer_text,
                 "boards_years": appearances,
@@ -187,7 +192,9 @@ async def query_past_papers(req: PastPaperQueryRequest):
 
         return {
             "chapter_no": req.chapter_no,
-            "total": len(result),
+            "total": total,
+            "offset": req.offset,
+            "page_size": req.page_size,
             "questions": result,
         }
     except Exception as e:

@@ -376,28 +376,15 @@ def cleanup_questions_with_llm(questions: List[PastPaperQuestion]) -> List[PastP
         return questions
 
     system_prompt = (
-        "You are processing 9th class Physics past paper questions from Pakistan boards.\n"
-        "Some chunks may contain MULTIPLE questions bundled together in one block of text.\n\n"
-        "For each item in the input:\n"
-        "1. Detect if it contains multiple questions "
-        "(look for numbered lists like '1.', '2.', 'Q.1', or multiple 'Ans.' / 'Sol.' markers).\n"
-        "2. Split into individual questions if needed.\n"
-        "3. For each extracted question:\n"
-        "   - Put ONLY the question stem in 'question_text' — remove any embedded answer and image markdown.\n"
-        "   - Put ONLY the answer in 'answer_text' — null for MCQs.\n"
-        "   - Put option strings in 'options' for MCQs, empty array otherwise.\n"
-        "   - Fix garbled or incomplete wording. Do NOT invent content that is missing.\n"
-        "   - Set 'section': 'mcq' if it has options, 'short' for brief answers, "
-        "'long' for derivations/lengthy answers.\n\n"
-        "Return JSON with a single field 'items'. Each element must have:\n"
-        "  'source_id' : the original item id (string)\n"
-        "  'questions' : array of one or more objects, each with:\n"
-        "    'question_text' : question stem only, no image markdown\n"
-        "    'options'       : list of option strings (empty list for non-MCQ)\n"
-        "    'answer_text'   : answer only, or null for MCQ\n"
-        "    'section'       : 'mcq' | 'short' | 'long'\n"
-        "If a chunk contains only one question, 'questions' must still be an array of length 1.\n"
-        "Do NOT filter out any question. Every input item must appear in the output."
+        "You are cleaning 9th class Physics past paper questions from Pakistan boards.\n"
+        "Some items may contain MULTIPLE questions bundled together.\n\n"
+        "For each item:\n"
+        "1. If bundled (multiple 'Ans.', 'Sol.', or numbered '1.' '2.' markers), split into individual questions.\n"
+        "2. For each question: put ONLY the stem in 'question_text', ONLY the answer in 'answer_text'.\n"
+        "3. Fix garbled or incomplete wording — do NOT invent missing content.\n"
+        "4. Set 'section': 'mcq' if has options, 'short' for brief answers, 'long' for derivations.\n\n"
+        "Return JSON {\"items\": [{\"source_id\": \"...\", \"questions\": [{\"question_text\", \"options\", \"answer_text\", \"section\"}]}]}.\n"
+        "options=[] for non-MCQ, answer_text=null for MCQ, 'questions' always an array, every input item must appear."
     )
 
     _img_re = re.compile(r'!\[.*?\]\(https?://\S+\)|https?://cdn\.mathpix\.com/\S+', re.IGNORECASE)

@@ -154,8 +154,13 @@ export default function PastPapersScreen({ navigation }) {
 
   // API states
   const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [results, setResults] = useState(null);
+  const [total, setTotal] = useState(0);
+  const [offset, setOffset] = useState(0);
   const [error, setError] = useState(null);
+
+  const PAGE_SIZE = 10;
 
   const toggleSidebar = () => setSidebarVisible(!sidebarVisible);
 
@@ -207,19 +212,6 @@ export default function PastPapersScreen({ navigation }) {
     });
   };
 
-  // Clean raw inputs (splitter for question/answer separation)
-  const getCleanedInput = (text, isQuestion = false) => {
-    if (!text) return "";
-    let clean = text;
-    if (isQuestion) {
-      clean = text.split(/Ans\.|Answer:|Sol\./i)[0].trim();
-    } else {
-      const parts = text.split(/Answer:|Ans\.|Sol\./i);
-      clean = parts.length > 1 ? parts[parts.length - 1].trim() : text.trim();
-    }
-    return clean;
-  };
-
   const chapterOptions = useMemo(() => CHAPTERS_DATA[subject] || [], [subject]);
   const topicOptions = useMemo(() => chapter ? (TOPICS_DATA[chapter] || []) : [], [chapter]);
 
@@ -229,7 +221,22 @@ export default function PastPapersScreen({ navigation }) {
     setYear(null);
     setBoard(null);
     setResults(null);
+    setTotal(0);
+    setOffset(0);
     setError(null);
+  };
+
+  const buildPayload = (currentOffset) => {
+    const payload = {
+      chapter_no: parseInt(chapter),
+      n_questions: 100,
+      offset: currentOffset,
+      page_size: PAGE_SIZE,
+    };
+    if (topic) payload.topic_numbers = [topic];
+    if (board) payload.boards = [BOARD_MAPPING[board] || board];
+    if (year) payload.years = [parseInt(year)];
+    return payload;
   };
 
   const handleSearch = async () => {
@@ -237,33 +244,22 @@ export default function PastPapersScreen({ navigation }) {
       Alert.alert("Chapter Required", "Please select a chapter to find specific past paper questions.");
       return;
     }
-
     setIsLoading(true);
     setResults(null);
+    setTotal(0);
+    setOffset(0);
     setError(null);
-
     try {
-      const aiServiceUrl = `${AI_BASE_URL}/past-papers/query`;
-
-      const payload = {
-        chapter_no: parseInt(chapter),
-        n_questions: 100
-      };
-
-      if (topic) payload.topic_numbers = [topic];
-      if (board) payload.boards = [BOARD_MAPPING[board] || board];
-      if (year) payload.years = [parseInt(year)];
-
-      const response = await fetch(aiServiceUrl, {
+      const response = await fetch(`${AI_BASE_URL}/past-papers/query`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+        body: JSON.stringify(buildPayload(0)),
       });
-
       const data = await response.json();
-
       if (response.ok && data.questions) {
         setResults(data.questions);
+        setTotal(data.total || 0);
+        setOffset(PAGE_SIZE);
       } else {
         setError(data.error || 'Failed to get a valid response from the server.');
       }
@@ -272,6 +268,27 @@ export default function PastPapersScreen({ navigation }) {
       setError('A network error occurred. Please check your connection and try again.');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleLoadMore = async () => {
+    if (isLoadingMore || offset >= total) return;
+    setIsLoadingMore(true);
+    try {
+      const response = await fetch(`${AI_BASE_URL}/past-papers/query`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(buildPayload(offset)),
+      });
+      const data = await response.json();
+      if (response.ok && data.questions) {
+        setResults(prev => [...prev, ...data.questions]);
+        setOffset(prev => prev + PAGE_SIZE);
+      }
+    } catch (e) {
+      console.error("Load more error:", e);
+    } finally {
+      setIsLoadingMore(false);
     }
   };
 
@@ -371,18 +388,14 @@ export default function PastPapersScreen({ navigation }) {
               ) : results && Array.isArray(results) && results.length > 0 ? (
                 <View>
                   {results.map((item, index) => {
-                    const rawQuestion = getCleanedInput(item.question_text || item.question || item.text || "", true);
-                    const rawAnswer = getCleanedInput(item.answer_text || item.answer || item.explanation || "", false);
+                    const rawQuestion = item.question || item.question_text || "";
+                    const rawAnswer   = item.answer   || item.answer_text   || "";
+                    const options     = item.options  || [];
+                    const sectionName = item.section  || 'Question';
+                    const boardsYears = item.boards_years || [];
 
-                    const options = (item.options || item.choices || []);
-                    const sectionName = item.section || item.type || 'Question';
-
-                    // Check if answer is meaningful before showing box
-                    const hasMeaningfulAnswer = rawAnswer &&
-                                               rawAnswer.trim() !== "" &&
-                                               rawAnswer.trim() !== "..." &&
-                                               rawAnswer.trim() !== "." &&
-                                               rawAnswer.length > 0;
+                    const hasMeaningfulAnswer = rawAnswer.trim().length > 1 &&
+                                               rawAnswer.trim() !== "...";
 
                     return (
                       <View key={index} style={{ borderBottomColor: theme.background, borderBottomWidth: index === results.length - 1 ? 0 : 2, paddingBottom: 20, marginBottom: 20 }}>
@@ -393,9 +406,9 @@ export default function PastPapersScreen({ navigation }) {
                                 {sectionName.replace('_', ' ')}
                               </Text>
                             </View>
-                            {item.appearances && item.appearances.length > 0 && (
-                              <Text style={{ fontSize: 11, color: theme.textSecondary }}>
-                                {item.appearances.map(a => `${a.board} ${a.year}`).join(', ')}
+                            {boardsYears.length > 0 && (
+                              <Text style={{ fontSize: 11, color: theme.textSecondary, flexShrink: 1 }}>
+                                {boardsYears.join(', ')}
                               </Text>
                             )}
                          </View>
@@ -404,7 +417,7 @@ export default function PastPapersScreen({ navigation }) {
                             {renderContentWithImages(`**Q${index + 1}:** ${rawQuestion}`, [styles.resultsText, {color: theme.text, fontWeight: 'bold', fontSize: 17}])}
                          </View>
 
-                         {options && options.length > 0 && (
+                         {options.length > 0 && (
                            <View style={{ marginTop: 10, marginLeft: 10 }}>
                              {options.map((opt, i) => (
                                <View key={i} style={{ marginBottom: 6 }}>
@@ -414,17 +427,39 @@ export default function PastPapersScreen({ navigation }) {
                            </View>
                          )}
 
-                         {hasMeaningfulAnswer ? (
+                         {hasMeaningfulAnswer && (
                            <View style={{ marginTop: 12, backgroundColor: theme.background, padding: 12, borderRadius: 10, borderLeftWidth: 4, borderLeftColor: theme.primary }}>
                               <Text style={[styles.resultsText, {color: theme.primary, fontWeight: 'bold', fontSize: 14, marginBottom: 6}]}>EXPLANATION / ANSWER:</Text>
                               <View>
                                 {renderContentWithImages(rawAnswer, [styles.resultsText, {color: theme.text, lineHeight: 22}])}
                               </View>
                            </View>
-                         ) : null}
+                         )}
                       </View>
                     );
                   })}
+
+                  {offset < total && (
+                    <TouchableOpacity
+                      onPress={handleLoadMore}
+                      disabled={isLoadingMore}
+                      style={{ alignItems: 'center', paddingVertical: 16, marginTop: 8, borderRadius: 12, backgroundColor: theme.primary + '15', borderWidth: 1, borderColor: theme.primary + '40' }}
+                    >
+                      {isLoadingMore ? (
+                        <ActivityIndicator size="small" color={theme.primary} />
+                      ) : (
+                        <Text style={{ color: theme.primary, fontWeight: '600', fontSize: 15 }}>
+                          Load More ({total - offset} remaining)
+                        </Text>
+                      )}
+                    </TouchableOpacity>
+                  )}
+
+                  {offset >= total && total > 0 && (
+                    <View style={{ alignItems: 'center', paddingVertical: 16 }}>
+                      <Text style={{ color: theme.textSecondary, fontSize: 13 }}>All {total} questions loaded</Text>
+                    </View>
+                  )}
                 </View>
               ) : results && Array.isArray(results) && results.length === 0 ? (
                 <View style={styles.centered}>
