@@ -160,7 +160,7 @@ export default function PastPapersScreen({ navigation }) {
   const [offset, setOffset] = useState(0);
   const [error, setError] = useState(null);
 
-  const PAGE_SIZE = 10;
+  const PAGE_SIZE = 5;
 
   const toggleSidebar = () => setSidebarVisible(!sidebarVisible);
 
