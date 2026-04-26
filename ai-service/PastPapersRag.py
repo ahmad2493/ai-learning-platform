@@ -639,7 +639,7 @@ def retrieve_past_paper_questions(
         filtered_chunks = filtered_chunks[:n_questions]
 
         for c in filtered_chunks:
-            if c.get("section", "") not in ("mcq", "exercise_mcq"):
+            if c.get("section", "") not in ("mcq", "exercise_mcq") and not c.get("answer_text"):
                 c["answer_text"] = c.get("question_text", "")
 
         results_from_json: List[PastPaperQuestion] = []

@@ -176,7 +176,6 @@ async def query_past_papers(req: PastPaperQueryRequest):
 
         total = len(all_questions)
         page = all_questions[req.offset : req.offset + req.page_size]
-        page = cleanup_questions_with_llm(page)
 
         result = []
         for q in page:
