@@ -1,12 +1,11 @@
 /**
  * Test Result Screen
- * Displays the final score and detailed feedback for MCQs, Short, and Long questions.
- * Updated: Integrated MathView for professional LaTeX rendering in review.
- * Fixed: Replaced illegal <div> with <View> to resolve Invariant Violation.
+ * Optimized: Uses SmartMathText with better LaTeX detection to avoid unnecessary WebViews.
+ * Fixed: Replaced 'div' with 'View' and fixed layout height issues.
  * Author: Momna Butt (BCSF22M021)
  */
 
-import React from 'react';
+import React, { memo } from 'react';
 import {
   View,
   Text,
@@ -19,16 +18,109 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../utils/ThemeContext';
 import MathView from '../components/MathView';
 
+// --- Optimized Components ---
+
+const SmartMathText = memo(({ content, color, fontSize, style }) => {
+  if (!content) return null;
+  
+  // Only use MathView if it contains actual LaTeX delimiters
+  const hasLatex = /[\$]|\\\(|\\\[|\\begin\{/.test(content);
+  
+  if (!hasLatex) {
+    // Handle Markdown bold **text** by splitting and styling
+    const parts = content.split(/(\*\*.*?\*\*)/g);
+    return (
+      <Text style={[{ color, fontSize }, style]}>
+        {parts.map((part, i) => {
+          if (part.startsWith('**') && part.endsWith('**')) {
+            return (
+              <Text key={i} style={{ fontWeight: 'bold' }}>
+                {part.replace(/\*\*/g, '')}
+              </Text>
+            );
+          }
+          return part;
+        })}
+      </Text>
+    );
+  }
+  
+  return <MathView content={content} color={color} fontSize={fontSize} />;
+});
+
+const ResultMCQCard = memo(({ q, index, userAnswer, theme }) => {
+  const isCorrect = userAnswer?.toString().toLowerCase() === q.correct_option?.toString().toLowerCase();
+
+  return (
+    <View style={[styles.card, { backgroundColor: theme.surface }]}>
+      <View style={styles.qHeader}>
+        <Text style={[styles.qNumber, { color: theme.primary }]}>Question {index + 1}</Text>
+        <Ionicons 
+          name={isCorrect ? "checkmark-circle" : "close-circle"} 
+          size={24} 
+          color={isCorrect ? "#4CAF50" : theme.error} 
+        />
+      </View>
+      
+      <SmartMathText 
+        content={q.question} 
+        color={theme.text} 
+        fontSize={16} 
+      />
+      
+      <View style={styles.optionsContainer}>
+        {Object.entries(q.options).map(([key, val]) => {
+          const isCorrectOption = key.toLowerCase() === q.correct_option?.toLowerCase();
+          const isUserSelection = key.toLowerCase() === userAnswer?.toLowerCase();
+
+          let optionStyle = { borderColor: theme.inputBorder };
+          let textColor = theme.text;
+
+          if (isCorrectOption) {
+            optionStyle = { borderColor: "#4CAF50", backgroundColor: "#4CAF5015" };
+            textColor = "#2E7D32";
+          } else if (isUserSelection && !isCorrect) {
+            optionStyle = { borderColor: theme.error, backgroundColor: theme.error + '15' };
+            textColor = theme.error;
+          }
+
+          return (
+            <View key={key} style={[styles.option, optionStyle]}>
+              <View style={{ flex: 1 }}>
+                <SmartMathText 
+                  content={`**${key.toUpperCase()}.** ${val}`} 
+                  color={textColor} 
+                  fontSize={15} 
+                />
+              </View>
+              {isCorrectOption && <Ionicons name="checkmark" size={16} color="#4CAF50" style={{ marginLeft: 5 }} />}
+              {isUserSelection && !isCorrect && <Ionicons name="close" size={16} color={theme.error} style={{ marginLeft: 5 }} />}
+            </View>
+          );
+        })}
+      </View>
+
+      {!isCorrect && (
+        <View style={[styles.explanation, { backgroundColor: theme.primary + '10' }]}>
+          <SmartMathText 
+            content={`**Correct Answer:** ${q.correct_option?.toUpperCase()}`} 
+            color={theme.primary} 
+            fontSize={14} 
+          />
+        </View>
+      )}
+    </View>
+  );
+});
+
 export default function TestResultScreen({ navigation, route }) {
   const { theme } = useTheme();
   const { test, userAnswers, score } = route.params;
 
-  // Helper to render short questions regardless of structure (array or object)
   const renderShortQuestionsReview = () => {
     const sq = test.short_questions;
     if (!sq) return null;
 
-    // CASE 1: Flat Array (Custom Mode)
     if (Array.isArray(sq)) {
       if (sq.length === 0) return null;
       return (
@@ -36,7 +128,7 @@ export default function TestResultScreen({ navigation, route }) {
           <Text style={[styles.sectionHeading, { color: theme.primary }]}>Section B: Short Questions</Text>
           {sq.map((q, index) => (
             <View key={`sq-${index}`} style={[styles.card, { backgroundColor: theme.surface }]}>
-              <MathView 
+              <SmartMathText 
                 content={`**Q${index + 1}.** ${q.question}`} 
                 color={theme.text} 
                 fontSize={16} 
@@ -50,7 +142,6 @@ export default function TestResultScreen({ navigation, route }) {
       );
     }
 
-    // CASE 2: Object with Q2, Q3, Q4 keys (Board Mode)
     const keys = Object.keys(sq).filter(k => Array.isArray(sq[k]) && sq[k].length > 0).sort();
     if (keys.length === 0) return null;
 
@@ -64,7 +155,7 @@ export default function TestResultScreen({ navigation, route }) {
             </Text>
             {sq[groupKey].map((q, index) => (
               <View key={`${groupKey}-${index}`} style={[styles.card, { backgroundColor: theme.surface }]}>
-                <MathView 
+                <SmartMathText 
                   content={`**(${index + 1})** ${q.question}`} 
                   color={theme.text} 
                   fontSize={16} 
@@ -82,12 +173,11 @@ export default function TestResultScreen({ navigation, route }) {
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
-      <View style={[styles.header, { borderBottomColor: theme.inputBorder }]}>
+      <View style={[styles.header, { borderBottomColor: theme.inputBorder, alignItems: 'center' }]}>
         <Text style={[styles.headerTitle, { color: theme.text }]}>Test Result</Text>
       </View>
 
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        {/* Score Card */}
+      <ScrollView contentContainerStyle={styles.scrollContent} removeClippedSubviews={true}>
         <View style={[styles.scoreCard, { backgroundColor: theme.primary, elevation: 5 }]}>
           <Ionicons name="trophy-outline" size={60} color="white" />
           <Text style={styles.scoreTitle}>Test Summary</Text>
@@ -105,85 +195,25 @@ export default function TestResultScreen({ navigation, route }) {
           </View>
         </View>
 
-        {/* Detailed Feedback Header */}
         <Text style={[styles.sectionTitle, { color: theme.text, fontSize: 22, textAlign: 'center', marginVertical: 10 }]}>Detailed Review</Text>
         
-        {/* Section A: MCQs */}
         {test.mcqs.length > 0 && (
           <View style={styles.resultSection}>
             <Text style={[styles.sectionHeading, { color: theme.primary }]}>Section A: MCQs</Text>
-            {test.mcqs.map((q, index) => {
-              const userAnswer = userAnswers[q.question_number];
-              const isCorrect = userAnswer?.toString().toLowerCase() === q.correct_option?.toString().toLowerCase();
-
-              return (
-                <View key={q.question_number} style={[styles.card, { backgroundColor: theme.surface }]}>
-                  <View style={styles.qHeader}>
-                    <Text style={[styles.qNumber, { color: theme.primary }]}>Question {index + 1}</Text>
-                    <Ionicons 
-                      name={isCorrect ? "checkmark-circle" : "close-circle"} 
-                      size={24} 
-                      color={isCorrect ? "#4CAF50" : theme.error} 
-                    />
-                  </View>
-                  
-                  <MathView 
-                    content={q.question} 
-                    color={theme.text} 
-                    fontSize={16} 
-                  />
-                  
-                  <View style={styles.optionsContainer}>
-                    {Object.entries(q.options).map(([key, val]) => {
-                      const isCorrectOption = key.toLowerCase() === q.correct_option?.toLowerCase();
-                      const isUserSelection = key.toLowerCase() === userAnswer?.toLowerCase();
-
-                      let optionStyle = { borderColor: theme.inputBorder };
-                      let textColor = theme.text;
-
-                      if (isCorrectOption) {
-                        optionStyle = { borderColor: "#4CAF50", backgroundColor: "#4CAF5015" };
-                        textColor = "#2E7D32";
-                      } else if (isUserSelection && !isCorrect) {
-                        optionStyle = { borderColor: theme.error, backgroundColor: theme.error + '15' };
-                        textColor = theme.error;
-                      }
-
-                      return (
-                        <View key={key} style={[styles.option, optionStyle]}>
-                          <View style={{ flex: 1 }}>
-                            <MathView 
-                              content={`**${key.toUpperCase()}.** ${val}`} 
-                              color={textColor} 
-                              fontSize={15} 
-                            />
-                          </View>
-                          {isCorrectOption && <Ionicons name="checkmark" size={16} color="#4CAF50" style={{ marginLeft: 5 }} />}
-                          {isUserSelection && !isCorrect && <Ionicons name="close" size={16} color={theme.error} style={{ marginLeft: 5 }} />}
-                        </View>
-                      );
-                    })}
-                  </View>
-
-                  {!isCorrect && (
-                    <View style={[styles.explanation, { backgroundColor: theme.primary + '10' }]}>
-                      <MathView 
-                        content={`**Correct Answer:** ${q.correct_option?.toUpperCase()}`} 
-                        color={theme.primary} 
-                        fontSize={14} 
-                      />
-                    </View>
-                  )}
-                </View>
-              );
-            })}
+            {test.mcqs.map((q, index) => (
+              <ResultMCQCard 
+                key={q.question_number}
+                q={q}
+                index={index}
+                userAnswer={userAnswers[q.question_number]}
+                theme={theme}
+              />
+            ))}
           </View>
         )}
 
-        {/* Section B: Short Questions */}
         {renderShortQuestionsReview()}
 
-        {/* Section C: Long Questions */}
         {test.long_questions && test.long_questions.length > 0 && (
           <View style={styles.resultSection}>
             <Text style={[styles.sectionHeading, { color: theme.primary }]}>Section C: Long Questions</Text>
@@ -192,7 +222,7 @@ export default function TestResultScreen({ navigation, route }) {
                 <Text style={[styles.qNumber, { color: theme.primary, marginBottom: 10 }]}>Question {index + 1}</Text>
                 
                 <View style={styles.longPart}>
-                  <MathView 
+                  <SmartMathText 
                     content={`**(a)** ${q.part_a.question}`} 
                     color={theme.text} 
                     fontSize={15} 
@@ -201,7 +231,7 @@ export default function TestResultScreen({ navigation, route }) {
                 </View>
 
                 <View style={[styles.longPart, { marginTop: 15 }]}>
-                  <MathView 
+                  <SmartMathText 
                     content={`**(b)** ${q.part_b.question}`} 
                     color={theme.text} 
                     fontSize={15} 
@@ -226,15 +256,10 @@ export default function TestResultScreen({ navigation, route }) {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  header: { padding: 16, borderBottomWidth: 1, alignItems: 'center' },
+  header: { padding: 16, borderBottomWidth: 1 },
   headerTitle: { fontSize: 20, fontWeight: 'bold' },
   scrollContent: { padding: 20 },
-  scoreCard: { 
-    padding: 30, 
-    borderRadius: 20, 
-    alignItems: 'center', 
-    marginBottom: 30 
-  },
+  scoreCard: { padding: 30, borderRadius: 20, alignItems: 'center', marginBottom: 30 },
   scoreTitle: { fontSize: 24, fontWeight: 'bold', color: 'white', marginVertical: 15 },
   scoreRow: { flexDirection: 'row', alignItems: 'center', marginTop: 10 },
   scoreItem: { alignItems: 'center', paddingHorizontal: 20 },
@@ -248,14 +273,7 @@ const styles = StyleSheet.create({
   qHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
   qNumber: { fontSize: 14, fontWeight: 'bold' },
   optionsContainer: { gap: 8, marginTop: 10 },
-  option: { 
-    padding: 12, 
-    borderWidth: 1, 
-    borderRadius: 8, 
-    flexDirection: 'row', 
-    justifyContent: 'space-between', 
-    alignItems: 'center' 
-  },
+  option: { padding: 12, borderWidth: 1, borderRadius: 8, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   explanation: { marginTop: 15, padding: 10, borderRadius: 8 },
   marksFooter: { borderTopWidth: 1, borderTopColor: '#EEE', marginTop: 10, paddingTop: 5 },
   marksLabel: { fontSize: 12, fontStyle: 'italic' },

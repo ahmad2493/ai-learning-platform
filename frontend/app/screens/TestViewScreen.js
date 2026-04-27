@@ -1,11 +1,11 @@
 /**
  * Test View Screen - Interactive Test Interface
- * Fixed: Submit button logic to require all MCQs to be attempted.
- * Updated: Integrated MathView for professional LaTeX rendering.
+ * Optimized: Reduced WebView lag by memoizing components and smart LaTeX rendering.
+ * Fixed: Layout height issues in options by using standard Text for non-LaTeX content.
  * Author: Momna Butt (BCSF22M021)
  */
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, memo } from 'react';
 import {
   View,
   Text,
@@ -21,6 +21,98 @@ import { AI_SUBMIT_TEST_URL } from '../utils/apiConfig';
 import { useAuth } from '../context/AuthContext';
 import CustomAlert from '../components/CustomAlert';
 import MathView from '../components/MathView';
+
+// --- Optimized Components ---
+
+const SmartMathText = memo(({ content, color, fontSize, style }) => {
+  if (!content) return null;
+  
+  // Only use MathView if it contains actual LaTeX delimiters
+  const hasLatex = /[\$]|\\\(|\\\[|\\begin\{/.test(content);
+  
+  if (!hasLatex) {
+    // Handle Markdown bold **text** by splitting and styling
+    const parts = content.split(/(\*\*.*?\*\*)/g);
+    return (
+      <Text style={[{ color, fontSize }, style]}>
+        {parts.map((part, i) => {
+          if (part.startsWith('**') && part.endsWith('**')) {
+            return (
+              <Text key={i} style={{ fontWeight: 'bold' }}>
+                {part.replace(/\*\*/g, '')}
+              </Text>
+            );
+          }
+          return part;
+        })}
+      </Text>
+    );
+  }
+  
+  return <MathView content={content} color={color} fontSize={fontSize} />;
+});
+
+const MCQOption = memo(({ optionKey, value, isSelected, isCorrect, isSubmitted, onPress, theme }) => {
+  let optionStyle = { borderColor: theme.inputBorder };
+  let textColor = theme.text;
+
+  if (isSubmitted) {
+    if (isCorrect) {
+      optionStyle = { borderColor: '#4CAF50', backgroundColor: '#4CAF5015' };
+      textColor = '#2E7D32';
+    } else if (isSelected) {
+      optionStyle = { borderColor: theme.error, backgroundColor: theme.error + '15' };
+      textColor = theme.error;
+    }
+  } else if (isSelected) {
+    optionStyle = { borderColor: theme.primary, backgroundColor: theme.primary + '10' };
+  }
+
+  return (
+    <TouchableOpacity 
+      onPress={() => onPress(optionKey)} 
+      disabled={isSubmitted} 
+      style={[styles.option, optionStyle]}
+    >
+      <View style={{ flex: 1 }}>
+        <SmartMathText 
+          content={`**${optionKey.toUpperCase()}.** ${value}`} 
+          color={textColor} 
+          fontSize={15} 
+        />
+      </View>
+      {isSubmitted && isCorrect && <Ionicons name="checkmark-circle" size={16} color="#4CAF50" style={{ marginLeft: 5 }} />}
+    </TouchableOpacity>
+  );
+});
+
+const MCQCard = memo(({ q, index, userAnswer, isSubmitted, onSelect, theme }) => {
+  return (
+    <View style={[styles.card, { backgroundColor: theme.surface }]}>
+      <SmartMathText 
+        content={`**${index + 1}.** ${q.question}`} 
+        color={theme.text} 
+        fontSize={16} 
+      />
+      <View style={{ marginTop: 15 }}>
+        {Object.entries(q.options).map(([key, val]) => (
+          <MCQOption 
+            key={key}
+            optionKey={key}
+            value={val}
+            isSelected={userAnswer === key}
+            isCorrect={q.correct_option?.toLowerCase() === key.toLowerCase()}
+            isSubmitted={isSubmitted}
+            onPress={onSelect}
+            theme={theme}
+          />
+        ))}
+      </View>
+    </View>
+  );
+});
+
+// --- Main Screen ---
 
 export default function TestViewScreen({ navigation, route }) {
   const { theme } = useTheme();
@@ -137,21 +229,23 @@ export default function TestViewScreen({ navigation, route }) {
       setTimeLeft(diff);
       if (diff === 0 && !isSubmitted && !loading && !isSubmittingRef.current) {
         clearInterval(interval);
-        handleSubmit(true); // Auto-submit on timer expiry
+        handleSubmit(true); 
       }
     }, 1000);
     return () => clearInterval(interval);
   }, [test.test_details.expires_at, isSubmitted, loading, isReadMode, handleSubmit]);
 
+  const handleSelectOption = useCallback((qNum, key) => {
+    setUserAnswers(prev => ({ ...prev, [qNum]: key }));
+  }, []);
+
   const allAttempted = hasMcqs && test.mcqs.every(q => userAnswers[q.question_number] !== undefined);
   const canSubmit = hasMcqs && !isSubmitted && !loading && allAttempted;
 
-  // Helper to render short questions regardless of structure (array or object)
   const renderShortQuestions = () => {
     const sq = test.short_questions;
     if (!sq) return null;
 
-    // CASE 1: Flat Array (Custom Mode)
     if (Array.isArray(sq)) {
       if (sq.length === 0) return null;
       return (
@@ -159,7 +253,7 @@ export default function TestViewScreen({ navigation, route }) {
           <Text style={[styles.sectionHeading, { color: theme.primary }]}>Section B: Short Questions</Text>
           {sq.map((q, index) => (
             <View key={`sq-${index}`} style={[styles.card, { backgroundColor: theme.surface }]}>
-              <MathView 
+              <SmartMathText 
                 content={`**Q${index + 1}.** ${q.question}`} 
                 color={theme.text} 
                 fontSize={16} 
@@ -171,7 +265,6 @@ export default function TestViewScreen({ navigation, route }) {
       );
     }
 
-    // CASE 2: Object with Q2, Q3, Q4 keys (Board Mode)
     const keys = Object.keys(sq).filter(k => Array.isArray(sq[k]) && sq[k].length > 0).sort();
     if (keys.length === 0) return null;
 
@@ -185,7 +278,7 @@ export default function TestViewScreen({ navigation, route }) {
             </Text>
             {sq[groupKey].map((q, index) => (
               <View key={`${groupKey}-${index}`} style={[styles.card, { backgroundColor: theme.surface }]}>
-                <MathView 
+                <SmartMathText 
                   content={`**(${index + 1})** ${q.question}`} 
                   color={theme.text} 
                   fontSize={16} 
@@ -225,7 +318,7 @@ export default function TestViewScreen({ navigation, route }) {
         </View>
       </View>
 
-      <ScrollView contentContainerStyle={styles.scrollContent}>
+      <ScrollView contentContainerStyle={styles.scrollContent} removeClippedSubviews={true}>
         <Text style={[styles.testTitle, { color: theme.text }]}>Physics - {test.test_details.mode?.toUpperCase()} TEST</Text>
 
         {isSubmitted && finalScore && (
@@ -249,45 +342,15 @@ export default function TestViewScreen({ navigation, route }) {
           <View style={styles.section}>
             <Text style={[styles.sectionHeading, { color: theme.primary }]}>Section A: MCQs</Text>
             {test.mcqs.map((q, index) => (
-              <View key={q.question_number} style={[styles.card, { backgroundColor: theme.surface }]}>
-                <MathView 
-                  content={`**${index + 1}.** ${q.question}`} 
-                  color={theme.text} 
-                  fontSize={16} 
-                />
-                <View style={{ marginTop: 15 }}>
-                  {Object.entries(q.options).map(([key, val]) => {
-                    const isSelected = userAnswers[q.question_number] === key;
-                    const isCorrect = q.correct_option?.toLowerCase() === key.toLowerCase();
-                    
-                    let optionStyle = { borderColor: theme.inputBorder };
-                    if (isSubmitted) {
-                      if (isCorrect) optionStyle = { borderColor: '#4CAF50', backgroundColor: '#4CAF5015' };
-                      else if (isSelected) optionStyle = { borderColor: theme.error, backgroundColor: theme.error + '15' };
-                    } else if (isSelected) {
-                      optionStyle = { borderColor: theme.primary, backgroundColor: theme.primary + '10' };
-                    }
-
-                    return (
-                      <TouchableOpacity 
-                        key={key} 
-                        onPress={() => !isSubmitted && setUserAnswers({...userAnswers, [q.question_number]: key})} 
-                        disabled={isSubmitted} 
-                        style={[styles.option, optionStyle]}
-                      >
-                          <View style={{ flex: 1 }}>
-                            <MathView 
-                              content={`**${key.toUpperCase()}.** ${val}`} 
-                              color={theme.text} 
-                              fontSize={15} 
-                            />
-                          </View>
-                          {isSubmitted && isCorrect && <Ionicons name="checkmark-circle" size={16} color="#4CAF50" style={{ marginLeft: 5 }} />}
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-              </View>
+              <MCQCard 
+                key={q.question_number}
+                q={q}
+                index={index}
+                userAnswer={userAnswers[q.question_number]}
+                isSubmitted={isSubmitted}
+                onSelect={(key) => handleSelectOption(q.question_number, key)}
+                theme={theme}
+              />
             ))}
           </View>
         )}
@@ -305,7 +368,7 @@ export default function TestViewScreen({ navigation, route }) {
                   Q{test.test_details.mode === 'board' ? index + 5 : index + 1}.
                 </Text>
                 <View style={styles.longPart}>
-                  <MathView 
+                  <SmartMathText 
                     content={`**(a)** ${q.part_a.question}`} 
                     color={theme.text} 
                     fontSize={15} 
@@ -313,7 +376,7 @@ export default function TestViewScreen({ navigation, route }) {
                   <Text style={[styles.marksLabel, { color: theme.textSecondary, marginTop: 5 }]}>[Marks: {q.part_a.marks}]</Text>
                 </View>
                 <View style={[styles.longPart, { marginTop: 15 }]}>
-                  <MathView 
+                  <SmartMathText 
                     content={`**(b)** ${q.part_b.question}`} 
                     color={theme.text} 
                     fontSize={15} 

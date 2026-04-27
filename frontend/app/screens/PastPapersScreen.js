@@ -1,14 +1,10 @@
 /**
  * Past Papers Screen - Past Papers Access
+ * Optimized: Uses SmartMathText to fix vertical gap and lag issues.
  * Author: Momna Butt (BCSF22M021)
- *
- * Functionality:
- * - Allows filtering past papers by subject, chapter, topic, year, and board
- * - Constructs a query and sends it to the past paper RAG service
- * - Displays AI-generated results, loading states, and errors
  */
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, memo } from 'react';
 import {
   View,
   Text,
@@ -26,6 +22,36 @@ import Sidebar from './SidebarComponent';
 import Dropdown from '../components/Dropdown';
 import MathView from '../components/MathView';
 import { AI_BASE_URL } from '../utils/apiConfig';
+
+// --- Optimized Components ---
+
+const SmartMathText = memo(({ content, color, fontSize, style }) => {
+  if (!content) return null;
+  
+  // Only use MathView if it contains actual LaTeX delimiters
+  const hasLatex = /[\$]|\\\(|\\\[|\\begin\{/.test(content);
+  
+  if (!hasLatex) {
+    // Handle Markdown bold **text** natively
+    const parts = content.split(/(\*\*.*?\*\*)/g);
+    return (
+      <Text style={[{ color, fontSize }, style]}>
+        {parts.map((part, i) => {
+          if (part.startsWith('**') && part.endsWith('**')) {
+            return (
+              <Text key={i} style={{ fontWeight: 'bold' }}>
+                {part.replace(/\*\*/g, '')}
+              </Text>
+            );
+          }
+          return part;
+        })}
+      </Text>
+    );
+  }
+  
+  return <MathView content={content} color={color} fontSize={fontSize} />;
+});
 
 // --- Data for Dropdowns ---
 const CHAPTERS_DATA = {
@@ -167,25 +193,19 @@ export default function PastPapersScreen({ navigation }) {
   // --- Helper Functions ---
 
   /**
-   * Renders content that may contain images (markdown format) or math expressions.
-   * Uses MathView (KaTeX) for text and equations, and Expo Image for images.
+   * Optimized content renderer using SmartMathText to avoid WebView lag/gaps.
    */
   const renderContentWithImages = (text, textStyle) => {
     if (!text) return null;
 
-    // Flatten style to get color and fontSize
     const flattenedStyle = Array.isArray(textStyle) ? Object.assign({}, ...textStyle) : textStyle;
     const color = flattenedStyle?.color || theme.text;
     const fontSize = flattenedStyle?.fontSize || 16;
 
-    // Pre-process: convert markdown bold to HTML bold for the MathView WebView
-    let processedText = text.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>');
-
     // Split logic for: Images markdown ![]()
-    const parts = processedText.split(/(!\[\]\(.*?\))/g);
+    const parts = text.split(/(!\[\]\(.*?\))/g);
 
     return parts.map((part, i) => {
-      // 1. Handle Images
       const imageMatch = part.match(/!\[\]\((.*?)\)/);
       if (imageMatch) {
         return (
@@ -198,15 +218,15 @@ export default function PastPapersScreen({ navigation }) {
         );
       }
 
-      // 2. Handle Text and Math (using MathView)
       if (!part.trim()) return null;
 
       return (
-        <MathView
+        <SmartMathText
           key={i}
           content={part}
           color={color}
           fontSize={fontSize}
+          style={flattenedStyle}
         />
       );
     });
@@ -307,7 +327,7 @@ export default function PastPapersScreen({ navigation }) {
             </TouchableOpacity>
         </View>
 
-        <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
+        <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled" removeClippedSubviews={true}>
             <Text style={[styles.mainTitle, { color: theme.text }]}>Past Papers</Text>
             <Text style={[styles.subtitle, { color: theme.textSecondary }]}>Access past examination papers for practice</Text>
 
